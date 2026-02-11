@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { AvailabilityToggle } from "@/components/inventory/availability-toggle"
 
-export default async function ProductDetailsPage({ params }: { params: { id: string } }) {
-    const result = await getProductById(params.id)
+export default async function ProductDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
+    const result = await getProductById(id)
 
     if (!result.success || !result.data) {
         notFound()

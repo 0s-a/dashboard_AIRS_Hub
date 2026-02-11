@@ -66,7 +66,17 @@ export async function getProductById(id: string) {
             return { success: false, error: 'Product not found', data: null }
         }
 
-        return { success: true, data: product }
+        // Convert Decimal to string for serialization
+        const serializedProduct = {
+            ...product,
+            price: product.price.toString(),
+            variants: product.variants.map(v => ({
+                ...v,
+                price: v.price?.toString() || null
+            }))
+        }
+
+        return { success: true, data: serializedProduct }
     } catch (error) {
         console.error('Failed to fetch product:', error)
         return { success: false, error: 'Failed to fetch product', data: null }

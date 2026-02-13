@@ -4,17 +4,7 @@ import { ProductSheet } from "@/components/inventory/product-sheet"
 
 export default async function InventoryPage() {
     const result = await getProducts()
-    const rawProducts = result.data || []
-
-    // Serialize Decimal types to numbers for Client Components
-    const products = rawProducts.map(product => ({
-        ...product,
-        price: Number(product.price),
-        variants: (product as any).variants?.map((v: any) => ({
-            ...v,
-            price: v.price ? Number(v.price) : null
-        })) || []
-    }))
+    const products = result.data || []
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">

@@ -48,6 +48,7 @@ interface DataTableProps<TData, TValue> {
     showSearch?: boolean
     groupingOptions?: GroupingOption[]
     renderSubComponent?: (props: { row: any }) => React.ReactElement
+    globalFilterFn?: (row: any, columnId: string, filterValue: string) => boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -57,6 +58,7 @@ export function DataTable<TData, TValue>({
     showSearch = true,
     groupingOptions = [],
     renderSubComponent,
+    globalFilterFn,
 }: DataTableProps<TData, TValue>) {
     const [globalFilter, setGlobalFilter] = React.useState("")
     const [sorting, setSorting] = React.useState<SortingState>([])
@@ -96,6 +98,7 @@ export function DataTable<TData, TValue>({
         getGroupedRowModel: getGroupedRowModel(),
         getExpandedRowModel: getExpandedRowModel(),
         getRowCanExpand: () => true,
+        globalFilterFn: globalFilterFn,
     })
 
     return (

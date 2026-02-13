@@ -1,7 +1,7 @@
 "use client"
 
 import { DataTable } from "@/components/ui/data-table"
-import { columns } from "./columns"
+import { columns, customGlobalFilterFn } from "./columns"
 import { VariantsList } from "@/components/inventory/variants-list"
 
 interface InventoryTableProps {
@@ -26,6 +26,7 @@ export function InventoryTable({ products }: InventoryTableProps) {
                     basePrice={Number(row.original.price)}
                 />
             )}
+            globalFilterFn={customGlobalFilterFn}
         />
     )
 }

@@ -15,12 +15,18 @@ import {
     Box,
     ArrowRight,
     Share2,
-    Loader2
+    Loader2,
+    Palette,
+    FileText,
+    Plus
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { AvailabilityToggle } from "@/components/inventory/availability-toggle"
 import { ProductSheet } from "@/components/inventory/product-sheet"
+import { QuickAddAlternativeName } from "@/components/inventory/quick-add-alternative-name"
+import { QuickAddColor } from "@/components/inventory/quick-add-color"
+import { QuickAddVariant } from "@/components/inventory/quick-add-variant"
 import { deleteProduct } from "@/lib/actions/inventory"
 import { toast } from "sonner"
 import {
@@ -52,6 +58,12 @@ type ProductData = {
     price: string
     isAvailable: boolean
     imagePath: string | null
+    colors: Array<{
+        name: string
+        code: string
+        imagePath: string | null
+    }> | null
+    alternativeNames: string[] | null
     createdAt: Date
     updatedAt: Date
     categoryId: string | null
@@ -174,11 +186,11 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                         className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
                                     />
                                 ) : (
-                                    <div className="flex items-center justify-center h-full bg-gradient-to-br from-muted/50 to-muted/20">
+                                    <div className="flex items-center justify-center h-full bg-linear-to-br from-muted/50 to-muted/20">
                                         <Package className="h-24 w-24 text-muted-foreground/30" />
                                     </div>
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                             </div>
                         </DialogTrigger>
                         <DialogContent className="max-w-5xl border-none bg-black/95 p-0">
@@ -207,7 +219,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         {/* Title & Badge */}
                         <div className="space-y-3">
                             <div className="flex items-start justify-between gap-4">
-                                <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-l from-foreground to-foreground/80 bg-clip-text">
+                                <h1 className="text-3xl font-bold tracking-tight bg-linear-to-l from-foreground to-foreground/80 bg-clip-text">
                                     {product.name}
                                 </h1>
                                 <AvailabilityToggle
@@ -221,7 +233,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                     {product.itemNumber}
                                 </Badge>
                                 {product.category && (
-                                    <Badge className="gap-1.5 bg-gradient-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all">
+                                    <Badge className="gap-1.5 bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all">
                                         <Layers className="h-3 w-3" />
                                         {product.category.name}
                                     </Badge>
@@ -247,11 +259,178 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             </div>
                         )}
 
+                        {/* Alternative Names Display */}
+                        {product.alternativeNames && product.alternativeNames.length > 0 && (
+                            <div className="space-y-3 pt-4 border-t border-border/50">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-amber-600" />
+                                        <h3 className="text-sm font-semibold text-muted-foreground">الأسماء البديلة</h3>
+                                    </div>
+                                    <QuickAddAlternativeName
+                                        productId={product.id}
+                                        productName={product.name}
+                                        currentAlternativeNames={product.alternativeNames}
+                                        trigger={
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 px-3 text-xs bg-linear-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-300 text-amber-700 hover:text-amber-800 transition-all"
+                                            >
+                                                <Plus className="h-3.5 w-3.5 ml-1" />
+                                                إضافة
+                                            </Button>
+                                        }
+                                    />
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {product.alternativeNames.map((altName, idx) => (
+                                        <Badge
+                                            key={idx}
+                                            variant="outline"
+                                            className="px-3 py-1.5 text-sm bg-linear-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200 hover:from-amber-100 hover:to-orange-100 hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all duration-300 cursor-default hover:-translate-y-0.5"
+                                        >
+                                            {altName}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {/* Alternative Names - Empty State with Quick Add */}
+                        {(!product.alternativeNames || product.alternativeNames.length === 0) && (
+                            <div className="space-y-3 pt-4 border-t border-border/50">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-amber-600" />
+                                        <h3 className="text-sm font-semibold text-muted-foreground">الأسماء البديلة</h3>
+                                    </div>
+                                    <QuickAddAlternativeName
+                                        productId={product.id}
+                                        productName={product.name}
+                                        currentAlternativeNames={null}
+                                        trigger={
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 px-3 text-xs bg-linear-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-300 text-amber-700 hover:text-amber-800 transition-all"
+                                            >
+                                                <Plus className="h-3.5 w-3.5 ml-1" />
+                                                إضافة اسم بديل
+                                            </Button>
+                                        }
+                                    />
+                                </div>
+                                <p className="text-sm text-muted-foreground italic">لا توجد أسماء بديلة لهذا المنتج</p>
+                            </div>
+                        )}
+
+                        {/* Colors Display */}
+                        {product.colors && product.colors.length > 0 && (
+                            <div className="space-y-3 pt-4 border-t border-border/50">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Palette className="h-4 w-4 text-primary" />
+                                        <h3 className="text-sm font-semibold text-muted-foreground">الألوان المتاحة</h3>
+                                    </div>
+                                    <QuickAddColor
+                                        productId={product.id}
+                                        productName={product.name}
+                                        currentColors={product.colors}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    {product.colors.map((color, idx) => (
+                                        <Dialog key={idx}>
+                                            <DialogTrigger asChild>
+                                                <div className="group relative rounded-xl border border-border/50 overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 cursor-pointer hover:-translate-y-1">
+                                                    {/* Color Preview */}
+                                                    <div className="aspect-square relative">
+                                                        {color.imagePath ? (
+                                                            <Image
+                                                                src={color.imagePath}
+                                                                alt={color.name}
+                                                                fill
+                                                                className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
+                                                            />
+                                                        ) : (
+                                                            <div
+                                                                className="w-full h-full transition-all duration-300 group-hover:brightness-110"
+                                                                style={{ backgroundColor: color.code }}
+                                                            />
+                                                        )}
+                                                        <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                    </div>
+                                                    {/* Color Info */}
+                                                    <div className="p-3 bg-background/95 backdrop-blur-sm border-t border-border/50">
+                                                        <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{color.name}</p>
+                                                        <p className="text-xs text-muted-foreground font-mono">{color.code}</p>
+                                                    </div>
+                                                </div>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-w-3xl border-none bg-black/95 p-0">
+                                                <div className="relative aspect-square w-full">
+                                                    {color.imagePath ? (
+                                                        <Image
+                                                            src={color.imagePath}
+                                                            alt={color.name}
+                                                            fill
+                                                            className="object-contain"
+                                                            priority
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            className="w-full h-full flex items-center justify-center"
+                                                            style={{ backgroundColor: color.code }}
+                                                        >
+                                                            <div className="text-center space-y-2">
+                                                                <p className="text-4xl font-bold text-white drop-shadow-lg">{color.name}</p>
+                                                                <p className="text-2xl font-mono text-white/90">{color.code}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {/* Colors - Empty State */}
+                        {(!product.colors || product.colors.length === 0) && (
+                            <div className="space-y-3 pt-4 border-t border-border/50">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Palette className="h-4 w-4 text-primary" />
+                                        <h3 className="text-sm font-semibold text-muted-foreground">الألوان المتاحة</h3>
+                                    </div>
+                                    <QuickAddColor
+                                        productId={product.id}
+                                        productName={product.name}
+                                        currentColors={null}
+                                        trigger={
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 px-3 text-xs bg-linear-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20 border-primary/30 text-primary hover:text-primary/90 transition-all"
+                                            >
+                                                <Plus className="h-3.5 w-3.5 ml-1" />
+                                                إضافة لون
+                                            </Button>
+                                        }
+                                    />
+                                </div>
+                                <p className="text-sm text-muted-foreground italic">لا توجد ألوان لهذا المنتج</p>
+                            </div>
+                        )}
+
+                        {/* Section Divider */}
+                        <div className="border-t border-border/20 my-6" />
+
                         {/* Price */}
                         <div className="pt-4 border-t border-border/50">
-                            <div className="flex items-baseline gap-2 p-4 rounded-xl bg-gradient-to-l from-primary/10 to-indigo-500/10 border border-primary/20">
+                            <div className="flex items-baseline gap-2 p-4 rounded-xl bg-linear-to-l from-primary/10 to-indigo-500/10 border border-primary/20">
                                 <span className="text-sm text-muted-foreground">السعر:</span>
-                                <span className="text-4xl font-black bg-gradient-to-l from-primary via-primary to-indigo-400 bg-clip-text text-transparent">
+                                <span className="text-4xl font-black bg-linear-to-l from-primary via-primary to-indigo-400 bg-clip-text text-transparent">
                                     {formatPrice(product.price)}
                                 </span>
                             </div>
@@ -282,7 +461,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             <ProductSheet
                                 product={product as any}
                                 trigger={
-                                    <Button className="flex-1 gap-2 bg-gradient-to-l from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80" size="lg">
+                                    <Button className="flex-1 gap-2 bg-linear-to-l from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80" size="lg">
                                         <Edit className="h-4 w-4" />
                                         تعديل
                                     </Button>
@@ -336,7 +515,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             <p className="text-sm font-medium text-muted-foreground">عدد الأشكال</p>
                             <h3 className="text-3xl font-bold mt-2 group-hover:text-primary transition-colors">{product.variants.length}</h3>
                         </div>
-                        <div className="size-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <div className="size-12 rounded-xl bg-linear-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Box className="size-6 text-primary" />
                         </div>
                     </div>
@@ -348,7 +527,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             <p className="text-sm font-medium text-muted-foreground">تاريخ الإنشاء</p>
                             <h3 className="text-sm font-bold mt-2 group-hover:text-indigo-500 transition-colors">{formatDate(product.createdAt)}</h3>
                         </div>
-                        <div className="size-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <div className="size-12 rounded-xl bg-linear-to-br from-indigo-500/20 to-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Calendar className="size-6 text-indigo-500" />
                         </div>
                     </div>
@@ -360,7 +539,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             <p className="text-sm font-medium text-muted-foreground">آخر تحديث</p>
                             <h3 className="text-sm font-bold mt-2 group-hover:text-green-500 transition-colors">{formatDate(product.updatedAt)}</h3>
                         </div>
-                        <div className="size-12 rounded-xl bg-gradient-to-br from-green-500/20 to-green-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <div className="size-12 rounded-xl bg-linear-to-br from-green-500/20 to-green-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <Calendar className="size-6 text-green-500" />
                         </div>
                     </div>
@@ -370,10 +549,18 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
             {/* Variants Section */}
             {product.variants.length > 0 && (
                 <div className="glass-panel rounded-2xl p-6 border border-border/50">
-                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                        <Box className="h-6 w-6 text-primary" />
-                        أشكال المنتج
-                    </h2>
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-2xl font-bold flex items-center gap-2">
+                            <Box className="h-6 w-6 text-primary" />
+                            أشكال المنتج
+                        </h2>
+                        <QuickAddVariant
+                            productId={product.id}
+                            productName={product.name}
+                            basePrice={Number(product.price)}
+                            currentVariants={product.variants}
+                        />
+                    </div>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {product.variants.map((variant) => (
                             <Dialog key={variant.id}>
@@ -389,17 +576,17 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                                     className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
                                                 />
                                             ) : (
-                                                <div className="flex items-center justify-center h-full bg-gradient-to-br from-muted/50 to-muted/20">
+                                                <div className="flex items-center justify-center h-full bg-linear-to-br from-muted/50 to-muted/20">
                                                     <Package className="h-16 w-16 text-muted-foreground/30" />
                                                 </div>
                                             )}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                            <div className="absolute inset-0 bg-linear-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
                                         {/* Variant Info */}
-                                        <div className="p-4 space-y-2 bg-gradient-to-t from-background/80 to-background/50 backdrop-blur-sm">
+                                        <div className="p-4 space-y-2 bg-linear-to-t from-background/80 to-background/50 backdrop-blur-sm">
                                             <h3 className="font-semibold group-hover:text-primary transition-colors">{variant.name}</h3>
                                             {variant.price && (
-                                                <p className="text-lg font-bold bg-gradient-to-l from-primary to-indigo-400 bg-clip-text text-transparent">
+                                                <p className="text-lg font-bold bg-linear-to-l from-primary to-indigo-400 bg-clip-text text-transparent">
                                                     {formatPrice(variant.price)}
                                                 </p>
                                             )}

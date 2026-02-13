@@ -29,7 +29,11 @@ const getDashboardData = unstable_cache(
                 select: {
                     id: true,
                     name: true,
-                    category: true,
+                    category: {
+                        select: {
+                            name: true
+                        }
+                    },
                     price: true,
                     imagePath: true,
                     isAvailable: true,
@@ -49,20 +53,33 @@ const getDashboardData = unstable_cache(
                     createdAt: true
                 }
             }),
-            // Get category distribution
+            // Get category distribution - group by categoryId then fetch category names
             prisma.product.groupBy({
-                by: ['category'],
-                _count: { category: true }
+                by: ['categoryId'],
+                _count: { categoryId: true },
+                where: {
+                    categoryId: { not: null }
+                }
             })
         ])
 
         // Low stock count (mock for now)
         const lowStockCount = 0
 
+        // Fetch category names for the groups
+        const categoryIds = categoryGroups.map(g => g.categoryId).filter((id): id is string => id !== null)
+        const categories = await prisma.category.findMany({
+            where: { id: { in: categoryIds } },
+            select: { id: true, name: true }
+        })
+
+        // Create a map for quick lookup
+        const categoryMap = new Map(categories.map(c => [c.id, c.name]))
+
         // Category data transformation
         const categoryData = categoryGroups.map((group, index) => ({
-            name: group.category,
-            value: group._count.category,
+            name: categoryMap.get(group.categoryId!) || 'غير مصنف',
+            value: group._count.categoryId,
             color: ['hsl(var(--primary))', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'][index % 6]
         }))
 
@@ -78,6 +95,7 @@ const getDashboardData = unstable_cache(
             },
             recentProducts: recentProducts.map(p => ({
                 ...p,
+                category: p.category?.name || 'غير مصنف',
                 price: Number(p.price)
             })),
             recentCustomers,

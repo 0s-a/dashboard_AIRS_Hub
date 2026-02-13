@@ -14,7 +14,9 @@ import {
     Loader2,
     MoreHorizontal,
     ChevronRight,
-    ChevronDown
+    ChevronDown,
+    Plus,
+    SearchCheck
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -48,6 +50,34 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+
+// Custom Global Filter Function for Smart Search
+export const customGlobalFilterFn = (row: any, columnId: string, filterValue: string) => {
+    const searchValue = filterValue.toLowerCase().trim()
+    if (!searchValue) return true
+
+    const product = row.original
+
+    // Search in primary fields
+    if (product.name?.toLowerCase().includes(searchValue)) return true
+    if (product.itemNumber?.toLowerCase().includes(searchValue)) return true
+    if (product.brand?.toLowerCase().includes(searchValue)) return true
+    if (product.category?.name?.toLowerCase().includes(searchValue)) return true
+
+    // Search in alternative names
+    if (product.alternativeNames && Array.isArray(product.alternativeNames)) {
+        const matchedName = product.alternativeNames.find((name: string) =>
+            name.toLowerCase().includes(searchValue)
+        )
+        if (matchedName) {
+            // Store match info for highlighting
+            row.matchedViaAlternativeName = matchedName
+            return true
+        }
+    }
+
+    return false
+}
 
 // --- Component: ActionCell ---
 // Handles local state for actions (loading, dialogs)
@@ -227,9 +257,32 @@ export const columns: ColumnDef<Product>[] = [
                         href={`/inventory/${product.id}`}
                         className="flex flex-col gap-1 min-w-0 group/link"
                     >
-                        <span className="font-bold text-sm text-foreground truncate group-hover/link:text-primary transition-colors">
-                            {product.name}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-foreground truncate group-hover/link:text-primary transition-colors">
+                                {product.name}
+                            </span>
+                            {/* Match via Alternative Name Indicator */}
+                            {(row as any).matchedViaAlternativeName && (
+                                <TooltipProvider delayDuration={0}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Badge
+                                                variant="outline"
+                                                className="px-1.5 py-0 text-[10px] bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-help shrink-0"
+                                            >
+                                                <SearchCheck className="h-3 w-3" />
+                                            </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-xs">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="font-semibold">تم العثور عليه عبر اسم بديل:</span>
+                                                <span className="text-green-600">"{(row as any).matchedViaAlternativeName}"</span>
+                                            </div>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            )}
+                        </div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[10px] text-muted-foreground font-mono">
                                 ID: {product.itemNumber}
@@ -264,6 +317,68 @@ export const columns: ColumnDef<Product>[] = [
                                 </TooltipProvider>
                             )}
                         </div>
+                        {/* Alternative Names Display */}
+                        {(product as any).alternativeNames && Array.isArray((product as any).alternativeNames) && (product as any).alternativeNames.length > 0 && (
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                <TooltipProvider delayDuration={0}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="flex items-center gap-1 flex-wrap">
+                                                {(product as any).alternativeNames.slice(0, 2).map((altName: string, idx: number) => (
+                                                    <Badge
+                                                        key={idx}
+                                                        variant="outline"
+                                                        className="px-1.5 py-0 text-[10px] bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-default"
+                                                    >
+                                                        {altName}
+                                                    </Badge>
+                                                ))}
+                                                {(product as any).alternativeNames.length > 2 && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="px-1.5 py-0 text-[10px] bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 cursor-help"
+                                                    >
+                                                        +{(product as any).alternativeNames.length - 2}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" className="max-w-xs">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-xs font-semibold text-muted-foreground mb-1">الأسماء البديلة:</span>
+                                                {(product as any).alternativeNames.map((altName: string, idx: number) => (
+                                                    <span key={idx} className="text-xs">• {altName}</span>
+                                                ))}
+                                            </div>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                        )}
+                        {/* Colors Display */}
+                        {(product as any).colors && Array.isArray((product as any).colors) && (product as any).colors.length > 0 && (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                                <TooltipProvider delayDuration={0}>
+                                    {(product as any).colors.map((color: any, idx: number) => (
+                                        <Tooltip key={idx}>
+                                            <TooltipTrigger asChild>
+                                                <div
+                                                    className="h-5 w-5 rounded-md border-2 border-white shadow-sm ring-1 ring-black/10 cursor-pointer transition-all hover:scale-110 hover:ring-2 hover:ring-primary/50"
+                                                    style={{ backgroundColor: color.code }}
+                                                    onClick={(e) => e.preventDefault()}
+                                                />
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" className="text-xs">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-medium">{color.name}</span>
+                                                    <span className="text-muted-foreground font-mono">{color.code}</span>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    ))}
+                                </TooltipProvider>
+                            </div>
+                        )}
                     </Link>
                 </div>
             )

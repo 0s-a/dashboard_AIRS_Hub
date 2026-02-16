@@ -10,7 +10,6 @@ async function main() {
         {
             itemNumber: 'APPLE-001', // ضروري للربط والبحث
             name: 'آيفون 15 برو ماكس',
-            category: 'جوالات',
             description: 'أحدث هاتف آيفون بتصميم من التيتانيوم.',
             price: 5499.00,
             unit: 'حبة',
@@ -22,7 +21,6 @@ async function main() {
         {
             itemNumber: 'APPLE-002',
             name: 'ساعة آبل الترا 2',
-            category: 'ساعات',
             description: 'ساعة رياضية متطورة للغواصين والرياضيين.',
             price: 3299.00,
             unit: 'حبة',
@@ -33,7 +31,6 @@ async function main() {
         {
             itemNumber: 'APPLE-003',
             name: 'ماك بوك اير M3',
-            category: 'كمبيوترات',
             description: 'لابتوب نحيف وقوي بمعالج M3 الجديد.',
             price: 4999.00,
             unit: 'كرتون',
@@ -44,7 +41,6 @@ async function main() {
         {
             itemNumber: 'ACC-101',
             name: 'شاحن 20 واط أصلي',
-            category: 'اكسسوارات',
             description: 'شاحن سريع من آبل.',
             price: 99.00,
             unit: 'حبة',
@@ -79,7 +75,7 @@ async function main() {
             name: 'سارة العتيبي',
             totalOrders: 12,
             isActive: true,
-       
+
         }
     ]
 

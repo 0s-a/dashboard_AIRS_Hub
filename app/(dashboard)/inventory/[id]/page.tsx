@@ -10,5 +10,17 @@ export default async function ProductDetailsPage({ params }: { params: Promise<{
         notFound()
     }
 
-    return <ProductDetailsClient product={result.data} />
+    // Transform colors from JsonValue to the expected type
+    const transformedProduct = {
+        ...result.data,
+        colors: result.data.colors as Array<{
+            itemNumber: string
+            name: string
+            code: string
+            imagePath: string | null
+        }> | null,
+        alternativeNames: result.data.alternativeNames as string[] | null
+    }
+
+    return <ProductDetailsClient product={transformedProduct} />
 }

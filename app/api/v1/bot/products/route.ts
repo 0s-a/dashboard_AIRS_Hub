@@ -17,12 +17,12 @@ export async function GET(req: NextRequest) {
             where: { isAvailable: true },
             select: {
                 id: true,
+                itemNumber: true,
                 name: true,
                 category: true,
                 description: true,
                 price: true,
-                imagePath: true,
-                sku: true
+                imagePath: true
             }
         })
 

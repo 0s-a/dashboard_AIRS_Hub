@@ -27,6 +27,7 @@ import { ProductSheet } from "@/components/inventory/product-sheet"
 import { QuickAddAlternativeName } from "@/components/inventory/quick-add-alternative-name"
 import { QuickAddColor } from "@/components/inventory/quick-add-color"
 import { QuickAddVariant } from "@/components/inventory/quick-add-variant"
+import { EditColorDialog } from "@/components/inventory/edit-color-dialog"
 import { deleteProduct } from "@/lib/actions/inventory"
 import { toast } from "sonner"
 import {
@@ -59,6 +60,7 @@ type ProductData = {
     isAvailable: boolean
     imagePath: string | null
     colors: Array<{
+        itemNumber: string
         name: string
         code: string
         imagePath: string | null
@@ -90,6 +92,13 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     const router = useRouter()
     const [isDeleting, setIsDeleting] = useState(false)
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
+    const [selectedColor, setSelectedColor] = useState<{
+        itemNumber: string
+        name: string
+        code: string
+        imagePath: string | null
+    } | null>(null)
+    const [editColorOpen, setEditColorOpen] = useState(false)
 
     const formatPrice = (price: string) => {
         return new Intl.NumberFormat('ar-SA', {
@@ -340,57 +349,49 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                 </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {product.colors.map((color, idx) => (
-                                        <Dialog key={idx}>
-                                            <DialogTrigger asChild>
-                                                <div className="group relative rounded-xl border border-border/50 overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 cursor-pointer hover:-translate-y-1">
-                                                    {/* Color Preview */}
-                                                    <div className="aspect-square relative">
-                                                        {color.imagePath ? (
-                                                            <Image
-                                                                src={color.imagePath}
-                                                                alt={color.name}
-                                                                fill
-                                                                className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
-                                                            />
-                                                        ) : (
-                                                            <div
-                                                                className="w-full h-full transition-all duration-300 group-hover:brightness-110"
-                                                                style={{ backgroundColor: color.code }}
-                                                            />
-                                                        )}
-                                                        <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                                    </div>
-                                                    {/* Color Info */}
-                                                    <div className="p-3 bg-background/95 backdrop-blur-sm border-t border-border/50">
-                                                        <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{color.name}</p>
-                                                        <p className="text-xs text-muted-foreground font-mono">{color.code}</p>
+                                        <div
+                                            key={color.itemNumber || idx}
+                                            onClick={() => {
+                                                setSelectedColor(color)
+                                                setEditColorOpen(true)
+                                            }}
+                                            className="group relative rounded-xl border border-border/50 overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 cursor-pointer hover:-translate-y-1"
+                                        >
+                                            {/* Color Preview */}
+                                            <div className="aspect-square relative">
+                                                {color.imagePath ? (
+                                                    <Image
+                                                        src={color.imagePath}
+                                                        alt={color.name}
+                                                        fill
+                                                        className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="w-full h-full transition-all duration-300 group-hover:brightness-110"
+                                                        style={{ backgroundColor: color.code }}
+                                                    />
+                                                )}
+                                                <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                    <div className="absolute bottom-2 right-2">
+                                                        <Badge variant="secondary" className="text-xs font-mono opacity-90">
+                                                            <Edit className="h-3 w-3 mr-1" />
+                                                            تعديل
+                                                        </Badge>
                                                     </div>
                                                 </div>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-3xl border-none bg-black/95 p-0">
-                                                <div className="relative aspect-square w-full">
-                                                    {color.imagePath ? (
-                                                        <Image
-                                                            src={color.imagePath}
-                                                            alt={color.name}
-                                                            fill
-                                                            className="object-contain"
-                                                            priority
-                                                        />
-                                                    ) : (
-                                                        <div
-                                                            className="w-full h-full flex items-center justify-center"
-                                                            style={{ backgroundColor: color.code }}
-                                                        >
-                                                            <div className="text-center space-y-2">
-                                                                <p className="text-4xl font-bold text-white drop-shadow-lg">{color.name}</p>
-                                                                <p className="text-2xl font-mono text-white/90">{color.code}</p>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
+                                            </div>
+                                            {/* Color Info */}
+                                            <div className="p-3 bg-background/95 backdrop-blur-sm border-t border-border/50 space-y-1">
+                                                <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{color.name}</p>
+                                                <p className="text-xs text-muted-foreground font-mono">{color.code}</p>
+                                                {color.itemNumber && (
+                                                    <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5">
+                                                        {color.itemNumber}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -614,6 +615,18 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         ))}
                     </div>
                 </div>
+            )}
+
+            {/* Edit Color Dialog */}
+            {selectedColor && (
+                <EditColorDialog
+                    productId={product.id}
+                    productItemNumber={product.itemNumber}
+                    productName={product.name}
+                    color={selectedColor}
+                    open={editColorOpen}
+                    onOpenChange={setEditColorOpen}
+                />
             )}
         </div>
     )

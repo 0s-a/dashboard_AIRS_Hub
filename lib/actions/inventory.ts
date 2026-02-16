@@ -279,25 +279,30 @@ export async function addAlternativeNameToProduct(productId: string, newAlternat
 
 export async function addColorToProduct(
     productId: string,
-    colorData: { name: string; code: string; imagePath?: string }
+    colorData: { itemNumber: string; name: string; code: string; imagePath?: string }
 ) {
     try {
         // Validate input
+        const trimmedItemNumber = colorData.itemNumber.trim()
         const trimmedName = colorData.name.trim()
         const trimmedCode = colorData.code.trim()
 
+        if (!trimmedItemNumber) {
+            return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
+        }
+
         if (!trimmedName) {
-            return { success: false, error: 'اسم اللون لا يمكن أن يكون فارغاً' }
+            return { success: false, error: '\u0627\u0633\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
         }
 
         if (!trimmedCode) {
-            return { success: false, error: 'كود اللون لا يمكن أن يكون فارغاً' }
+            return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
         }
 
         // Validate hex color code
         const hexRegex = /^#[0-9A-Fa-f]{6}$/
         if (!hexRegex.test(trimmedCode)) {
-            return { success: false, error: 'كود اللون يجب أن يكون بصيغة hex صحيحة (مثال: #ff0000)' }
+            return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0628\u0635\u064a\u063a\u0629 hex \u0635\u062d\u064a\u062d\u0629 (\u0645\u062b\u0627\u0644: #ff0000)' }
         }
 
         // Get current product
@@ -306,29 +311,39 @@ export async function addColorToProduct(
         })
 
         if (!product) {
-            return { success: false, error: 'المنتج غير موجود' }
+            return { success: false, error: '\u0627\u0644\u0645\u0646\u062a\u062c \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
         }
 
         // Get current colors
         const currentColors = (product.colors as any[]) || []
 
-        // Check for duplicates
+        // Check if itemNumber already exists
+        const itemNumberExists = currentColors.some(
+            (color: any) => color.itemNumber === trimmedItemNumber
+        )
+        if (itemNumberExists) {
+            return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0645\u0648\u062c\u0648\u062f \u0628\u0627\u0644\u0641\u0639\u0644' }
+        }
+
+        // Check for duplicate name
         const isDuplicateName = currentColors.some(
             (color: any) => color.name.toLowerCase() === trimmedName.toLowerCase()
         )
         if (isDuplicateName) {
-            return { success: false, error: 'هذا اللون موجود بالفعل' }
+            return { success: false, error: '\u0647\u0630\u0627 \u0627\u0644\u0644\u0648\u0646 \u0645\u0648\u062c\u0648\u062f \u0628\u0627\u0644\u0641\u0639\u0644' }
         }
 
+        // Check for duplicate code
         const isDuplicateCode = currentColors.some(
             (color: any) => color.code.toLowerCase() === trimmedCode.toLowerCase()
         )
         if (isDuplicateCode) {
-            return { success: false, error: 'كود اللون هذا مستخدم بالفعل' }
+            return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0647\u0630\u0627 \u0645\u0633\u062a\u062e\u062f\u0645 \u0628\u0627\u0644\u0641\u0639\u0644' }
         }
 
-        // Add new color
+        // Add new color with itemNumber
         const newColor = {
+            itemNumber: trimmedItemNumber,
             name: trimmedName,
             code: trimmedCode,
             imagePath: colorData.imagePath || null
@@ -353,9 +368,202 @@ export async function addColorToProduct(
         }
     } catch (error) {
         console.error('Failed to add color:', error)
-        return { success: false, error: 'فشل إضافة اللون' }
+        return { success: false, error: '\u0641\u0634\u0644 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0644\u0648\u0646' }
     }
 }
+
+
+/**
+ * Update color in product by itemNumber
+ */
+export async function updateColorInProduct(
+    productId: string,
+    colorItemNumber: string,
+    colorData: { itemNumber?: string; name?: string; code?: string; imagePath?: string | null }
+) {
+    try {
+        // Get current product
+        const product = await prisma.product.findUnique({
+            where: { id: productId }
+        })
+
+        if (!product) {
+            return { success: false, error: '\u0627\u0644\u0645\u0646\u062a\u062c \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
+        }
+
+        // Get current colors
+        const currentColors = (product.colors as any[]) || []
+
+        // Find color index
+        const colorIndex = currentColors.findIndex(
+            (color: any) => color.itemNumber === colorItemNumber
+        )
+
+        if (colorIndex === -1) {
+            return { success: false, error: '\u0627\u0644\u0644\u0648\u0646 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
+        }
+
+        // Get current color
+        const currentColor = currentColors[colorIndex]
+
+        // Validate itemNumber if provided
+        if (colorData.itemNumber !== undefined) {
+            const trimmedItemNumber = colorData.itemNumber.trim()
+            if (!trimmedItemNumber) {
+                return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
+            }
+
+            // Check if new itemNumber already exists (excluding current color)
+            const itemNumberExists = currentColors.some(
+                (color: any, idx: number) =>
+                    idx !== colorIndex &&
+                    color.itemNumber === trimmedItemNumber
+            )
+            if (itemNumberExists) {
+                return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0645\u0648\u062c\u0648\u062f \u0628\u0627\u0644\u0641\u0639\u0644' }
+            }
+        }
+
+        // Validate name if provided
+        if (colorData.name !== undefined) {
+            const trimmedName = colorData.name.trim()
+            if (!trimmedName) {
+                return { success: false, error: '\u0627\u0633\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
+            }
+
+            // Check for duplicate name (excluding current color)
+            const isDuplicateName = currentColors.some(
+                (color: any, idx: number) =>
+                    idx !== colorIndex &&
+                    color.name.toLowerCase() === trimmedName.toLowerCase()
+            )
+            if (isDuplicateName) {
+                return { success: false, error: '\u0647\u0630\u0627 \u0627\u0644\u0627\u0633\u0645 \u0645\u0633\u062a\u062e\u062f\u0645 \u0628\u0627\u0644\u0641\u0639\u0644' }
+            }
+        }
+
+        // Validate code if provided
+        if (colorData.code !== undefined) {
+            const trimmedCode = colorData.code.trim()
+            if (!trimmedCode) {
+                return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
+            }
+
+            // Validate hex color code
+            const hexRegex = /^#[0-9A-Fa-f]{6}$/
+            if (!hexRegex.test(trimmedCode)) {
+                return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0628\u0635\u064a\u063a\u0629 hex \u0635\u062d\u064a\u062d\u0629 (\u0645\u062b\u0627\u0644: #ff0000)' }
+            }
+
+            // Check for duplicate code (excluding current color)
+            const isDuplicateCode = currentColors.some(
+                (color: any, idx: number) =>
+                    idx !== colorIndex &&
+                    color.code.toLowerCase() === trimmedCode.toLowerCase()
+            )
+            if (isDuplicateCode) {
+                return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0647\u0630\u0627 \u0645\u0633\u062a\u062e\u062f\u0645 \u0628\u0627\u0644\u0641\u0639\u0644' }
+            }
+        }
+
+        // Update color
+        const updatedColor = {
+            ...currentColor,
+            itemNumber: colorData.itemNumber !== undefined ? colorData.itemNumber.trim() : currentColor.itemNumber,
+            name: colorData.name !== undefined ? colorData.name.trim() : currentColor.name,
+            code: colorData.code !== undefined ? colorData.code.trim() : currentColor.code,
+            imagePath: colorData.imagePath !== undefined ? colorData.imagePath : currentColor.imagePath
+        }
+
+        // Update colors array
+        const updatedColors = [...currentColors]
+        updatedColors[colorIndex] = updatedColor
+
+        // Update product
+        const updatedProduct = await prisma.product.update({
+            where: { id: productId },
+            data: { colors: updatedColors }
+        })
+
+        revalidatePath('/inventory')
+        revalidatePath(`/inventory/${productId}`)
+
+        return {
+            success: true,
+            data: {
+                ...updatedProduct,
+                price: Number(updatedProduct.price)
+            }
+        }
+    } catch (error) {
+        console.error('Failed to update color:', error)
+        return { success: false, error: '\u0641\u0634\u0644 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0644\u0648\u0646' }
+    }
+}
+
+
+/**
+ * Delete color from product by itemNumber
+ */
+export async function deleteColorFromProduct(
+    productId: string,
+    colorItemNumber: string
+) {
+    try {
+        // Get current product
+        const product = await prisma.product.findUnique({
+            where: { id: productId }
+        })
+
+        if (!product) {
+            return { success: false, error: 'المنتج غير موجود' }
+        }
+
+        // Get current colors
+        const currentColors = (product.colors as any[]) || []
+
+        // Find color
+        const colorToDelete = currentColors.find(
+            (color: any) => color.itemNumber === colorItemNumber
+        )
+
+        if (!colorToDelete) {
+            return { success: false, error: 'اللون غير موجود' }
+        }
+
+        // Delete color image if exists
+        if (colorToDelete.imagePath) {
+            const { deleteOldImage } = await import('./upload')
+            await deleteOldImage(colorToDelete.imagePath)
+        }
+
+        // Remove color from array
+        const updatedColors = currentColors.filter(
+            (color: any) => color.itemNumber !== colorItemNumber
+        )
+
+        // Update product
+        const updatedProduct = await prisma.product.update({
+            where: { id: productId },
+            data: { colors: updatedColors }
+        })
+
+        revalidatePath('/inventory')
+        revalidatePath(`/inventory/${productId}`)
+
+        return {
+            success: true,
+            data: {
+                ...updatedProduct,
+                price: Number(updatedProduct.price)
+            }
+        }
+    } catch (error) {
+        console.error('Failed to delete color:', error)
+        return { success: false, error: 'فشل حذف اللون' }
+    }
+}
+
 
 export async function addVariantToProduct(
     productId: string,

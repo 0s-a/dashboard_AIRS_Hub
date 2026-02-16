@@ -101,53 +101,6 @@ function VariantImageUpload({ value, onChange }: { value?: string | null, onChan
     )
 }
 
-// Helper component for Color Image Upload
-function ColorImageUpload({ value, onChange, colorCode }: { value?: string | null, onChange: (url: string | null) => void, colorCode: string }) {
-    const [isUploading, setIsUploading] = useState(false)
-
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0]
-        if (!file) return
-
-        setIsUploading(true)
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const res = await uploadImage(formData)
-        if (res.success && res.url) {
-            onChange(res.url)
-            toast.success("تم رفع صورة اللون")
-        } else {
-            toast.error("فشل رفع الصورة")
-        }
-        setIsUploading(false)
-    }, [onChange])
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { 'image/*': [] },
-        maxFiles: 1
-    })
-
-    return (
-        <div
-            {...getRootProps()}
-            className={`
-                h-16 w-16 shrink-0 border-2 rounded-lg flex items-center justify-center cursor-pointer transition-colors overflow-hidden
-                ${isDragActive ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}
-            `}
-            style={{ backgroundColor: isUploading || isDragActive ? undefined : colorCode }}
-        >
-            <input {...getInputProps()} />
-            {isUploading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-white" />
-            ) : (
-                <UploadCloud className="h-5 w-5 text-white opacity-60 hover:opacity-100 transition-opacity" />
-            )}
-        </div>
-    )
-}
-
 // Schema Updated
 const formSchema = z.object({
     itemNumber: z.string().min(1, { message: "رقم الصنف مطلوب" }),
@@ -161,11 +114,7 @@ const formSchema = z.object({
     description: z.string().optional().nullable(),
     price: z.preprocess((val) => Number(val), z.number().min(0, { message: "السعر يجب أن يكون أكبر من 0" })),
     isAvailable: z.boolean().default(true),
-    colors: z.array(z.object({
-        name: z.string().min(1, "اسم اللون مطلوب"),
-        code: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "كود اللون يجب أن يكون بصيغة hex صحيحة"),
-        imagePath: z.string().optional().nullable(),
-    })).optional(),
+
     variants: z.array(z.object({
         id: z.string().optional(),
         name: z.string().min(1, "اسم الخيار مطلوب"),
@@ -212,11 +161,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             description: product?.description || "",
             price: product ? Number(product.price) : 0,
             isAvailable: product?.isAvailable ?? true,
-            colors: (product as any)?.colors?.map((c: any) => ({
-                name: c.name,
-                code: c.code,
-                imagePath: c.imagePath || null,
-            })) || [],
+
             variants: product?.variants?.map(v => ({
                 id: v.id,
                 name: v.name,
@@ -227,10 +172,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         },
     } as any)
 
-    const { fields: colorFields, append: appendColor, remove: removeColor } = useFieldArray({
-        control: form.control,
-        name: "colors",
-    })
+
 
     const { fields, append, remove } = useFieldArray({
         control: form.control,
@@ -513,129 +455,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                     )}
                 />
 
-                {/* Colors Section */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <FormLabel className="text-base font-semibold">الألوان المتاحة</FormLabel>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => appendColor({ name: "", code: "#000000", imagePath: null })}
-                            className="bg-secondary/50 border-dashed"
-                        >
-                            <Plus className="mr-2 h-3.5 w-3.5" />
-                            إضافة لون
-                        </Button>
-                    </div>
 
-                    {colorFields.length > 0 ? (
-                        <div className="grid gap-3">
-                            {colorFields.map((field, index) => (
-                                <div key={field.id} className="flex items-start gap-3 p-3 rounded-xl border border-border/60 bg-muted/10 animate-in fade-in slide-in-from-top-2">
-                                    {/* Color Picker */}
-                                    <FormField
-                                        control={form.control}
-                                        name={`colors.${index}.code`}
-                                        render={({ field }) => (
-                                            <FormItem className="flex flex-col items-center gap-1">
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <input
-                                                            type="color"
-                                                            {...field}
-                                                            className="w-16 h-16 rounded-lg cursor-pointer border-2 border-border"
-                                                        />
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    {/* Color Image Upload/Preview */}
-                                    <FormField
-                                        control={form.control}
-                                        name={`colors.${index}.imagePath`}
-                                        render={({ field }) => {
-                                            const currentColor = form.watch(`colors.${index}.code`)
-                                            return (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        {field.value ? (
-                                                            <div className="relative h-16 w-16 shrink-0">
-                                                                <Image
-                                                                    src={field.value}
-                                                                    alt="Color"
-                                                                    fill
-                                                                    className="object-cover rounded-lg border-2 border-border"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => field.onChange(null)}
-                                                                    className="absolute -top-2 -right-2 h-5 w-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors"
-                                                                >
-                                                                    <X className="h-3 w-3" />
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <ColorImageUpload
-                                                                value={field.value}
-                                                                onChange={field.onChange}
-                                                                colorCode={currentColor}
-                                                            />
-                                                        )}
-                                                    </FormControl>
-                                                </FormItem>
-                                            )
-                                        }}
-                                    />
-
-                                    <div className="flex-1 grid grid-cols-1 gap-3">
-                                        <FormField
-                                            control={form.control}
-                                            name={`colors.${index}.name`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input placeholder="اسم اللون (أحمر، أزرق...)" className="h-9" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name={`colors.${index}.code`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input placeholder="#000000" className="h-9 font-mono" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeColor(index)}
-                                        className="text-muted-foreground hover:text-destructive shrink-0"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-6 border-2 border-dashed rounded-xl text-muted-foreground text-sm">
-                            لا توجد ألوان مضافة لهذا المنتج.
-                        </div>
-                    )}
-                </div>
 
                 {/* Alternative Names Section */}
                 <div className="space-y-4">

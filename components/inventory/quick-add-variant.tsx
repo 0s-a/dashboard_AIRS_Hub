@@ -45,13 +45,13 @@ export function QuickAddVariant({
 
         const trimmedName = variantName.trim()
         if (!trimmedName) {
-            toast.error("الرجاء إدخال اسم الخيار")
+            toast.error('حقل مطلوب', { description: 'يُرجى إدخال اسم الخيار قبل الحفظ' })
             return
         }
 
         // Validate price if provided
         if (variantPrice && (isNaN(Number(variantPrice)) || Number(variantPrice) < 0)) {
-            toast.error("السعر يجب أن يكون رقماً صحيحاً")
+            toast.error('السعر غير صالح', { description: 'يُرجى إدخال رقم موجب صحيح للسعر' })
             return
         }
 
@@ -63,16 +63,16 @@ export function QuickAddVariant({
             })
 
             if (result.success) {
-                toast.success("تم إضافة الخيار بنجاح")
+                toast.success('تم إضافة الخيار', { description: `تم إضافة خيار "${trimmedName}" بنجاح` })
                 setVariantName("")
                 setVariantPrice("")
                 setOpen(false)
                 router.refresh()
             } else {
-                toast.error(result.error || "فشل إضافة الخيار")
+                toast.error('فشل إضافة الخيار', { description: result.error || 'تعذّر حفظ الخيار، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("حدث خطأ أثناء الإضافة")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى المحاولة مجدداً' })
         } finally {
             setIsSubmitting(false)
         }

@@ -17,13 +17,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { addColorToProduct } from "@/lib/actions/inventory"
-import { uploadImage } from "@/lib/actions/upload"
+import { uploadProductImage } from "@/lib/actions/upload"
 import { useDropzone } from "react-dropzone"
 import Image from "next/image"
 
 interface QuickAddColorProps {
     productId: string
     productName: string
+    productItemNumber?: string
     currentColors?: any[] | null
     trigger?: React.ReactNode
 }
@@ -31,6 +32,7 @@ interface QuickAddColorProps {
 export function QuickAddColor({
     productId,
     productName,
+    productItemNumber,
     currentColors,
     trigger
 }: QuickAddColorProps) {
@@ -51,25 +53,43 @@ export function QuickAddColor({
         const file = acceptedFiles[0]
         if (!file) return
 
+        if (!productItemNumber?.trim()) {
+            toast.error("رقم صنف المنتج غير متوفر")
+            return
+        }
+
         setIsUploading(true)
         try {
-            const formData = new FormData()
-            formData.append('file', file)
+            const slugged = sanitizeColorSlug(itemNumber.trim())
+            const colorSlot = slugged
+                ? `color-${slugged}`
+                : `color-${Date.now()}`
 
-            const res = await uploadImage(formData)
+            const res = await uploadProductImage(
+                file,
+                productItemNumber,
+                colorSlot,
+                'colors',
+                null
+            )
 
             if (res.success && res.url) {
                 setImagePath(res.url)
-                toast.success("تم رفع الصورة بنجاح")
+                toast.success('تم رفع الصورة', { description: 'سيتم حفظها مع اللون عند الإضافة' })
             } else {
-                toast.error("فشل رفع الصورة")
+                toast.error('فشل رفع الصورة', { description: res.error || 'تعذّر حفظ الصورة، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("حدث خطأ أثناء رفع الصورة")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم أثناء رفع الصورة' })
         } finally {
             setIsUploading(false)
         }
-    }, [])
+    }, [productItemNumber, itemNumber])
+
+    // helper: safe slug for color slot name
+    function sanitizeColorSlug(val: string) {
+        return val.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30)
+    }
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -104,7 +124,7 @@ export function QuickAddColor({
         const trimmedItemNumber = itemNumber.trim()
         if (!trimmedItemNumber) {
             setItemNumberError('رقم اللون مطلوب')
-            toast.error("الرجاء إدخال رقم اللون")
+            toast.error('حقل مطلوب', { description: 'يُرجى إدخال رقم اللون (SKU) قبل الحفظ' })
             return
         }
         setItemNumberError('')
@@ -112,13 +132,13 @@ export function QuickAddColor({
         const trimmedName = colorName.trim()
         if (!trimmedName) {
             setNameError('اسم اللون مطلوب')
-            toast.error("الرجاء إدخال اسم اللون")
+            toast.error('حقل مطلوب', { description: 'يُرجى إدخال اسم اللون قبل الحفظ' })
             return
         }
         setNameError('')
 
         if (!validateColorCode(colorCode)) {
-            toast.error("الرجاء إدخال كود لون صالح")
+            toast.error('كود اللون غير صالح', { description: 'يٌرجى إدخال كود HEX صحيح (مثال: #FF5733)' })
             return
         }
 
@@ -132,8 +152,7 @@ export function QuickAddColor({
             })
 
             if (result.success) {
-                toast.success("تم إضافة اللون بنجاح")
-                // Reset form
+                toast.success('تم إضافة اللون', { description: `تم إضافة لون "${trimmedName}" بنجاح` })
                 setItemNumber("")
                 setColorName("")
                 setColorCode("#000000")
@@ -144,10 +163,10 @@ export function QuickAddColor({
                 setOpen(false)
                 router.refresh()
             } else {
-                toast.error(result.error || "فشل إضافة اللون")
+                toast.error('فشل إضافة اللون', { description: result.error || 'تعذّر حفظ اللون، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("حدث خطأ أثناء الإضافة")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى التحقق من الاتصال والمحاولة مجدداً' })
         } finally {
             setIsSubmitting(false)
         }

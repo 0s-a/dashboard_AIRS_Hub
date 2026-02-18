@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { Palette, Loader2, Upload, X, Trash2, Edit, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { updateColorInProduct, deleteColorFromProduct } from "@/lib/actions/inventory"
-import { uploadImageWithItemNumber, deleteOldImage } from "@/lib/actions/upload"
+import { uploadProductImage, deleteProductImage } from "@/lib/actions/upload"
 import { useDropzone } from "react-dropzone"
 import Image from "next/image"
 
@@ -65,6 +65,7 @@ export function EditColorDialog({
     const [itemNumberError, setItemNumberError] = useState('')
     const [nameError, setNameError] = useState('')
     const [codeError, setCodeError] = useState('')
+    const replaceInputRef = useRef<HTMLInputElement>(null)
 
     // Reset form when dialog opens/closes
     useEffect(() => {
@@ -79,50 +80,75 @@ export function EditColorDialog({
         }
     }, [open, color])
 
-    // Image upload
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0]
+    // Image upload via dropzone (empty state) or replace input
+    const uploadFile = useCallback(async (file: File) => {
         if (!file) return
+
+        if (file.size > 20 * 1024 * 1024) {
+            const sizeMB = (file.size / 1024 / 1024).toFixed(1)
+            toast.error('الملف كبير جداً', { description: `حجم الملف ${sizeMB}MB يتجاوز الحد الأقصى المسموح (20MB)` })
+            return
+        }
+        if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif', 'image/heic', 'image/heif', 'image/bmp', 'image/tiff'].includes(file.type)) {
+            toast.error('صيغة الملف غير مدعومة', { description: 'يُرجى استخدام صيغة JPG أو PNG أو WEBP أو AVIF أو HEIC' })
+            return
+        }
 
         setIsUploading(true)
         try {
-            const res = await uploadImageWithItemNumber(
-                file,
-                'products',
-                productItemNumber,
-                'colors',
-                color.itemNumber,
-                imagePath
-            )
+            const slugPart = color.itemNumber.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
+            const colorSlot = slugPart ? `color-${slugPart}` : `color-${Date.now()}`
+            const res = await uploadProductImage(file, productItemNumber, colorSlot, 'colors', imagePath)
 
             if (res.success && res.url) {
                 setImagePath(res.url)
-                toast.success("تم رفع الصورة بنجاح")
+                toast.success('تم رفع الصورة', { description: `تم حفظ صورة لون ${colorName || color.name} بنجاح` })
             } else {
-                toast.error("فشل رفع الصورة")
+                toast.error('فشل رفع الصورة', { description: res.error || 'تعذّر حفظ الصورة، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("حدث خطأ أثناء رفع الصورة")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم أثناء رفع الصورة' })
         } finally {
             setIsUploading(false)
         }
     }, [productItemNumber, color.itemNumber, imagePath])
 
+    const onDrop = useCallback(async (acceptedFiles: File[]) => {
+        if (acceptedFiles[0]) await uploadFile(acceptedFiles[0])
+    }, [uploadFile])
+
+    // Handler for replace input
+    const handleReplaceInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) await uploadFile(file)
+        // reset so same file can be picked again
+        if (replaceInputRef.current) replaceInputRef.current.value = ''
+    }
+
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: { 'image/*': [] },
-        maxFiles: 1
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif', '.bmp', '.tiff'] },
+        maxFiles: 1,
+        maxSize: 20 * 1024 * 1024,
+        disabled: isSubmitting || isUploading || !!imagePath,
+        onDropRejected: (r) => {
+            const err = r[0]?.errors[0]
+            if (err?.code === 'file-too-large') {
+                toast.error('الملف كبير جداً', { description: 'الحد الأقصى المسموح هو 20MB' })
+            } else {
+                toast.error('صيغة غير مدعومة', { description: 'يُرجى استخدام JPG أو PNG أو WEBP أو AVIF أو HEIC' })
+            }
+        }
     })
 
     const handleRemoveImage = async () => {
         if (!imagePath) return
-
         try {
-            await deleteOldImage(imagePath)
+            await deleteProductImage(imagePath)
             setImagePath(null)
-            toast.success("تم حذف الصورة")
-        } catch (error) {
-            toast.error("فشل حذف الصورة")
+            toast.success('تم حذف الصورة', { description: 'سيتم حفظ التغيير عند الضغط على "تحديث"' })
+        } catch {
+            toast.error('فشل حذف الصورة', { description: 'تعذّر حذف الصورة، يُرجى المحاولة مجدداً' })
         }
     }
 
@@ -177,14 +203,14 @@ export function EditColorDialog({
             })
 
             if (result.success) {
-                toast.success("تم تحديث اللون بنجاح")
+                toast.success('تم تحديث اللون', { description: `تم حفظ بيانات لون "${trimmedName}" بنجاح` })
                 onOpenChange(false)
                 router.refresh()
             } else {
-                toast.error(result.error || "فشل تحديث اللون")
+                toast.error('فشل تحديث اللون', { description: result.error || 'تعذّر حفظ التغييرات، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("حدث خطأ أثناء التحديث")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى التحقق من الاتصال والمحاولة مجدداً' })
         } finally {
             setIsSubmitting(false)
         }
@@ -200,15 +226,15 @@ export function EditColorDialog({
             const result = await deleteColorFromProduct(productId, color.itemNumber)
 
             if (result.success) {
-                toast.success("تم حذف اللون بنجاح")
+                toast.success('تم حذف اللون', { description: `تم حذف لون "${color.name}" من المنتج بنجاح` })
                 setShowDeleteAlert(false)
                 onOpenChange(false)
                 router.refresh()
             } else {
-                toast.error(result.error || "فشل حذف اللون")
+                toast.error('فشل حذف اللون', { description: result.error || 'تعذّر حذف اللون، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("حدث خطأ أثناء الحذف")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم أثناء محاولة الحذف' })
         } finally {
             setIsDeleting(false)
         }
@@ -322,48 +348,89 @@ export function EditColorDialog({
                         <div className="space-y-2">
                             <Label>صورة اللون (اختياري)</Label>
 
+                            {/* Hidden input for replacing existing image */}
+                            <input
+                                ref={replaceInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                className="hidden"
+                                onChange={handleReplaceInput}
+                                disabled={isSubmitting || isUploading}
+                            />
+
                             {imagePath ? (
-                                <div className="relative h-32 w-full rounded-lg border-2 border-border overflow-hidden group">
-                                    <Image
-                                        src={imagePath}
-                                        alt={colorName}
-                                        fill
-                                        className="object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={handleRemoveImage}
-                                            disabled={isSubmitting}
-                                        >
-                                            <Trash2 className="h-4 w-4 mr-1" />
-                                            حذف
-                                        </Button>
+                                <div className="space-y-2">
+                                    <div className="relative h-36 w-full rounded-xl border-2 border-border overflow-hidden group">
+                                        <Image
+                                            src={imagePath}
+                                            alt={colorName || "معاينة"}
+                                            fill
+                                            className="object-cover"
+                                        />
+                                        {/* Color swatch badge */}
+                                        <div
+                                            className="absolute top-2 right-2 h-6 w-6 rounded-full border-2 border-white shadow-md z-10 transition-transform group-hover:scale-110"
+                                            style={{ backgroundColor: colorCode }}
+                                            title={colorCode}
+                                        />
+                                        {/* Hover overlay */}
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="secondary"
+                                                disabled={isUploading || isSubmitting}
+                                                onClick={() => replaceInputRef.current?.click()}
+                                            >
+                                                {isUploading ? (
+                                                    <Loader2 className="h-3.5 w-3.5 ml-1 animate-spin" />
+                                                ) : (
+                                                    <Upload className="h-3.5 w-3.5 ml-1" />
+                                                )}
+                                                تغيير
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={handleRemoveImage}
+                                                disabled={isSubmitting || isUploading}
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5 ml-1" />
+                                                حذف
+                                            </Button>
+                                        </div>
                                     </div>
+                                    <p className="text-xs text-muted-foreground text-center">مرّر الفأرة لتغيير الصورة أو حذفها</p>
                                 </div>
                             ) : (
                                 <div
                                     {...getRootProps()}
                                     className={`
-                                    border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-                                    ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 hover:border-primary/50'}
-                                    ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}
+                                    border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200
+                                    ${isDragActive ? 'border-primary bg-primary/10 scale-[1.01]' : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20'}
+                                    ${isSubmitting || isUploading ? 'opacity-50 cursor-not-allowed' : ''}
                                 `}
                                 >
-                                    <input {...getInputProps()} disabled={isSubmitting} />
+                                    <input {...getInputProps()} />
                                     {isUploading ? (
                                         <div className="flex flex-col items-center gap-2">
-                                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                             <p className="text-sm text-muted-foreground">جاري الرفع...</p>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center gap-2">
-                                            <Upload className="h-8 w-8 text-muted-foreground" />
+                                            <div className="relative">
+                                                <Upload className="h-8 w-8 text-muted-foreground" />
+                                                <div
+                                                    className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-background"
+                                                    style={{ backgroundColor: colorCode }}
+                                                />
+                                            </div>
                                             <p className="text-sm text-muted-foreground">
-                                                اسحب الصورة هنا أو اضغط للاختيار
+                                                {isDragActive ? 'افلت الصورة هنا' : 'اسحب الصورة هنا أو اضغط للاختيار'}
                                             </p>
+                                            <p className="text-xs text-muted-foreground/60">JPG، PNG، WEBP، AVIF، HEIC — حتى 20MB</p>
                                         </div>
                                     )}
                                 </div>

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import {
     Form,
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -17,8 +16,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { createProduct, updateProduct } from "@/lib/actions/inventory"
-import { uploadImage } from "@/lib/actions/upload" // New Upload Action
+import { uploadProductImage } from "@/lib/actions/upload"
 import { getCategories } from "@/lib/actions/categories"
+import { ImageGalleryUpload } from "@/components/ui/image-gallery-upload"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Product, Category } from "@prisma/client"
@@ -30,37 +30,57 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useDropzone } from "react-dropzone" // You need to install this: npm install react-dropzone
+import { useDropzone } from "react-dropzone"
 import Image from "next/image"
 import { Loader2, UploadCloud, X, Trash2, Plus } from "lucide-react"
+import type { ProductImage } from "@/lib/types/product"
 
 
 // Helper component for Variant Image Upload
-function VariantImageUpload({ value, onChange }: { value?: string | null, onChange: (url: string) => void }) {
+function VariantImageUpload({
+    value,
+    onChange,
+    productItemNumber,
+    variantName,
+}: {
+    value?: string | null
+    onChange: (url: string) => void
+    productItemNumber?: string
+    variantName?: string
+}) {
     const [isUploading, setIsUploading] = useState(false)
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const file = acceptedFiles[0]
         if (!file) return
 
-        setIsUploading(true)
-        const formData = new FormData()
-        formData.append('file', file)
+        if (!productItemNumber?.trim()) {
+            toast.error('حقل مطلوب', { description: 'يُرجى إدخال رقم الصنف أولاً قبل رفع صورة الخيار' })
+            return
+        }
 
-        const res = await uploadImage(formData)
+        setIsUploading(true)
+        const slot = variantName ? `variant-${variantName.toLowerCase().replace(/\s+/g, '-')}` : `variant-${Date.now()}`
+        const res = await uploadProductImage(file, productItemNumber, slot, 'variants', value || null)
         if (res.success && res.url) {
             onChange(res.url)
-            toast.success("تم رفع صورة المتغير")
+            toast.success('تم رفع الصورة', { description: 'تم حفظ صورة الخيار بنجاح وتحويلها إلى WebP' })
         } else {
-            toast.error("فشل رفع الصورة")
+            toast.error('فشل رفع الصورة', { description: res.error || 'تعذّر حفظ الصورة، يُرجى المحاولة مجدداً' })
         }
         setIsUploading(false)
-    }, [onChange])
+    }, [onChange, productItemNumber, variantName, value])
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: { 'image/*': [] },
-        maxFiles: 1
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif', '.bmp', '.tiff'] },
+        maxFiles: 1,
+        maxSize: 20 * 1024 * 1024,
+        onDropRejected: (r) => {
+            const err = r[0]?.errors[0]
+            if (err?.code === 'file-too-large') toast.error('الملف كبير جداً', { description: 'الحد الأقصى المسموح هو 20MB' })
+            else toast.error('صيغة غير مدعومة', { description: 'يُرجى استخدام JPG أو PNG أو WEBP أو AVIF' })
+        }
     })
 
     if (value) {
@@ -101,7 +121,6 @@ function VariantImageUpload({ value, onChange }: { value?: string | null, onChan
     )
 }
 
-// Schema Updated
 const formSchema = z.object({
     itemNumber: z.string().min(1, { message: "رقم الصنف مطلوب" }),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
@@ -111,10 +130,15 @@ const formSchema = z.object({
     tier: z.string().optional().nullable(),
     packaging: z.string().optional().nullable(),
     imagePath: z.string().optional().nullable(),
+    images: z.array(z.object({
+        url: z.string(),
+        alt: z.string().optional(),
+        isPrimary: z.boolean(),
+        order: z.number().optional(),
+    })).optional(),
     description: z.string().optional().nullable(),
     price: z.preprocess((val) => Number(val), z.number().min(0, { message: "السعر يجب أن يكون أكبر من 0" })),
     isAvailable: z.boolean().default(true),
-
     variants: z.array(z.object({
         id: z.string().optional(),
         name: z.string().min(1, "اسم الخيار مطلوب"),
@@ -133,7 +157,6 @@ interface ProductFormProps {
 
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
     const router = useRouter()
-    const [isUploading, setIsUploading] = useState(false)
     const [categories, setCategories] = useState<Category[]>([])
 
     useEffect(() => {
@@ -157,12 +180,12 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             categoryId: (product as any)?.categoryId || "",
             tier: product?.tier || "",
             packaging: product?.packaging || "",
-            imagePath: product?.imagePath || "",
+            imagePath: (product as any)?.imagePath || "",
+            images: ((product as any)?.images as ProductImage[]) || [],
             description: product?.description || "",
             price: product ? Number(product.price) : 0,
             isAvailable: product?.isAvailable ?? true,
-
-            variants: product?.variants?.map(v => ({
+            variants: product?.variants?.map((v: any) => ({
                 id: v.id,
                 name: v.name,
                 price: v.price ? Number(v.price) : "",
@@ -184,30 +207,20 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         name: "alternativeNames",
     })
 
-    // Drag & Drop Handling
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0]
-        if (!file) return
+    // Watch images and sync imagePath from primary
+    const watchedImages = form.watch('images') as ProductImage[] | undefined
+    const watchedItemNumber = form.watch('itemNumber')
 
-        setIsUploading(true)
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const res = await uploadImage(formData)
-        if (res.success && res.url) {
-            form.setValue('imagePath', res.url)
-            toast.success("تم رفع الصورة بنجاح")
-        } else {
-            toast.error("فشل رفع الصورة")
+    // Auto-sync imagePath from primary image
+    useEffect(() => {
+        const imgs = watchedImages || []
+        const primary = imgs.find(i => i.isPrimary) || imgs[0]
+        if (primary?.url) {
+            form.setValue('imagePath', primary.url)
+        } else if (imgs.length === 0) {
+            form.setValue('imagePath', '')
         }
-        setIsUploading(false)
-    }, [form])
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { 'image/*': [] },
-        maxFiles: 1
-    })
+    }, [watchedImages, form])
 
     async function onSubmit(values: FormValues) {
         try {
@@ -219,70 +232,42 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             }
 
             if (res.success) {
-                toast.success(product ? "تم تحديث المنتج" : "تم إنشاء المنتج")
+                toast.success(product ? 'تم تحديث المنتج' : 'تم إنشاء المنتج', {
+                    description: product
+                        ? `تم حفظ التغييرات على المنتج "${values.name}" بنجاح`
+                        : `تم إنشاء المنتج "${values.name}" وإضافته إلى المخزن`
+                })
                 if (onSuccess) onSuccess()
                 router.refresh()
             } else {
-                toast.error("حدث خطأ ما")
+                toast.error('فشل الحفظ', { description: 'تعذّر حفظ بيانات المنتج، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("خطأ في الإرسال")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى التحقق من الاتصال والمحاولة مجدداً' })
         }
     }
-
-    const currentImage = form.watch('imagePath')
 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
-                {/* Image Upload Zone */}
-                <div className="flex flex-col gap-2">
-                    <FormLabel>صورة المنتج</FormLabel>
-                    <div
-                        {...getRootProps()}
-                        className={`
-                            border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors
-                            ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 hover:border-primary/50'}
-                        `}
-                    >
-                        <input {...getInputProps()} />
-                        {isUploading ? (
-                            <div className="flex flex-col items-center gap-2">
-                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">جاري الرفع...</p>
-                            </div>
-                        ) : currentImage ? (
-                            <div className="relative group w-full h-40 flex items-center justify-center">
-                                <Image
-                                    src={currentImage}
-                                    alt="Preview"
-                                    fill
-                                    className="object-contain rounded-md"
+                {/* Multi-Image Gallery Upload */}
+                <FormField
+                    control={form.control}
+                    name="images"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormControl>
+                                <ImageGalleryUpload
+                                    images={(field.value as ProductImage[]) || []}
+                                    onChange={field.onChange}
+                                    productItemNumber={watchedItemNumber || ""}
+                                    maxImages={10}
                                 />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md">
-                                    <p className="text-white font-medium">تغيير الصورة</p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="icon"
-                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        form.setValue('imagePath', '')
-                                    }}
-                                >
-                                    <X className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center gap-2">
-                                <UploadCloud className="h-8 w-8 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">اسحب الصورة هنا أو اضغط للاختيار</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
 
                 <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -537,6 +522,8 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                                 <VariantImageUpload
                                                     value={field.value}
                                                     onChange={field.onChange}
+                                                    productItemNumber={watchedItemNumber}
+                                                    variantName={form.watch(`variants.${index}.name`)}
                                                 />
                                             </FormControl>
                                         )}

@@ -6,6 +6,7 @@ import Image from "next/image"
 import Link from "next/link"
 import {
     ChevronRight,
+    ChevronLeft,
     Package,
     Calendar,
     Edit,
@@ -18,7 +19,10 @@ import {
     Loader2,
     Palette,
     FileText,
-    Plus
+    Plus,
+    X,
+    Copy,
+    Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -65,6 +69,12 @@ type ProductData = {
         code: string
         imagePath: string | null
     }> | null
+    images: Array<{
+        url: string
+        alt?: string
+        isPrimary: boolean
+        order?: number
+    }> | null
     alternativeNames: string[] | null
     createdAt: Date
     updatedAt: Date
@@ -91,7 +101,28 @@ interface ProductDetailsClientProps {
 export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     const router = useRouter()
     const [isDeleting, setIsDeleting] = useState(false)
-    const [selectedImage, setSelectedImage] = useState<string | null>(null)
+    const [lightboxOpen, setLightboxOpen] = useState(false)
+    const [lightboxIndex, setLightboxIndex] = useState(0)
+    const [activeImageIndex, setActiveImageIndex] = useState(0)
+    const [copiedItemNumber, setCopiedItemNumber] = useState(false)
+
+    const copyItemNumber = async () => {
+        try {
+            await navigator.clipboard.writeText(product.itemNumber)
+            setCopiedItemNumber(true)
+            setTimeout(() => setCopiedItemNumber(false), 2000)
+        } catch {
+            // fallback for older browsers
+            const el = document.createElement('textarea')
+            el.value = product.itemNumber
+            document.body.appendChild(el)
+            el.select()
+            document.execCommand('copy')
+            document.body.removeChild(el)
+            setCopiedItemNumber(true)
+            setTimeout(() => setCopiedItemNumber(false), 2000)
+        }
+    }
     const [selectedColor, setSelectedColor] = useState<{
         itemNumber: string
         name: string
@@ -99,6 +130,26 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         imagePath: string | null
     } | null>(null)
     const [editColorOpen, setEditColorOpen] = useState(false)
+
+    // Build gallery images from images array or fallback to imagePath
+    const galleryImages = (() => {
+        if (product.images && product.images.length > 0) {
+            return [...product.images].sort((a, b) => {
+                if (a.isPrimary) return -1
+                if (b.isPrimary) return 1
+                return (a.order ?? 0) - (b.order ?? 0)
+            })
+        }
+        if (product.imagePath) {
+            return [{ url: product.imagePath, alt: product.name, isPrimary: true }]
+        }
+        return []
+    })()
+
+    const openLightbox = (index: number) => {
+        setLightboxIndex(index)
+        setLightboxOpen(true)
+    }
 
     const formatPrice = (price: string) => {
         return new Intl.NumberFormat('ar-SA', {
@@ -121,14 +172,14 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         try {
             const result = await deleteProduct(product.id)
             if (result.success) {
-                toast.success('تم حذف المنتج بنجاح')
+                toast.success('تم حذف المنتج', { description: `تم حذف "${product.name}" وجميع بياناته نهائياً` })
                 router.push('/inventory')
             } else {
-                toast.error(result.error || 'فشل حذف المنتج')
+                toast.error('فشل حذف المنتج', { description: result.error || 'تعذّر حذف المنتج، يُرجى المحاولة مجدداً' })
                 setIsDeleting(false)
             }
-        } catch (error) {
-            toast.error('حدث خطأ أثناء الحذف')
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم أثناء محاولة الحذف' })
             setIsDeleting(false)
         }
     }
@@ -136,9 +187,9 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     const handleShare = async () => {
         try {
             await navigator.clipboard.writeText(window.location.href)
-            toast.success('تم نسخ رابط المنتج')
-        } catch (error) {
-            toast.error('فشل نسخ الرابط')
+            toast.success('تم نسخ الرابط', { description: 'تم نسخ رابط المنتج إلى الحافظة' })
+        } catch {
+            toast.error('فشل النسخ', { description: 'تعذّر نسخ الرابط، يُرجى نسخه يدوياً من شريط العنوان' })
         }
     }
 
@@ -182,45 +233,139 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
 
             {/* Hero Section */}
             <div className="grid gap-6 lg:grid-cols-2">
-                {/* Product Image with Lightbox */}
-                <div className="glass-panel rounded-2xl p-6 border border-border/50">
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <div className="aspect-square relative rounded-xl overflow-hidden bg-muted/30 group cursor-pointer">
-                                {product.imagePath ? (
-                                    <Image
-                                        src={product.imagePath}
-                                        alt={product.name}
-                                        fill
-                                        className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center h-full bg-linear-to-br from-muted/50 to-muted/20">
-                                        <Package className="h-24 w-24 text-muted-foreground/30" />
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                {/* Product Gallery */}
+                <div className="glass-panel rounded-2xl p-4 border border-border/50 space-y-3">
+                    {/* Hero Image */}
+                    <div
+                        className="aspect-square relative rounded-xl overflow-hidden bg-muted/30 group cursor-pointer"
+                        onClick={() => galleryImages.length > 0 && openLightbox(0)}
+                    >
+                        {galleryImages.length > 0 ? (
+                            <Image
+                                src={galleryImages[0].url}
+                                alt={galleryImages[0].alt || product.name}
+                                fill
+                                className="object-cover transition-all duration-500 group-hover:scale-105 group-hover:brightness-105"
+                                priority
+                            />
+                        ) : (
+                            <div className="flex items-center justify-center h-full bg-linear-to-br from-muted/50 to-muted/20">
+                                <Package className="h-24 w-24 text-muted-foreground/30" />
                             </div>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-5xl border-none bg-black/95 p-0">
-                            <div className="relative aspect-square w-full">
-                                {product.imagePath ? (
-                                    <Image
-                                        src={product.imagePath}
-                                        alt={product.name}
-                                        fill
-                                        className="object-contain"
-                                        priority
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center h-full">
-                                        <Package className="h-32 w-32 text-white/30" />
-                                    </div>
-                                )}
+                        )}
+                        {galleryImages.length > 0 && (
+                            <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-3">
+                                <span className="text-white text-xs bg-black/50 px-2 py-1 rounded-full">
+                                    اضغط للتكبير
+                                </span>
                             </div>
-                        </DialogContent>
-                    </Dialog>
+                        )}
+                        {/* Image count badge */}
+                        {galleryImages.length > 1 && (
+                            <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                                {galleryImages.length} صور
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Thumbnail Strip */}
+                    {galleryImages.length > 1 && (
+                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                            {galleryImages.map((img, idx) => (
+                                <button
+                                    key={img.url}
+                                    type="button"
+                                    onClick={() => openLightbox(idx)}
+                                    className={`relative shrink-0 h-16 w-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${idx === 0
+                                        ? 'border-primary shadow-md shadow-primary/20'
+                                        : 'border-border/50 hover:border-primary/50'
+                                        }`}
+                                >
+                                    <Image
+                                        src={img.url}
+                                        alt={img.alt || `صورة ${idx + 1}`}
+                                        fill
+                                        className="object-cover"
+                                        sizes="64px"
+                                    />
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
+
+                {/* Lightbox */}
+                {lightboxOpen && galleryImages.length > 0 && (
+                    <div
+                        className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+                        onClick={() => setLightboxOpen(false)}
+                    >
+                        {/* Close */}
+                        <button
+                            className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                            onClick={() => setLightboxOpen(false)}
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+
+                        {/* Counter */}
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+                            {lightboxIndex + 1} / {galleryImages.length}
+                        </div>
+
+                        {/* Prev */}
+                        {galleryImages.length > 1 && (
+                            <button
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); setLightboxIndex((lightboxIndex - 1 + galleryImages.length) % galleryImages.length) }}
+                            >
+                                <ChevronRight className="h-8 w-8" />
+                            </button>
+                        )}
+
+                        {/* Image */}
+                        <div
+                            className="relative max-w-4xl max-h-[85vh] w-full h-full mx-16"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Image
+                                src={galleryImages[lightboxIndex].url}
+                                alt={galleryImages[lightboxIndex].alt || product.name}
+                                fill
+                                className="object-contain"
+                                priority
+                            />
+                        </div>
+
+                        {/* Next */}
+                        {galleryImages.length > 1 && (
+                            <button
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); setLightboxIndex((lightboxIndex + 1) % galleryImages.length) }}
+                            >
+                                <ChevronLeft className="h-8 w-8" />
+                            </button>
+                        )}
+
+                        {/* Thumbnail strip in lightbox */}
+                        {galleryImages.length > 1 && (
+                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                                {galleryImages.map((img, idx) => (
+                                    <button
+                                        key={img.url}
+                                        onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx) }}
+                                        className={`h-12 w-12 rounded-lg overflow-hidden border-2 transition-all ${idx === lightboxIndex ? 'border-white scale-110' : 'border-white/30 opacity-60 hover:opacity-100'
+                                            }`}
+                                    >
+                                        <div className="relative h-full w-full">
+                                            <Image src={img.url} alt="" fill className="object-cover" sizes="48px" />
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Product Info */}
                 <div className="space-y-6">
@@ -237,9 +382,19 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                 />
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className="gap-1.5 hover:bg-primary/5 transition-colors">
+                                <Badge
+                                    variant="outline"
+                                    className="gap-1.5 hover:bg-primary/5 transition-colors cursor-pointer select-none"
+                                    onClick={copyItemNumber}
+                                    title="انقر لنسخ رقم الصنف"
+                                >
                                     <Tag className="h-3 w-3" />
-                                    {product.itemNumber}
+                                    <span className="font-mono">{product.itemNumber}</span>
+                                    {copiedItemNumber ? (
+                                        <Check className="h-3 w-3 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3 w-3 text-muted-foreground/50" />
+                                    )}
                                 </Badge>
                                 {product.category && (
                                     <Badge className="gap-1.5 bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all">
@@ -344,6 +499,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                     <QuickAddColor
                                         productId={product.id}
                                         productName={product.name}
+                                        productItemNumber={product.itemNumber}
                                         currentColors={product.colors}
                                     />
                                 </div>
@@ -357,34 +513,53 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                             }}
                                             className="group relative rounded-xl border border-border/50 overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 cursor-pointer hover:-translate-y-1"
                                         >
-                                            {/* Color Preview */}
+                                            {/* Color Preview Area */}
                                             <div className="aspect-square relative">
                                                 {color.imagePath ? (
-                                                    <Image
-                                                        src={color.imagePath}
-                                                        alt={color.name}
-                                                        fill
-                                                        className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
-                                                    />
+                                                    <>
+                                                        <Image
+                                                            src={color.imagePath}
+                                                            alt={color.name}
+                                                            fill
+                                                            className="object-cover transition-all duration-500 group-hover:scale-105 group-hover:brightness-105"
+                                                        />
+                                                        {/* Color swatch badge overlay */}
+                                                        <div
+                                                            className="absolute top-2 right-2 h-5 w-5 rounded-full border-2 border-white shadow-md z-10 transition-transform group-hover:scale-125"
+                                                            style={{ backgroundColor: color.code }}
+                                                            title={color.code}
+                                                        />
+                                                    </>
                                                 ) : (
                                                     <div
-                                                        className="w-full h-full transition-all duration-300 group-hover:brightness-110"
+                                                        className="w-full h-full transition-all duration-300"
                                                         style={{ backgroundColor: color.code }}
-                                                    />
+                                                    >
+                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="h-10 w-10 rounded-full border-4 border-white/40 animate-pulse" />
+                                                        </div>
+                                                    </div>
                                                 )}
-                                                <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                {/* Edit overlay */}
+                                                <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                     <div className="absolute bottom-2 right-2">
-                                                        <Badge variant="secondary" className="text-xs font-mono opacity-90">
+                                                        <Badge variant="secondary" className="text-xs font-mono opacity-90 backdrop-blur-sm">
                                                             <Edit className="h-3 w-3 mr-1" />
                                                             تعديل
                                                         </Badge>
                                                     </div>
                                                 </div>
                                             </div>
-                                            {/* Color Info */}
+                                            {/* Color Info Footer */}
                                             <div className="p-3 bg-background/95 backdrop-blur-sm border-t border-border/50 space-y-1">
-                                                <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{color.name}</p>
-                                                <p className="text-xs text-muted-foreground font-mono">{color.code}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <div
+                                                        className="h-3 w-3 rounded-full shrink-0 border border-border/50"
+                                                        style={{ backgroundColor: color.code }}
+                                                    />
+                                                    <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{color.name}</p>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground font-mono pr-5">{color.code}</p>
                                                 {color.itemNumber && (
                                                     <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5">
                                                         {color.itemNumber}
@@ -407,6 +582,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                     <QuickAddColor
                                         productId={product.id}
                                         productName={product.name}
+                                        productItemNumber={product.itemNumber}
                                         currentColors={null}
                                         trigger={
                                             <Button

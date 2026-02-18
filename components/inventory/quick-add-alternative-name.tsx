@@ -41,7 +41,7 @@ export function QuickAddAlternativeName({
 
         const trimmedName = newName.trim()
         if (!trimmedName) {
-            toast.error("الرجاء إدخال اسم بديل")
+            toast.error('حقل مطلوب', { description: 'يُرجى إدخال الاسم البديل قبل الحفظ' })
             return
         }
 
@@ -50,15 +50,15 @@ export function QuickAddAlternativeName({
             const result = await addAlternativeNameToProduct(productId, trimmedName)
 
             if (result.success) {
-                toast.success("تم إضافة الاسم البديل بنجاح")
+                toast.success('تم إضافة الاسم البديل', { description: `تم إضافة "${trimmedName}" كاسم بديل للمنتج` })
                 setNewName("")
                 setOpen(false)
                 router.refresh()
             } else {
-                toast.error(result.error || "فشل إضافة الاسم البديل")
+                toast.error('فشل إضافة الاسم البديل', { description: result.error || 'تعذّر حفظ الاسم البديل، يُرجى المحاولة مجدداً' })
             }
-        } catch (error) {
-            toast.error("حدث خطأ أثناء الإضافة")
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى المحاولة مجدداً' })
         } finally {
             setIsSubmitting(false)
         }

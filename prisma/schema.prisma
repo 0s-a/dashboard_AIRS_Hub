@@ -18,7 +18,8 @@ model Product {
   packaging   String?
   price       Decimal   @db.Decimal(10, 2)
   isAvailable Boolean   @default(true)
-  imagePath        String?
+  imagePath        String?   // legacy - primary image URL (auto-updated)
+  images           Json?     // [{url, alt, isPrimary, order}]
   colors           Json?
   alternativeNames Json?
   createdAt        DateTime  @default(now())

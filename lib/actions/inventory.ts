@@ -108,13 +108,21 @@ export async function getProductById(id: string) {
 
 export async function createProduct(data: any) {
     try {
-        const { variants, colors, alternativeNames, ...productData } = data
+        const { variants, colors, alternativeNames, images, ...productData } = data
+
+        // Auto-sync imagePath from primary image
+        const primaryImage = images?.find((i: any) => i.isPrimary) || images?.[0]
+        if (primaryImage?.url && !productData.imagePath) {
+            productData.imagePath = primaryImage.url
+        }
+
         const product = await prisma.product.create({
             data: {
                 ...productData,
                 price: parseFloat(productData.price),
                 colors: colors || null,
                 alternativeNames: alternativeNames || null,
+                images: images?.length > 0 ? images : null,
                 variants: variants?.length > 0 ? {
                     create: variants.map((v: any) => ({
                         name: v.name,
@@ -140,7 +148,27 @@ export async function createProduct(data: any) {
 
 export async function updateProduct(id: string, data: any) {
     try {
-        const { variants, colors, alternativeNames, categoryId, category, ...productData } = data
+        const { variants, colors, alternativeNames, images, categoryId, category, ...productData } = data
+
+        // Auto-sync imagePath from primary image
+        const primaryImage = images?.find((i: any) => i.isPrimary) || images?.[0]
+        if (primaryImage?.url) {
+            productData.imagePath = primaryImage.url
+        } else if (images?.length === 0) {
+            productData.imagePath = null
+        }
+
+        // Handle itemNumber change: move images folder
+        if (productData.itemNumber) {
+            const currentProduct = await prisma.product.findUnique({
+                where: { id },
+                select: { itemNumber: true }
+            })
+            if (currentProduct && currentProduct.itemNumber !== productData.itemNumber) {
+                const { moveProductImages } = await import('./upload')
+                await moveProductImages(currentProduct.itemNumber, productData.itemNumber)
+            }
+        }
 
         // Use a transaction to update product and its variants
         const product = await prisma.$transaction(async (tx) => {
@@ -189,6 +217,7 @@ export async function updateProduct(id: string, data: any) {
                     price: parseFloat(productData.price),
                     colors: colors || null,
                     alternativeNames: alternativeNames || null,
+                    images: images?.length > 0 ? images : null,
                     category: categoryId ? {
                         connect: { id: categoryId }
                     } : undefined,

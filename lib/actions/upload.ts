@@ -1,76 +1,313 @@
 'use server'
 
-import { writeFile, unlink, readdir } from 'fs/promises'
+import { writeFile, unlink, readdir, rm } from 'fs/promises'
 import { join } from 'path'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
+import { processImageToWebP } from '@/lib/utils/image-processor'
 
-/**
- * Delete old image file if it exists
- * @param imagePath - Relative path to the image (e.g., '/uploads/products/PRD-123/main.webp')
- */
-export async function deleteOldImage(imagePath: string) {
-    try {
-        if (!imagePath) return { success: true }
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-        // Security: Ensure path starts with /uploads to prevent arbitrary file deletion
-        if (!imagePath.startsWith('/uploads/')) {
-            console.warn('محاولة حذف ملف خارج مجلد uploads:', imagePath)
-            return { success: false, error: 'مسار الملف غير صالح' }
-        }
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 
-        const fullPath = join(process.cwd(), 'public', imagePath)
-        if (existsSync(fullPath)) {
-            await unlink(fullPath)
-            console.log('✓ تم حذف الصورة القديمة:', imagePath)
-        }
-        return { success: true }
-    } catch (error) {
-        console.error('خطأ في حذف الصورة:', error)
-        return {
-            success: false,
-            error: 'فشل حذف الصورة القديمة'
-        }
-    }
-}
-
-/**
- * Allowed image MIME types
- */
 const ALLOWED_IMAGE_TYPES = [
     'image/jpeg',
     'image/jpg',
     'image/png',
     'image/webp',
-    'image/gif'
+    'image/gif',
+    'image/avif',
+    'image/heic',
+    'image/heif',
+    'image/bmp',
+    'image/tiff',
 ] as const
 
-/**
- * Sanitize filename to prevent path traversal and special characters
- */
-function sanitizeFilename(filename: string): string {
-    return filename
-        .replace(/[^a-zA-Z0-9.-]/g, '_') // Replace special chars with underscore
-        .replace(/\.{2,}/g, '.') // Replace multiple dots with single dot
-        .replace(/^\./, '') // Remove leading dot
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function sanitizeSlug(value: string): string {
+    return value
         .toLowerCase()
+        .replace(/[^a-z0-9-_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
 }
 
-/**
- * Validate file type based on MIME type
- */
 function isValidImageType(file: File): boolean {
     return ALLOWED_IMAGE_TYPES.includes(file.type as any)
 }
 
+function getPublicDir(): string {
+    return join(process.cwd(), 'public')
+}
+
 /**
- * Upload image with organized structure based on itemNumber
- * @param file - The file to upload
- * @param entityType - Type of entity: 'products', 'categories', etc.
- * @param itemNumber - Item number for organization (e.g., 'PRD-123', 'CLR-PRD123-001')
- * @param subFolder - Optional subfolder (e.g., 'colors', 'variants')
- * @param fieldName - Field name for the image (e.g., 'main', color itemNumber)
- * @param oldImagePath - Optional path to old image to delete
+ * Build the organized folder path for a product
+ * Structure: public/uploads/products/{itemNumber}/
+ */
+function getProductUploadDir(itemNumber: string, subFolder?: string): string {
+    const slug = sanitizeSlug(itemNumber)
+    const parts = [getPublicDir(), 'uploads', 'products', slug]
+    if (subFolder) parts.push(sanitizeSlug(subFolder))
+    return join(...parts)
+}
+
+/**
+ * Build the public URL for a product image
+ */
+function getProductImageUrl(itemNumber: string, filename: string, subFolder?: string): string {
+    const slug = sanitizeSlug(itemNumber)
+    const parts = ['/uploads', 'products', slug]
+    if (subFolder) parts.push(sanitizeSlug(subFolder))
+    parts.push(filename)
+    return parts.join('/')
+}
+
+// ─── Core Upload ──────────────────────────────────────────────────────────────
+
+/**
+ * Upload a product image with organized folder structure.
+ *
+ * @param file          - The image file to upload
+ * @param itemNumber    - Product item number (used as folder name)
+ * @param slot          - Image slot name: 'main', 'gallery-1', 'gallery-2', etc.
+ * @param subFolder     - Optional sub-folder: 'colors', 'variants'
+ * @param oldImagePath  - Optional old image path to delete before saving
+ */
+export async function uploadProductImage(
+    file: File,
+    itemNumber: string,
+    slot: string = 'main',
+    subFolder?: string,
+    oldImagePath?: string | null
+): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+        // ── Validation ──────────────────────────────────────────────────────
+        if (!file || file.size === 0) {
+            return { success: false, error: 'لم يتم اختيار ملف — يُرجى اختيار صورة للرفع' }
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            const sizeMB = (file.size / 1024 / 1024).toFixed(1)
+            return {
+                success: false,
+                error: `حجم الملف (${sizeMB}MB) يتجاوز الحد المسموح (20MB)`,
+            }
+        }
+
+        if (!isValidImageType(file)) {
+            return {
+                success: false,
+                error: 'صيغة الملف غير مدعومة — يُرجى رفع صورة بصيغة JPG، PNG، WEBP، AVIF أو HEIC',
+            }
+        }
+
+        if (!itemNumber?.trim()) {
+            return { success: false, error: 'رقم الصنف مطلوب — يُرجى إدخال رقم الصنف لتحديد مجلد الحفظ' }
+        }
+
+        // ── Prepare paths ────────────────────────────────────────────────────
+        const uploadDir = getProductUploadDir(itemNumber, subFolder)
+        await mkdir(uploadDir, { recursive: true })
+
+        const safeSlot = sanitizeSlug(slot) || 'img'
+
+        // ── Process + write ──────────────────────────────────────────────────
+        const rawBuffer = Buffer.from(await file.arrayBuffer())
+        const { buffer, width, height, size, savedPercent } = await processImageToWebP(rawBuffer)
+
+        // If Sharp converted successfully, save as .webp; otherwise keep original extension
+        const wasConverted = width > 0
+        const ext = wasConverted
+            ? 'webp'
+            : (file.name.split('.').pop()?.toLowerCase() || 'jpg')
+        const filename = `${safeSlot}.${ext}`
+        const filePath = join(uploadDir, filename)
+
+        // ── Delete old image ─────────────────────────────────────────────────
+        if (oldImagePath) {
+            await deleteProductImage(oldImagePath)
+        } else if (existsSync(filePath)) {
+            await unlink(filePath)
+        }
+
+        await writeFile(filePath, buffer)
+
+        const url = getProductImageUrl(itemNumber, filename, subFolder)
+        console.log(
+            wasConverted
+                ? `✓ Image uploaded: ${url} | ${width}×${height} | ${(size / 1024).toFixed(0)}KB | saved ${savedPercent}%`
+                : `⚠ Image saved as-is: ${url} | ${(size / 1024).toFixed(0)}KB (format not convertible)`
+        )
+
+        return { success: true, url }
+    } catch (error) {
+        console.error('Image upload error:', error)
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'تعذّر رفع الصورة — يُرجى المحاولة مجدداً',
+        }
+    }
+}
+
+/**
+ * Upload multiple product images at once.
+ * Slots are auto-named: main, gallery-1, gallery-2, ...
+ */
+export async function uploadProductImages(
+    files: File[],
+    itemNumber: string,
+    startIndex: number = 0
+): Promise<{ success: boolean; urls?: string[]; errors?: string[] }> {
+    const results = await Promise.all(
+        files.map((file, i) => {
+            const slot = startIndex === 0 && i === 0 ? 'main' : `gallery-${startIndex + i}`
+            return uploadProductImage(file, itemNumber, slot)
+        })
+    )
+
+    const urls: string[] = []
+    const errors: string[] = []
+
+    results.forEach((r, i) => {
+        if (r.success && r.url) {
+            urls.push(r.url)
+        } else {
+            errors.push(`الصورة ${i + 1}: ${r.error}`)
+        }
+    })
+
+    return {
+        success: errors.length === 0,
+        urls,
+        errors: errors.length > 0 ? errors : undefined,
+    }
+}
+
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
+/**
+ * Delete a single product image file.
+ */
+export async function deleteProductImage(
+    imagePath: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!imagePath) return { success: true }
+
+        if (!imagePath.startsWith('/uploads/')) {
+            console.warn('Attempted to delete file outside uploads:', imagePath)
+            return { success: false, error: 'مسار الملف غير صالح — تعذّر تحديد موقع الصورة' }
+        }
+
+        const fullPath = join(getPublicDir(), imagePath)
+        if (existsSync(fullPath)) {
+            await unlink(fullPath)
+            console.log(`✓ Image deleted: ${imagePath}`)
+        }
+
+        return { success: true }
+    } catch (error) {
+        console.error('Image delete error:', error)
+        return { success: false, error: 'تعذّر حذف الصورة — يُرجى المحاولة مجدداً' }
+    }
+}
+
+/**
+ * Delete the entire product image folder.
+ * Used when deleting a product.
+ */
+export async function deleteProductFolder(
+    itemNumber: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!itemNumber?.trim()) return { success: true }
+
+        const folderPath = getProductUploadDir(itemNumber)
+        if (existsSync(folderPath)) {
+            await rm(folderPath, { recursive: true, force: true })
+            console.log(`✓ Product folder deleted: ${folderPath}`)
+        }
+
+        return { success: true }
+    } catch (error) {
+        console.error('Folder delete error:', error)
+        return { success: false, error: 'تعذّر حذف مجلد الصور — يُرجى المحاولة مجدداً' }
+    }
+}
+
+// ─── Move / Rename ────────────────────────────────────────────────────────────
+
+/**
+ * Move product images folder when itemNumber changes.
+ * Called automatically when updating a product's itemNumber.
+ */
+export async function moveProductImages(
+    oldItemNumber: string,
+    newItemNumber: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!oldItemNumber || !newItemNumber) return { success: true }
+        if (sanitizeSlug(oldItemNumber) === sanitizeSlug(newItemNumber)) return { success: true }
+
+        const oldDir = getProductUploadDir(oldItemNumber)
+        const newDir = getProductUploadDir(newItemNumber)
+
+        if (!existsSync(oldDir)) return { success: true }
+
+        // Ensure parent exists
+        await mkdir(join(getPublicDir(), 'uploads', 'products'), { recursive: true })
+
+        // Read all files and move them
+        const { rename } = await import('fs/promises')
+        await rename(oldDir, newDir)
+
+        console.log(`✓ Product images moved: ${oldItemNumber} → ${newItemNumber}`)
+        return { success: true }
+    } catch (error) {
+        console.error('Move images error:', error)
+        return { success: false, error: 'تعذّر نقل مجلد الصور — يُرجى المحاولة مجدداً' }
+    }
+}
+
+// ─── Legacy (backward compat) ─────────────────────────────────────────────────
+
+/**
+ * @deprecated Use uploadProductImage instead.
+ * Kept for backward compatibility with old code.
+ */
+export async function uploadImage(formData: FormData) {
+    const file = formData.get('file') as File
+    if (!file) return { success: false, error: 'No file uploaded' }
+
+    if (file.size > MAX_FILE_SIZE) {
+        return { success: false, error: 'File too large (max 5MB)' }
+    }
+
+    if (!isValidImageType(file)) {
+        return { success: false, error: 'Invalid file type' }
+    }
+
+    const uploadDir = join(process.cwd(), 'public/uploads/misc')
+    await mkdir(uploadDir, { recursive: true })
+
+    const ext = file.name.split('.').pop() || 'jpg'
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const path = join(uploadDir, filename)
+
+    await writeFile(path, Buffer.from(await file.arrayBuffer()))
+    return { success: true, url: `/uploads/misc/${filename}` }
+}
+
+/**
+ * @deprecated Use deleteProductImage instead.
+ */
+export async function deleteOldImage(imagePath: string) {
+    return deleteProductImage(imagePath)
+}
+
+/**
+ * @deprecated Use uploadProductImage instead.
  */
 export async function uploadImageWithItemNumber(
     file: File,
@@ -80,114 +317,9 @@ export async function uploadImageWithItemNumber(
     fieldName?: string,
     oldImagePath?: string | null
 ) {
-    try {
-        // Validation: Check if file exists
-        if (!file) {
-            return { success: false, error: 'لم يتم رفع أي ملف' }
-        }
-
-        // Validation: Check MIME type
-        if (!isValidImageType(file)) {
-            return {
-                success: false,
-                error: 'نوع الملف غير مدعوم. يُرجى رفع صورة بصيغة JPG، PNG، WEBP أو GIF'
-            }
-        }
-
-        // Security: Sanitize itemNumber to prevent path traversal
-        const sanitizedItemNumber = sanitizeFilename(itemNumber)
-        if (!sanitizedItemNumber) {
-            return { success: false, error: 'رقم الصنف غير صالح' }
-        }
-
-        // Security: Sanitize subFolder if provided
-        const sanitizedSubFolder = subFolder ? sanitizeFilename(subFolder) : undefined
-
-        // Security: Sanitize fieldName if provided
-        const sanitizedFieldName = fieldName ? sanitizeFilename(fieldName) : undefined
-
-        const bytes = await file.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-
-        // Build directory path
-        const parts = ['public', 'uploads', entityType, sanitizedItemNumber]
-        if (sanitizedSubFolder) {
-            parts.push(sanitizedSubFolder)
-        }
-        const uploadDir = join(process.cwd(), ...parts)
-
-        // Ensure directory exists
-        await mkdir(uploadDir, { recursive: true })
-
-        // Get file extension and sanitize
-        const originalExt = file.name.split('.').pop() || 'jpg'
-        const ext = sanitizeFilename(originalExt)
-
-        // Create filename
-        const filename = sanitizedFieldName ? `${sanitizedFieldName}.${ext}` : `image.${ext}`
-        const filePath = join(uploadDir, filename)
-
-        // Delete old image if exists
-        if (oldImagePath) {
-            await deleteOldImage(oldImagePath)
-        } else if (existsSync(filePath)) {
-            // Delete existing file with same name
-            await unlink(filePath)
-        }
-
-        // Write new file
-        await writeFile(filePath, buffer)
-        console.log('✓ تم رفع الصورة بنجاح:', filename)
-
-        // Build URL path
-        const urlParts = ['/uploads', entityType, sanitizedItemNumber]
-        if (sanitizedSubFolder) {
-            urlParts.push(sanitizedSubFolder)
-        }
-        urlParts.push(filename)
-        const url = urlParts.join('/')
-
-        return { success: true, url }
-    } catch (error) {
-        console.error('خطأ في رفع الصورة:', error)
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'فشل رفع الصورة. الرجاء المحاولة مرة أخرى'
-        }
+    if (entityType === 'products') {
+        return uploadProductImage(file, itemNumber, fieldName || 'main', subFolder, oldImagePath)
     }
-}
-
-/**
- * Legacy upload function - maintains backward compatibility
- * Stores images with timestamp in flat structure
- */
-export async function uploadImage(formData: FormData) {
-    try {
-        const file = formData.get('file') as File
-        if (!file) {
-            return { success: false, error: 'No file uploaded' }
-        }
-
-        const bytes = await file.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-
-        // Ensure directory exists
-        const uploadDir = join(process.cwd(), 'public/uploads')
-        try {
-            await mkdir(uploadDir, { recursive: true })
-        } catch (e) {
-            // Ignore if exists
-        }
-
-        // Unique filename
-        const filename = `${Date.now()}-${file.name.replace(/\s/g, '-')}`
-        const path = join(uploadDir, filename)
-
-        await writeFile(path, buffer)
-
-        return { success: true, url: `/uploads/${filename}` }
-    } catch (error) {
-        console.error('Upload error:', error)
-        return { success: false, error: 'Upload failed' }
-    }
+    // categories fallback
+    return uploadImage(Object.assign(new FormData(), { file }))
 }

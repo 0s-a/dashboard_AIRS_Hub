@@ -22,6 +22,8 @@ interface PersonType {
     id: string
     name: string
     description: string | null
+    color: string | null
+    icon: string | null
     notes: string | null
     createdAt: Date
     updatedAt: Date
@@ -30,6 +32,8 @@ interface PersonType {
 const formSchema = z.object({
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     description: z.string().nullable().optional(),
+    color: z.string().nullable().optional(),
+    icon: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
 })
 
@@ -46,6 +50,8 @@ export function PersonTypeForm({ personType, onSuccess }: PersonTypeFormProps) {
         defaultValues: {
             name: personType?.name || "",
             description: personType?.description || "",
+            color: personType?.color || "#64748b",
+            icon: personType?.icon || "User",
             notes: personType?.notes || "",
         },
     })
@@ -87,6 +93,39 @@ export function PersonTypeForm({ personType, onSuccess }: PersonTypeFormProps) {
                         </FormItem>
                     )}
                 />
+
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="color"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>اللون</FormLabel>
+                                <FormControl>
+                                    <div className="flex gap-2">
+                                        <Input type="color" {...field} value={field.value || "#64748b"} className="w-12 h-9 p-1 shrink-0" />
+                                        <Input placeholder="#000000" {...field} value={field.value || ""} className="font-mono" />
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="icon"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>الأيقونة</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="مثال: User, Star, Crown..." {...field} value={field.value || ""} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
 
                 <FormField
                     control={form.control}

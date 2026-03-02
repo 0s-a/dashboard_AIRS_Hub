@@ -38,19 +38,21 @@ model Category {
 }
 
 model Person {
-  id              String   @id @default(uuid())
+  id              String      @id @default(uuid())
   name            String?
   address         String?
   notes           String?
-  type            String?  @default("عادي")
+  personTypeId    String?
+  personType      PersonType? @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
+  type            String?     @default("عادي")
   source          String?
   contacts        Json? // [{type: "phone"|"email"|"whatsapp", value, label, isPrimary}]
   tags            Json? // ["tag1", "tag2"]
-  isActive        Boolean  @default(true)
-  lastInteraction DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  groups          Group[] // Many-to-many relationship with Group
+  isActive        Boolean     @default(true)
+  lastInteraction DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  groups          Group[]
 
   @@map("Customer")
 }
@@ -62,7 +64,8 @@ model Group {
   tags      Json? // ["tag1", "tag2", ...]
   isActive  Boolean  @default(true)
   category  String?
-  persons   Person[] // Many-to-many relationship with Person
+  personId  String?
+  person    Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -130,7 +133,10 @@ model PersonType {
   id          String   @id @default(uuid())
   name        String   @unique
   description String?
+  color       String?  @default("#64748b")
+  icon        String?  @default("User")
   notes       String?
+  persons     Person[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

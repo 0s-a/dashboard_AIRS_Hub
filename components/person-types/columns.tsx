@@ -6,6 +6,8 @@ interface PersonType {
     id: string
     name: string
     description: string | null
+    color: string | null
+    icon: string | null
     notes: string | null
     createdAt: Date
     updatedAt: Date

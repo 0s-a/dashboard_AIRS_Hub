@@ -1,28 +1,21 @@
-import { getGroup, togglePersonInGroup } from "@/lib/actions/groups"
-import { getPersons } from "@/lib/actions/persons"
+import { getGroup } from "@/lib/actions/groups"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowRight, UsersRound, Calendar, Tag, Plus, Check } from "lucide-react"
+import { ArrowRight, UsersRound, Calendar, Tag, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { GroupPersonsDialog } from "@/components/groups/group-persons-dialog"
-import { DataTable } from "@/components/ui/data-table"
-import { columns } from "@/components/columns" // Re-using Person columns
 
 export const dynamic = "force-dynamic"
 
 export default async function GroupDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = await params;
     const { data: group, success } = await getGroup(resolvedParams.id)
-    const { data: allPersons } = await getPersons()
 
     if (!success || !group) {
         notFound()
     }
 
-    const groupPersonsIds = group.persons.map((p: any) => p.id)
-
-    // Logic moved to group-persons-dialog component
+    const { person } = group;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
@@ -42,7 +35,7 @@ export default async function GroupDetailsPage({ params }: { params: Promise<{ i
                         </Badge>
                     </h2>
                     <p className="text-muted-foreground mt-1 text-sm font-medium">
-                        تفاصيل المجموعة والأشخاص المنتمين إليها
+                        تفاصيل المجموعة ومعلومات المالك
                     </p>
                 </div>
             </div>
@@ -96,35 +89,23 @@ export default async function GroupDetailsPage({ params }: { params: Promise<{ i
                     </div>
                 </div>
 
-                <div className="rounded-xl border bg-primary text-primary-foreground shadow-sm p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                    <div className="absolute inset-0 bg-white/10 dark:bg-black/10 transition-opacity" />
-                    <UsersRound className="size-10 mb-4 opacity-80" />
-                    <h3 className="text-4xl font-bold mb-1 relative z-10">{group.persons.length}</h3>
-                    <p className="text-sm font-medium opacity-80 relative z-10">شخص في هذه المجموعة</p>
+                <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-primary/50 transition-colors">
+                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <User className="size-10 mb-4 text-primary/80" />
+                    <h3 className="text-lg font-bold mb-1 relative z-10 text-foreground">
+                        {person ? person.name : "لا يوجد مالك"}
+                    </h3>
+                    <p className="text-sm font-medium text-muted-foreground relative z-10">
+                        {person?.type || "صاحب المجموعة"}
+                    </p>
+                    {person && (
+                        <Button variant="link" asChild className="mt-2 h-auto p-0 relative z-10">
+                            <Link href={`/persons/${person.id}`}>
+                                عرض الملف الشخصي
+                            </Link>
+                        </Button>
+                    )}
                 </div>
-            </div>
-
-            {/* Persons Table Section */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-lg font-bold">الأشخاص في المجموعة</h3>
-                    </div>
-
-                    <GroupPersonsDialog
-                        groupId={group.id}
-                        allPersons={(allPersons as any) || []}
-                        groupPersonsIds={groupPersonsIds}
-                    />
-                </div>
-
-                <main className="rounded-xl border bg-card shadow-sm overflow-hidden p-1">
-                    <DataTable
-                        columns={columns as any}
-                        data={group.persons as any}
-                        searchPlaceholder="ابحث في أعضاء المجموعة..."
-                    />
-                </main>
             </div>
         </div>
     )

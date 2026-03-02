@@ -62,7 +62,8 @@ export async function getPersons() {
                 lastInteraction: true,
                 createdAt: true,
                 updatedAt: true,
-                groups: true // Added groups
+                groups: true,
+                personType: true
             }
         })
         return { success: true, data: persons }

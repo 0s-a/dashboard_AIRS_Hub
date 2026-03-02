@@ -35,6 +35,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import Link from "next/link"
 
 const formatPhoneNumber = (phone: string) => {
     const cleaned = phone.replace(/\D/g, '')
@@ -57,73 +58,23 @@ function getContactsByType(contacts: ContactItem[], type: string): ContactItem[]
     return contacts.filter(c => c.type === type)
 }
 
-// Person type configuration with icons, colors, and labels
-const personTypeConfig: Record<string, {
-    label: string
-    icon: typeof Crown
-    gradient: string
-    textColor: string
-    borderColor: string
-    bgColor: string
-    dotColor: string
-}> = {
-    'VIP': {
-        label: 'VIP',
-        icon: Crown,
-        gradient: 'from-amber-500/20 to-yellow-500/10',
-        textColor: 'text-amber-700 dark:text-amber-400',
-        borderColor: 'border-amber-400/40',
-        bgColor: 'bg-gradient-to-r from-amber-500/15 to-yellow-500/10',
-        dotColor: 'bg-amber-500',
-    },
-    'مميز': {
-        label: 'مميز',
-        icon: Star,
-        gradient: 'from-violet-500/20 to-purple-500/10',
-        textColor: 'text-violet-700 dark:text-violet-400',
-        borderColor: 'border-violet-400/40',
-        bgColor: 'bg-gradient-to-r from-violet-500/15 to-purple-500/10',
-        dotColor: 'bg-violet-500',
-    },
-    'تاجر': {
-        label: 'تاجر',
-        icon: Building,
-        gradient: 'from-emerald-500/20 to-teal-500/10',
-        textColor: 'text-emerald-700 dark:text-emerald-400',
-        borderColor: 'border-emerald-400/40',
-        bgColor: 'bg-gradient-to-r from-emerald-500/15 to-teal-500/10',
-        dotColor: 'bg-emerald-500',
-    },
-    'مشرف': {
-        label: 'مشرف',
-        icon: ShieldCheck,
-        gradient: 'from-cyan-500/20 to-teal-500/10',
-        textColor: 'text-cyan-700 dark:text-cyan-400',
-        borderColor: 'border-cyan-400/40',
-        bgColor: 'bg-gradient-to-r from-cyan-500/15 to-teal-500/10',
-        dotColor: 'bg-cyan-500',
-    },
-    'جديد': {
-        label: 'جديد',
-        icon: Sparkles,
-        gradient: 'from-sky-500/20 to-cyan-500/10',
-        textColor: 'text-sky-700 dark:text-sky-400',
-        borderColor: 'border-sky-400/40',
-        bgColor: 'bg-gradient-to-r from-sky-500/15 to-cyan-500/10',
-        dotColor: 'bg-sky-500',
-    },
-    'عادي': {
-        label: 'عادي',
-        icon: User,
-        gradient: 'from-slate-500/10 to-gray-500/5',
-        textColor: 'text-slate-600 dark:text-slate-400',
-        borderColor: 'border-slate-300/50',
-        bgColor: 'bg-gradient-to-r from-slate-500/10 to-gray-500/5',
-        dotColor: 'bg-slate-400',
-    },
+const allIcons: Record<string, any> = {
+    Crown, Star, User, Building, Sparkles, ShieldCheck, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power
 }
 
-const defaultTypeConfig = personTypeConfig['عادي']
+function getIcon(name: string | null) {
+    if (!name) return User
+    return allIcons[name] || User
+}
+
+// Helper to get contrast color for text on background
+function getContrastColor(hexColor: string | null) {
+    if (!hexColor) return "text-slate-600 dark:text-slate-400"
+    
+    // Simple heuristic: if it's very light, use dark text, etc.
+    // For now, we'll just return a base set of classes that work with the background
+    return "" 
+}
 
 // Contact type icons & colors
 const contactTypeStyles: Record<string, { icon: typeof Phone; color: string; bgColor: string; hoverBg: string }> = {
@@ -172,18 +123,27 @@ export const columns: ColumnDef<Person>[] = [
                         <span className="font-semibold text-sm truncate max-w-[160px]">{name || "بدون اسم"}</span>
                         <div className="flex items-center gap-1.5 flex-wrap">
                             {groups.map((group: any) => (
-                                <span key={group.id} className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-muted text-muted-foreground border border-border/50">
-                                    {group.number}
-                                </span>
+                                <TooltipProvider key={group.id}>
+                                    <Tooltip delayDuration={300}>
+                                        <TooltipTrigger asChild>
+                                            <Link 
+                                                href={`/groups/${group.id}`}
+                                                className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                                            >
+                                                {group.number}
+                                            </Link>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="text-xs">
+                                            {group.name}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             ))}
                             {tags.slice(0, 2).map((tag, i) => (
-                                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/5 text-blue-600 dark:text-blue-400 border border-blue-500/10">
                                     {tag}
                                 </span>
                             ))}
-                            {tags.length > 2 && (
-                                <span className="text-[10px] text-muted-foreground">+{tags.length - 2}</span>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -191,28 +151,56 @@ export const columns: ColumnDef<Person>[] = [
         }
     },
 
-    // ──────────────────────────────────────
-    // Column 2: Person Type (Professional Badge)
-    // ──────────────────────────────────────
     {
         accessorKey: "type",
         header: "النوع",
         cell: ({ row }) => {
-            const type = row.original.type || 'عادي'
-            const config = personTypeConfig[type] || defaultTypeConfig
-            const TypeIcon = config.icon
+            const person = row.original as any
+            const personType = person.personType
+            const typeName = personType?.name || person.type || 'عادي'
+            const color = personType?.color || "#64748b"
+            const iconName = personType?.icon || "User"
+            const TypeIcon = getIcon(iconName)
 
             return (
                 <div className="flex justify-center">
-                    <div className={`
-                        inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold
-                        border ${config.borderColor} ${config.bgColor} ${config.textColor}
-                        transition-all duration-200 hover:scale-105 cursor-default
-                        shadow-sm
-                    `}>
-                        <TypeIcon className="h-3.5 w-3.5" />
-                        <span>{config.label}</span>
+                    <div 
+                        className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all duration-300 hover:scale-105 cursor-default shadow-[0_0_15px_-3px_rgba(0,0,0,0.1)] hover:shadow-[0_0_20px_-3px_rgba(0,0,0,0.15)] backdrop-blur-md overflow-hidden group/type border"
+                        style={{ 
+                            backgroundColor: `${color}15`, 
+                            color: color,
+                            borderColor: `${color}40`
+                        }}
+                    >
+                         {/* Animated glow effect on hover */}
+                        <div className="absolute inset-0 opacity-0 group-hover/type:opacity-20 transition-opacity duration-500 bg-gradient-to-r from-transparent via-white to-transparent -translate-x-full group-hover/type:translate-x-full blur-sm" />
+                        
+                        <div 
+                            className="h-1.5 w-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)] group-hover/type:scale-125 transition-transform" 
+                            style={{ backgroundColor: color }}
+                        />
+                        <TypeIcon className="h-3.5 w-3.5 opacity-80 group-hover/type:opacity-100 transition-opacity" />
+                        <span className="tracking-tight">{typeName}</span>
                     </div>
+                </div>
+            )
+        }
+    },
+
+    // ──────────────────────────────────────
+    // Column 3.5: Source
+    // ──────────────────────────────────────
+    {
+        accessorKey: "source",
+        header: "المصدر",
+        cell: ({ row }) => {
+            const source = row.original.source
+            if (!source) return <span className="text-muted-foreground text-xs text-center block">-</span>
+            return (
+                <div className="flex justify-center">
+                    <Badge variant="outline" className="text-[10px] font-medium bg-muted/50 text-muted-foreground border-border/50">
+                        {source}
+                    </Badge>
                 </div>
             )
         }
@@ -429,6 +417,24 @@ export const columns: ColumnDef<Person>[] = [
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
+            )
+        }
+    },
+
+    // ──────────────────────────────────────
+    // Column 5.4: Active Status
+    // ──────────────────────────────────────
+    {
+        accessorKey: "isActive",
+        header: "الحالة",
+        cell: ({ row }) => {
+            const isActive = row.original.isActive
+            return (
+                <div className="flex justify-center">
+                    <Badge variant={isActive ? "secondary" : "outline"} className={`text-[10px] font-medium ${isActive ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"}`}>
+                        {isActive ? "نشط" : "غير نشط"}
+                    </Badge>
+                </div>
             )
         }
     },

@@ -41,7 +41,8 @@ const formSchema = z.object({
     name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
     address: z.string().optional(),
     notes: z.string().optional(),
-    type: z.string().optional(),
+    personTypeId: z.string().optional(),
+    type: z.string().optional(), // backward compatibility
     source: z.string().optional(),
     contacts: z.array(contactSchema),
     tags: z.string().optional(), // comma-separated, parsed on submit
@@ -83,6 +84,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
             name: person?.name || "",
             address: person?.address || "",
             notes: person?.notes || "",
+            personTypeId: person?.personTypeId || "",
             type: person?.type || "عادي",
             source: person?.source || "",
             contacts: existingContacts.length > 0
@@ -119,6 +121,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                 name: values.name,
                 address: values.address || null,
                 notes: values.notes || null,
+                personTypeId: values.personTypeId || null,
                 type: values.type || "عادي",
                 source: values.source || null,
                 contacts: cleanContacts.length > 0 ? cleanContacts : null,
@@ -178,7 +181,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
 
                         <FormField
                             control={form.control}
-                            name="type"
+                            name="personTypeId"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
@@ -197,7 +200,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                                 </div>
                                             ) : (
                                                 personTypes.map((pt) => (
-                                                    <SelectItem key={pt.id} value={pt.name}>
+                                                    <SelectItem key={pt.id} value={pt.id}>
                                                         {pt.name}
                                                     </SelectItem>
                                                 ))

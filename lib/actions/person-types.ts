@@ -30,6 +30,8 @@ export async function getPersonTypeById(id: string) {
 export async function createPersonType(data: {
     name: string
     description?: string | null
+    color?: string | null
+    icon?: string | null
     notes?: string | null
 }) {
     try {
@@ -37,6 +39,8 @@ export async function createPersonType(data: {
             data: {
                 name: data.name,
                 description: data.description,
+                color: data.color,
+                icon: data.icon,
                 notes: data.notes,
             }
         })
@@ -54,6 +58,8 @@ export async function createPersonType(data: {
 export async function updatePersonType(id: string, data: {
     name?: string
     description?: string | null
+    color?: string | null
+    icon?: string | null
     notes?: string | null
 }) {
     try {
@@ -62,6 +68,8 @@ export async function updatePersonType(id: string, data: {
             data: {
                 name: data.name,
                 description: data.description,
+                color: data.color,
+                icon: data.icon,
                 notes: data.notes,
             }
         })

@@ -29,13 +29,15 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
 
-type GroupWithCount = Group & {
-    _count?: {
-        persons: number
-    }
+type GroupWithPerson = Group & {
+    person?: {
+        id: string
+        name: string | null
+        type: string | null
+    } | null
 }
 
-export const columns: ColumnDef<GroupWithCount>[] = [
+export const columns: ColumnDef<GroupWithPerson>[] = [
     {
         accessorKey: "number",
         header: "رقم المجموعة",
@@ -88,16 +90,22 @@ export const columns: ColumnDef<GroupWithCount>[] = [
         },
     },
     {
-        id: "personsCount",
-        header: "عدد الأشخاص",
+        id: "person",
+        header: "الشخص المرتبط",
         cell: ({ row }) => {
-            const count = row.original._count?.persons || 0
+            const person = row.original.person
             return (
                 <div className="flex justify-center">
-                    <Badge variant="outline" className="font-mono gap-1.5 text-xs bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                        <UsersRound className="size-3" />
-                        {count}
-                    </Badge>
+                    {person ? (
+                        <Link href={`/persons/${person.id}`} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors cursor-pointer text-xs font-medium">
+                            <UsersRound className="size-3" />
+                            <span className="truncate max-w-[120px]">{person.name || "بدون اسم"}</span>
+                        </Link>
+                    ) : (
+                        <Badge variant="outline" className="text-xs text-muted-foreground italic h-6">
+                            لا يوجد المالك
+                        </Badge>
+                    )}
                 </div>
             )
         },
@@ -188,11 +196,6 @@ export const columns: ColumnDef<GroupWithCount>[] = [
                                 <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
                                 <AlertDialogDescription>
                                     هل أنت متأكد من رغبتك في حذف المجموعة &quot;<strong className="text-foreground">{group.name}</strong>&quot; نهائياً؟
-                                    {(group._count?.persons || 0) > 0 && (
-                                        <span className="block mt-2 p-2 rounded-md bg-red-50 text-red-600 border border-red-200 text-xs">
-                                            ⚠️ يرجى الانتباه: هذه المجموعة مرتبطة بـ {group._count?.persons} شخص، سيتم فك هذا الارتباط.
-                                        </span>
-                                    )}
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter className="flex-row-reverse sm:flex-row-reverse sm:justify-start gap-2">

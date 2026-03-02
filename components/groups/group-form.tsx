@@ -18,10 +18,19 @@ import { Group } from "@prisma/client"
 import { useState } from "react"
 import { toast } from "sonner"
 import { createGroup, updateGroup } from "@/lib/actions/groups"
-import { Loader2, X } from "lucide-react"
+import { Loader2, X, UsersRound } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-
 import { Switch } from "@/components/ui/switch"
+import { getPersons } from "@/lib/actions/persons"
+import { useEffect } from "react"
+import { Person } from "@prisma/client"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 const formSchema = z.object({
     name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
@@ -29,6 +38,7 @@ const formSchema = z.object({
     tags: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
     category: z.string().optional(),
+    personId: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -41,6 +51,17 @@ interface GroupFormProps {
 export function GroupForm({ group, onSuccess }: GroupFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [tagInput, setTagInput] = useState("")
+    const [persons, setPersons] = useState<Person[]>([])
+    const [isLoadingPersons, setIsLoadingPersons] = useState(true)
+
+    useEffect(() => {
+        const fetchPersons = async () => {
+            const { data } = await getPersons()
+            if (data) setPersons(data as any)
+            setIsLoadingPersons(false)
+        }
+        fetchPersons()
+    }, [])
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -50,6 +71,7 @@ export function GroupForm({ group, onSuccess }: GroupFormProps) {
             tags: (group?.tags as string[]) || [], // Tags stored as JSON array
             isActive: group?.isActive ?? true,
             category: group?.category || "",
+            personId: group?.personId || "",
         },
     })
 
@@ -150,6 +172,36 @@ export function GroupForm({ group, onSuccess }: GroupFormProps) {
                                         {...field}
                                     />
                                 </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="personId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-xs font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1">
+                                    <UsersRound className="h-3 w-3" /> مالك المجموعة (اختياري)
+                                </FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value || undefined} disabled={isLoadingPersons}>
+                                    <FormControl>
+                                        <SelectTrigger className="h-11 bg-muted/30 focus:ring-1 focus:ring-primary/20 transition-colors">
+                                            <SelectValue placeholder={isLoadingPersons ? "جاري التحميل..." : "اختر مالكاً للمجموعة..."} />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {persons.map((person) => (
+                                            <SelectItem key={person.id} value={person.id}>
+                                                {person.name || "بدون اسم"}
+                                            </SelectItem>
+                                        ))}
+                                        {persons.length === 0 && !isLoadingPersons && (
+                                            <div className="p-2 text-sm text-center text-muted-foreground">لا يوجد أشخاص متاحون</div>
+                                        )}
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}

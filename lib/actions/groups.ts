@@ -7,8 +7,8 @@ export async function getGroups() {
     try {
         const groups = await prisma.group.findMany({
             include: {
-                _count: {
-                    select: { persons: true }
+                person: {
+                    select: { id: true, name: true, type: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
@@ -25,9 +25,7 @@ export async function getGroup(id: string) {
         const group = await prisma.group.findUnique({
             where: { id },
             include: {
-                persons: {
-                    orderBy: { lastInteraction: 'desc' }
-                }
+                person: true
             }
         })
         if (!group) return { success: false, error: 'المجموعة غير موجودة' }
@@ -38,7 +36,7 @@ export async function getGroup(id: string) {
     }
 }
 
-export async function createGroup(data: { name: string; number: string; tags?: string[]; isActive?: boolean; category?: string | null }) {
+export async function createGroup(data: { name: string; number: string; tags?: string[]; isActive?: boolean; category?: string | null; personId?: string | null }) {
     try {
         const group = await prisma.group.create({
             data: {
@@ -47,6 +45,7 @@ export async function createGroup(data: { name: string; number: string; tags?: s
                 tags: data.tags as any || [],
                 isActive: data.isActive ?? true,
                 category: data.category || null,
+                personId: data.personId || null,
             }
         })
         revalidatePath('/groups')
@@ -58,7 +57,7 @@ export async function createGroup(data: { name: string; number: string; tags?: s
     }
 }
 
-export async function updateGroup(id: string, data: { name?: string; number?: string; tags?: string[]; isActive?: boolean; category?: string | null }) {
+export async function updateGroup(id: string, data: { name?: string; number?: string; tags?: string[]; isActive?: boolean; category?: string | null; personId?: string | null }) {
     try {
         const group = await prisma.group.update({
             where: { id },
@@ -68,6 +67,7 @@ export async function updateGroup(id: string, data: { name?: string; number?: st
                 tags: data.tags as any,
                 isActive: data.isActive,
                 category: data.category,
+                personId: data.personId !== undefined ? data.personId : undefined,
             }
         })
         revalidatePath('/groups')
@@ -107,40 +107,26 @@ export async function toggleGroupActive(id: string, isActive: boolean) {
     }
 }
 
-export async function togglePersonInGroup(personId: string, groupId: string) {
+export async function setGroupPerson(groupId: string, personId: string | null) {
     try {
         const group = await prisma.group.findUnique({
-            where: { id: groupId },
-            include: { persons: { select: { id: true } } }
+            where: { id: groupId }
         })
 
         if (!group) return { success: false, error: 'المجموعة غير موجودة' }
 
-        const isLinked = group.persons.some((p: any) => p.id === personId)
-
-        if (isLinked) {
-            await prisma.group.update({
-                where: { id: groupId },
-                data: {
-                    persons: { disconnect: { id: personId } }
-                }
-            })
-        } else {
-            await prisma.group.update({
-                where: { id: groupId },
-                data: {
-                    persons: { connect: { id: personId } }
-                }
-            })
-        }
+        await prisma.group.update({
+            where: { id: groupId },
+            data: { personId }
+        })
 
         revalidatePath('/dashboard/groups')
         revalidatePath(`/dashboard/groups/${groupId}`)
         revalidatePath('/dashboard/persons')
 
-        return { success: true, linked: !isLinked }
+        return { success: true }
     } catch (error) {
-        console.error('Failed to toggle person in group:', error)
+        console.error('Failed to set group person:', error)
         return { success: false, error: 'فشل ربط/فك ربط الشخص بالمجموعة' }
     }
 }

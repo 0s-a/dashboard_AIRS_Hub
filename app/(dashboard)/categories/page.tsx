@@ -8,16 +8,10 @@ import { CategoryTable } from "@/components/categories/category-table"
 import { getCategories } from "@/lib/actions/categories"
 import { Category } from "@prisma/client"
 
-type CategoryWithCount = Category & {
-    _count: {
-        products: number
-    }
-}
-
 export default function CategoriesPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
     const [selectedCategory, setSelectedCategory] = useState<Category | undefined>()
-    const [categories, setCategories] = useState<CategoryWithCount[]>([])
+    const [categories, setCategories] = useState<Category[]>([])
 
     useEffect(() => {
         loadCategories()
@@ -47,7 +41,6 @@ export default function CategoriesPage() {
     }
 
     const activeCount = categories.filter(c => c.isActive).length
-    const totalProducts = categories.reduce((sum, c) => sum + c._count.products, 0)
 
     return (
         <div className="space-y-6">
@@ -99,17 +92,6 @@ export default function CategoriesPage() {
                     </div>
                 </div>
 
-                <div className="glass-panel rounded-xl p-6 border border-border/50">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">إجمالي المنتجات</p>
-                            <h3 className="text-3xl font-bold mt-2">{totalProducts}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-                            <span className="text-2xl">📦</span>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Table */}

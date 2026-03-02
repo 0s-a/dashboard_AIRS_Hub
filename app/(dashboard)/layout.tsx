@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Button } from "@/components/ui/button"
 
@@ -67,12 +67,20 @@ export default function DashboardLayout({
                             <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>المخزون</span>
                         </Link>
                         <Link
-                            href="/crm"
+                            href="/persons"
                             className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "العملاء" : ""}
+                            title={isCollapsed ? "الأشخاص" : ""}
                         >
                             <Users className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>العملاء</span>
+                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>الأشخاص</span>
+                        </Link>
+                        <Link
+                            href="/groups"
+                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
+                            title={isCollapsed ? "المجموعات" : ""}
+                        >
+                            <UserSquare2 className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
+                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>المجموعات</span>
                         </Link>
                         <Link
                             href="/categories"
@@ -82,6 +90,31 @@ export default function DashboardLayout({
                             <Layers className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
                             <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>التصنيفات</span>
                         </Link>
+                        <Link
+                            href="/price-labels"
+                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
+                            title={isCollapsed ? "مسميات التسعيرات" : ""}
+                        >
+                            <Tag className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
+                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>مسميات التسعيرات</span>
+                        </Link>
+                        <Link
+                            href="/person-types"
+                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
+                            title={isCollapsed ? "أنواع الأشخاص" : ""}
+                        >
+                            <UserCog className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
+                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>أنواع الأشخاص</span>
+                        </Link>
+                        <Link
+                            href="/gallery"
+                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
+                            title={isCollapsed ? "معرض الصور" : ""}
+                        >
+                            <Images className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
+                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>معرض الصور</span>
+                        </Link>
+
                     </nav>
                     <div className={`mt-auto p-4 border-t border-border/50 ${isCollapsed ? 'hidden' : ''}`}>
                         <div className="bg-muted/50 rounded-xl p-3 flex items-center gap-3">

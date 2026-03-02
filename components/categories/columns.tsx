@@ -28,13 +28,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-type CategoryWithCount = Category & {
-    _count: {
-        products: number
-    }
-}
-
-export const columns: ColumnDef<CategoryWithCount>[] = [
+export const columns: ColumnDef<Category>[] = [
     {
         accessorKey: "itemNumber",
         header: "رقم الصنف",
@@ -75,20 +69,7 @@ export const columns: ColumnDef<CategoryWithCount>[] = [
         },
     },
 
-    {
-        accessorKey: "_count.products",
-        header: "عدد المنتجات",
-        cell: ({ row }) => {
-            const count = row.original._count.products
-            return (
-                <div className="text-center">
-                    <Badge variant="secondary" className="font-mono">
-                        {count}
-                    </Badge>
-                </div>
-            )
-        },
-    },
+
     {
         accessorKey: "isActive",
         header: "الحالة",
@@ -182,11 +163,7 @@ export const columns: ColumnDef<CategoryWithCount>[] = [
                                 <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                                 <AlertDialogDescription>
                                     سيتم حذف التصنيف "{category.name}" بشكل نهائي.
-                                    {category._count.products > 0 && (
-                                        <span className="block mt-2 text-destructive font-bold">
-                                            تحذير: هذا التصنيف مرتبط بـ {category._count.products} منتج ولا يمكن حذفه.
-                                        </span>
-                                    )}
+
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

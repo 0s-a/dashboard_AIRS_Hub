@@ -4,14 +4,10 @@ import { DataTable } from "@/components/ui/data-table"
 import { columns } from "./columns"
 import { Category } from "@prisma/client"
 
-type CategoryWithCount = Category & {
-    _count: {
-        products: number
-    }
-}
+
 
 interface CategoryTableProps {
-    data: CategoryWithCount[]
+    data: Category[]
 }
 
 export function CategoryTable({ data }: CategoryTableProps) {

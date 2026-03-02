@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { getProductById } from "@/lib/actions/inventory"
 import { ProductDetailsClient } from "@/components/inventory/product-details-client"
+import type { PriceEntry } from "@/lib/actions/inventory"
 
 export default async function ProductDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -13,21 +14,14 @@ export default async function ProductDetailsPage({ params }: { params: Promise<{
     // Transform JsonValue fields to expected types
     const transformedProduct = {
         ...result.data,
-        imagePath: (result.data as any).imagePath ?? null,
-        colors: result.data.colors as Array<{
-            itemNumber: string
-            name: string
-            code: string
-            imagePath: string | null
-        }> | null,
-        images: result.data.images as Array<{
-            url: string
-            alt?: string
-            isPrimary: boolean
-            order?: number
-        }> | null,
-        alternativeNames: result.data.alternativeNames as string[] | null
+        prices: (result.data as any).prices as PriceEntry[] | null,
+        variants: (result.data as any).variants || [],
+        mediaImages: (result.data as any).mediaImages || [],
+        alternativeNames: result.data.alternativeNames as string[] | null,
+        tags: (result.data as any).tags as string[] | null,
+        productTags: ((result.data as any).productTags || []).map((pt: any) => pt.tag)
     }
 
     return <ProductDetailsClient product={transformedProduct} />
 }
+

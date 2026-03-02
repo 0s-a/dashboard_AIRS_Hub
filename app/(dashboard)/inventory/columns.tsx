@@ -16,9 +16,12 @@ import {
     ChevronRight,
     ChevronDown,
     Plus,
-    SearchCheck
+    SearchCheck,
+    Copy,
+    Check
 } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -70,8 +73,8 @@ export const customGlobalFilterFn = (row: any, columnId: string, filterValue: st
             name.toLowerCase().includes(searchValue)
         )
         if (matchedName) {
-            // Store match info for highlighting
-            row.matchedViaAlternativeName = matchedName
+            // We use standard row object to check matching, instead of mutating it.
+            // Component should calculate this independently if needed for UI, or use a safe non-mutating context map.
             return true
         }
     }
@@ -173,20 +176,6 @@ const ActionCell = ({ product }: { product: Product }) => {
     )
 }
 
-// --- Helper: Get Tier Styles ---
-const getTierBadgeProps = (tier: string | null) => {
-    switch (tier?.toUpperCase()) {
-        case 'A':
-            return { className: "bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-100", label: "Tier A" }
-        case 'B':
-            return { className: "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100", label: "Tier B" }
-        case 'C':
-            return { className: "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-100", label: "Tier C" }
-        default:
-            return { className: "bg-gray-50 text-gray-500 border-gray-100 hover:bg-gray-50", label: tier || "-" }
-    }
-}
-
 // --- Table Columns Definition ---
 export const columns: ColumnDef<Product>[] = [
     {
@@ -222,45 +211,52 @@ export const columns: ColumnDef<Product>[] = [
             return (
                 <div className="flex items-center gap-4">
                     {/* Product Image Section */}
-                    {product.imagePath ? (
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border bg-muted/20 cursor-zoom-in group transition-all hover:ring-2 hover:ring-primary/20">
-                                    <Image
-                                        src={product.imagePath}
-                                        alt={product.name}
-                                        fill
-                                        className="object-cover transition-transform duration-300 group-hover:scale-110"
-                                    />
-                                </div>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
-                                <div className="relative aspect-square w-full max-h-[80vh]">
-                                    <Image
-                                        src={product.imagePath}
-                                        alt={product.name}
-                                        fill
-                                        className="object-contain"
-                                        priority
-                                    />
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    ) : (
-                        <div className="h-14 w-14 shrink-0 rounded-xl bg-muted/30 border border-dashed flex items-center justify-center">
-                            <Package className="h-6 w-6 text-muted-foreground/30" />
-                        </div>
-                    )}
+                    {(() => {
+                        const mediaImages = (product as any).mediaImages as Array<{ url: string; isPrimary: boolean }> | null
+                        const src = mediaImages?.find(i => i.isPrimary)?.url ?? mediaImages?.[0]?.url
+                        return src ? (
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border bg-muted/20 cursor-zoom-in group transition-all hover:ring-2 hover:ring-primary/40 shadow-sm">
+                                        <Image
+                                            src={src}
+                                            alt={product.name}
+                                            fill
+                                            className="object-cover transition-transform duration-500 group-hover:scale-110"
+                                        />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                                    </div>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
+                                    <div className="relative aspect-square w-full max-h-[80vh]">
+                                        <Image
+                                            src={src}
+                                            alt={product.name}
+                                            fill
+                                            className="object-contain"
+                                            priority
+                                        />
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        ) : (
+                            <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/30 border border-dashed flex items-center justify-center">
+                                <Package className="h-5 w-5 text-muted-foreground/30" />
+                            </div>
+                        )
+                    })()}
 
                     {/* Product Details Section - Wrapped in Link */}
-                    <Link
-                        href={`/inventory/${product.id}`}
-                        className="flex flex-col gap-1 min-w-0 group/link"
+                    <div
+                        className="flex flex-col gap-0.5 min-w-0 group/link"
                     >
                         <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-sm text-foreground truncate group-hover/link:text-primary transition-colors">
+                            <Link
+                                href={`/inventory/${product.id}`}
+                                className="font-bold text-[13px] text-foreground truncate hover:text-primary transition-colors decoration-primary/30 underline-offset-4 hover:underline"
+                            >
                                 {product.name}
-                            </span>
+                            </Link>
                             {/* Match via Alternative Name Indicator */}
                             {(row as any).matchedViaAlternativeName && (
                                 <TooltipProvider delayDuration={0}>
@@ -283,10 +279,20 @@ export const columns: ColumnDef<Product>[] = [
                                 </TooltipProvider>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                                ID: {product.itemNumber}
-                            </span>
+                        <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                            <div className="flex items-center gap-1 group/copy cursor-pointer bg-muted/40 hover:bg-muted/60 px-1.5 py-0.5 rounded transition-colors"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    navigator.clipboard.writeText(product.itemNumber);
+                                    toast.success('تم نسخ رقم الصنف');
+                                }}
+                            >
+                                <span className="text-muted-foreground font-mono">
+                                    {product.itemNumber}
+                                </span>
+                                <Copy className="h-2.5 w-2.5 text-muted-foreground/50 group-hover/copy:text-primary transition-colors" />
+                            </div>
+                            
                             {/* Variants Badge */}
                             {(product as any).variants?.length > 0 && (
                                 <TooltipProvider>
@@ -294,7 +300,7 @@ export const columns: ColumnDef<Product>[] = [
                                         <TooltipTrigger asChild>
                                             <Badge
                                                 variant="secondary"
-                                                className="px-1.5 py-0 text-[10px] bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+                                                className="px-1.5 py-0 text-[10px] bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 cursor-pointer"
                                                 onClick={(e) => {
                                                     e.preventDefault()
                                                     row.toggleExpanded()
@@ -305,12 +311,15 @@ export const columns: ColumnDef<Product>[] = [
                                         </TooltipTrigger>
                                         <TooltipContent>
                                             <div className="flex flex-col gap-1 text-xs">
-                                                {(product as any).variants.map((v: any, i: number) => (
-                                                    <span key={i} className="flex items-center gap-2">
-                                                        <span>{v.name}</span>
-                                                        {v.price && <span className="opacity-70">({Number(v.price).toFixed(2)} ر.ي)</span>}
-                                                    </span>
-                                                ))}
+                                                {(product as any).variants.map((v: any, i: number) => {
+                                                    const priceToUse = v.price || (product as any).prices?.[0]?.value;
+                                                    return (
+                                                        <span key={i} className="flex items-center justify-between gap-4">
+                                                            <span>{v.name}</span>
+                                                            {priceToUse && <span className="opacity-70 font-mono">({Number(priceToUse).toLocaleString('en-US')} ر.ي)</span>}
+                                                        </span>
+                                                    )
+                                                })}
                                             </div>
                                         </TooltipContent>
                                     </Tooltip>
@@ -355,55 +364,44 @@ export const columns: ColumnDef<Product>[] = [
                                 </TooltipProvider>
                             </div>
                         )}
-                        {/* Colors Display */}
-                        {(product as any).colors && Array.isArray((product as any).colors) && (product as any).colors.length > 0 && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
+                        {/* Variants Dots Display */}
+                        {(product as any).variants && Array.isArray((product as any).variants) && (product as any).variants.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1.5 px-0.5">
                                 <TooltipProvider delayDuration={0}>
-                                    {(product as any).colors.map((color: any, idx: number) => (
+                                    {(product as any).variants.slice(0, 6).map((variant: any, idx: number) => (
                                         <Tooltip key={idx}>
                                             <TooltipTrigger asChild>
                                                 <div
-                                                    className="h-5 w-5 rounded-md border-2 border-white shadow-sm ring-1 ring-black/10 cursor-pointer transition-all hover:scale-110 hover:ring-2 hover:ring-primary/50"
-                                                    style={{ backgroundColor: color.code }}
-                                                    onClick={(e) => e.preventDefault()}
+                                                    className="h-4.5 w-4.5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/5 cursor-pointer transition-all hover:scale-125 hover:ring-primary/50 hover:z-10 -ml-1 first:ml-0"
+                                                    style={{ backgroundColor: variant.hex || '#9ca3af' }}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        row.toggleExpanded();
+                                                    }}
                                                 />
                                             </TooltipTrigger>
                                             <TooltipContent side="bottom" className="text-xs">
                                                 <div className="flex flex-col gap-0.5">
-                                                    <span className="font-medium">{color.name}</span>
-                                                    <span className="text-muted-foreground font-mono">{color.code}</span>
+                                                    <span className="font-medium">{variant.name}</span>
+                                                    <span className="text-[10px] text-muted-foreground font-mono">{variant.variantNumber}</span>
                                                 </div>
                                             </TooltipContent>
                                         </Tooltip>
                                     ))}
+                                    {(product as any).variants.length > 6 && (
+                                        <div className="text-[9px] font-bold text-muted-foreground bg-muted h-4.5 w-4.5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/5 flex items-center justify-center -ml-1">
+                                            +{(product as any).variants.length - 6}
+                                        </div>
+                                    )}
                                 </TooltipProvider>
                             </div>
                         )}
-                    </Link>
+                    </div>
                 </div>
             )
         },
     },
-    {
-        accessorKey: "category",
-        header: "المجموعة",
-        enableGrouping: true,
-        cell: ({ row }) => {
-            const category = (row.original as any).category
-            return (
-                <div className="flex items-center">
-                    {category ? (
-                        <Badge variant="outline" className="px-2 py-1 text-xs bg-secondary/30 text-secondary-foreground font-medium border-secondary/20 hover:bg-secondary/40">
-                            {category.icon && <span className="mr-1">{category.icon}</span>}
-                            {category.name}
-                        </Badge>
-                    ) : (
-                        <span className="text-xs text-muted-foreground">غير محدد</span>
-                    )}
-                </div>
-            )
-        },
-    },
+
     {
         accessorKey: "brand",
         header: "البراند",
@@ -423,49 +421,59 @@ export const columns: ColumnDef<Product>[] = [
             )
         },
     },
+
     {
-        accessorKey: "unit",
-        header: "الوحدة والعبوة",
-        enableGrouping: true,
+        accessorKey: "prices",
+        header: "الأسعار",
         cell: ({ row }) => {
-            const product = row.original
+            const product = row.original;
+            const prices: Array<{ label: string; value: number, currency?: string, unit?: string, quantity?: number }> = (product as any).prices || []
+            
+            if (prices.length === 0) {
+                return <span className="text-muted-foreground text-[11px] italic">لا يوجد تسعير</span>
+            }
+
             return (
-                <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                        <Box className="h-3.5 w-3.5 text-muted-foreground" />
-                        {product.unit}
-                    </div>
-                    <span className="text-[11px] text-muted-foreground line-clamp-1">
-                        {product.packaging || "-"}
-                    </span>
-                </div>
-            )
-        }
-    },
-    {
-        accessorKey: "tier",
-        header: "المستوى",
-        enableGrouping: true,
-        cell: ({ row }) => {
-            const props = getTierBadgeProps(row.original.tier)
-            return (
-                <Badge variant="outline" className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold border ${props.className}`}>
-                    {props.label}
-                </Badge>
-            )
-        }
-    },
-    {
-        accessorKey: "price",
-        header: "السعر",
-        cell: ({ row }) => {
-            const amount = parseFloat(row.getValue("price"))
-            return (
-                <div className="flex items-baseline gap-1">
-                    <span className="font-mono text-base font-bold tabular-nums text-foreground">
-                        {amount.toFixed(2)}
-                    </span>
-                    <span className="text-[10px] font-medium text-muted-foreground">ر.ي</span>
+                <div className="flex flex-col gap-1.5 w-full min-w-[120px]">
+                    {prices.map((p, i) => (
+                        <div 
+                            key={i} 
+                            className={cn(
+                                "flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg border transition-colors w-full",
+                                i === 0 
+                                    ? "bg-linear-to-r from-emerald-500/10 to-teal-500/5 hover:from-emerald-500/20 hover:to-teal-500/10 border-emerald-500/30 shadow-xs" 
+                                    : "bg-muted/30 hover:bg-muted/50 border-border/40"
+                            )}
+                        >
+                            <div className="flex flex-col flex-1 min-w-0 pr-2">
+                                <span className={cn(
+                                    "text-[10px] truncate",
+                                    i === 0 ? "font-bold text-emerald-700/90" : "font-semibold text-foreground/80"
+                                )} title={p.label}>
+                                    {p.label}
+                                </span>
+                                {p.unit && (
+                                    <span className="text-[8px] text-muted-foreground truncate">
+                                        {p.quantity ? `${p.quantity} ` : ''}{p.unit}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex items-baseline gap-1 shrink-0">
+                                <span className={cn(
+                                    "font-mono tabular-nums",
+                                    i === 0 ? "text-[14px] font-extrabold text-emerald-700" : "text-[12px] font-bold text-foreground/90"
+                                )}>
+                                    {Number(p.value).toLocaleString('en-US')}
+                                </span>
+                                <span className={cn(
+                                    "text-[8px] font-bold uppercase mb-0.5",
+                                    i === 0 ? "text-emerald-600/80" : "text-muted-foreground/80"
+                                )}>
+                                    {p.currency || 'ر.ي'}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )
         },

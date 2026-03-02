@@ -40,14 +40,14 @@ export function WelcomeSection() {
                         إضافة منتج
                     </Button>
                 </Link>
-                <Link href="/crm">
+                <Link href="/persons">
                     <Button
                         variant="outline"
                         className="group shadow-md hover:shadow-lg transition-all duration-300"
                         size="lg"
                     >
                         <Users className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
-                        إضافة عميل
+                        إضافة شخص
                     </Button>
                 </Link>
                 <Button

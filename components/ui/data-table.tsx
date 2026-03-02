@@ -164,9 +164,10 @@ export function DataTable<TData, TValue>({
                 </div>
             </div>
 
-            <div className="card-premium overflow-hidden">
-                <Table>
-                    <TableHeader className="bg-muted/30">
+            <div className="card-premium overflow-hidden flex flex-col max-h-[calc(100vh-280px)]">
+                <div className="overflow-auto custom-scrollbar">
+                    <Table>
+                        <TableHeader className="bg-muted/30 sticky top-0 z-10 backdrop-blur-md shadow-sm">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id} className="hover:bg-transparent border-b border-border/50">
                                 {headerGroup.headers.map((header) => {
@@ -176,7 +177,7 @@ export function DataTable<TData, TValue>({
                                         <TableHead
                                             key={header.id}
                                             className={cn(
-                                                "h-12 px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right",
+                                                "h-10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right",
                                                 isSortable && "cursor-pointer select-none hover:text-foreground transition-colors"
                                             )}
                                             onClick={header.column.getToggleSortingHandler()}
@@ -225,8 +226,8 @@ export function DataTable<TData, TValue>({
                                                     <TableCell
                                                         key={cell.id}
                                                         className={cn(
-                                                            "px-4 py-4",
-                                                            isGrouped && "py-3"
+                                                            "px-3 py-2",
+                                                            isGrouped && "py-2"
                                                         )}
                                                     >
                                                         {cell.getIsGrouped() ? (
@@ -302,6 +303,7 @@ export function DataTable<TData, TValue>({
                         )}
                     </TableBody>
                 </Table>
+                </div>
             </div>
 
             {/* Pagination UI */}

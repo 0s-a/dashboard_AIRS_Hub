@@ -7,7 +7,7 @@ import { TrendingUp } from "lucide-react"
 interface ActivityData {
     date: string
     products: number
-    customers: number
+    persons: number
 }
 
 interface ActivityChartProps {
@@ -25,7 +25,7 @@ export function ActivityChart({ data }: ActivityChartProps) {
                             نشاط النظام
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
-                            إحصائيات المنتجات والعملاء في آخر 7 أيام
+                            إحصائيات المنتجات والأشخاص في آخر 7 أيام
                         </p>
                     </div>
                 </div>
@@ -76,12 +76,12 @@ export function ActivityChart({ data }: ActivityChartProps) {
                         />
                         <Area
                             type="monotone"
-                            dataKey="customers"
+                            dataKey="persons"
                             stroke="#10b981"
                             strokeWidth={2}
                             fillOpacity={1}
                             fill="url(#colorCustomers)"
-                            name="العملاء"
+                            name="الأشخاص"
                         />
                     </AreaChart>
                 </ResponsiveContainer>

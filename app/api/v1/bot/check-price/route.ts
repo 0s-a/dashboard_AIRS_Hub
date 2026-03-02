@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             data: {
                 productId: product.id,
                 productName: product.name,
-                price: product.price,
+                prices: product.prices || [],
                 currency: 'SAR'
             }
         })

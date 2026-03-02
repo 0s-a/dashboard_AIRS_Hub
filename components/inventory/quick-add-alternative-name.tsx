@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { addAlternativeNameToProduct } from "@/lib/actions/inventory"
+import { addAlternativeNameToProduct, removeAlternativeNameFromProduct } from "@/lib/actions/inventory"
 
 interface QuickAddAlternativeNameProps {
     productId: string
@@ -35,6 +35,29 @@ export function QuickAddAlternativeName({
     const [open, setOpen] = useState(false)
     const [newName, setNewName] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [removingName, setRemovingName] = useState<string | null>(null)
+
+    const handleRemoveName = async (e: React.MouseEvent, nameToRemove: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+
+        if (removingName || isSubmitting) return
+
+        setRemovingName(nameToRemove)
+        try {
+            const result = await removeAlternativeNameFromProduct(productId, nameToRemove)
+            if (result.success) {
+                toast.success('تم إزالة الاسم', { description: `تم إزالة "${nameToRemove}" من الأسماء البديلة للمنتج` })
+                router.refresh()
+            } else {
+                toast.error('فشل إزالة الاسم', { description: result.error || 'تعذّر إزالة الاسم البديل' })
+            }
+        } catch {
+            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى المحاولة مجدداً' })
+        } finally {
+            setRemovingName(null)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -113,8 +136,13 @@ export function QuickAddAlternativeName({
                                     <Badge
                                         key={idx}
                                         variant="outline"
-                                        className="px-2 py-0.5 text-xs bg-muted/50 text-muted-foreground hover:bg-muted cursor-default"
+                                        className={`px-2 py-0.5 text-xs bg-muted/50 text-muted-foreground transition-all flex items-center gap-1 ${removingName === name ? 'opacity-50 pointer-events-none' : 'hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 cursor-pointer'}`}
+                                        onClick={(e) => handleRemoveName(e, name)}
+                                        title="انقر للإزالة"
                                     >
+                                        {removingName === name && (
+                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                        )}
                                         {name}
                                     </Badge>
                                 ))}

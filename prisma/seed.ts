@@ -8,23 +8,20 @@ async function main() {
     // 1. تعريف المنتجات مع الحقول الجديدة (رقم الصنف، الوحدة، المستوى، العبوة)
     const products = [
         {
-            itemNumber: 'APPLE-001', // ضروري للربط والبحث
+            itemNumber: 'APPLE-001',
             name: 'آيفون 15 برو ماكس',
             description: 'أحدث هاتف آيفون بتصميم من التيتانيوم.',
-            price: 5499.00,
+            prices: [{ label: 'سعر المفرد', value: 5499.00 }],
             unit: 'حبة',
-            tier: 'A', // صنف عالي الأهمية
             packaging: '1x1',
             isAvailable: true,
-            // imagePath: '/images/iphone15.png' // يمكنك إضافة مسار صورة حقيقي هنا
         },
         {
             itemNumber: 'APPLE-002',
             name: 'ساعة آبل الترا 2',
             description: 'ساعة رياضية متطورة للغواصين والرياضيين.',
-            price: 3299.00,
+            prices: [{ label: 'سعر المفرد', value: 3299.00 }],
             unit: 'حبة',
-            tier: 'B',
             packaging: '1x1',
             isAvailable: true,
         },
@@ -32,19 +29,17 @@ async function main() {
             itemNumber: 'APPLE-003',
             name: 'ماك بوك اير M3',
             description: 'لابتوب نحيف وقوي بمعالج M3 الجديد.',
-            price: 4999.00,
+            prices: [{ label: 'سعر المفرد', value: 4999.00 }],
             unit: 'كرتون',
-            tier: 'A',
-            packaging: '6 حبات', // مثال لو كان يباع بالجملة أو وصف للتغليف
-            isAvailable: false, // لنجرب حالة غير متوفر
+            packaging: '6 حبات',
+            isAvailable: false,
         },
         {
             itemNumber: 'ACC-101',
             name: 'شاحن 20 واط أصلي',
             description: 'شاحن سريع من آبل.',
-            price: 99.00,
+            prices: [{ label: 'سعر المفرد', value: 99.00 }, { label: 'سعر الجملة', value: 80.00 }],
             unit: 'حبة',
-            tier: 'C',
             packaging: '24x1',
             isAvailable: true,
         }
@@ -61,32 +56,34 @@ async function main() {
         console.log(`  └─ Created/Updated product: ${product.name} (#${product.itemNumber})`)
     }
 
-    // 2. تعريف العملاء
-    const customers = [
+    // 2. تعريف الأشخاص
+    const persons = [
         {
-            phoneNumber: '+966500000001',
+            id: 'seed-customer-001',
             name: 'أحمد القحطاني',
-            totalOrders: 5,
+            contacts: [
+                { type: 'phone', value: '+966500000001', label: 'شخصي', isPrimary: true }
+            ],
             isActive: true,
-
         },
         {
-            phoneNumber: '+966500000002',
+            id: 'seed-customer-002',
             name: 'سارة العتيبي',
-            totalOrders: 12,
+            contacts: [
+                { type: 'phone', value: '+966500000002', label: 'شخصي', isPrimary: true }
+            ],
             isActive: true,
-
         }
     ]
 
-    console.log('\n👥 Seeding Customers...')
-    for (const c of customers) {
-        const customer = await prisma.customer.upsert({
-            where: { phoneNumber: c.phoneNumber },
+    console.log('\n👥 Seeding Persons...')
+    for (const c of persons) {
+        const person = await prisma.person.upsert({
+            where: { id: c.id },
             update: {},
             create: c,
         })
-        console.log(`  └─ Created/Updated customer: ${customer.name}`)
+        console.log(`  └─ Created/Updated person: ${person.name}`)
     }
 
     console.log('\n✅ Seeding finished.')

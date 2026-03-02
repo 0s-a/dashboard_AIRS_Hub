@@ -6,6 +6,7 @@ export type ProductImage = {
     alt?: string
     isPrimary: boolean
     order?: number
+    mediaImageId?: string
 }
 
 /**

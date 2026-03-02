@@ -7,11 +7,7 @@ export async function getCategories(activeOnly: boolean = false) {
     try {
         const categories = await prisma.category.findMany({
             where: activeOnly ? { isActive: true } : undefined,
-            include: {
-                _count: {
-                    select: { products: true }
-                }
-            },
+
             orderBy: { name: 'asc' },
         })
         return { success: true, data: categories }
@@ -25,11 +21,7 @@ export async function getCategoryById(id: string) {
     try {
         const category = await prisma.category.findUnique({
             where: { id },
-            include: {
-                _count: {
-                    select: { products: true }
-                }
-            }
+
         })
         return { success: true, data: category }
     } catch (error) {
@@ -98,23 +90,14 @@ export async function deleteCategory(id: string) {
         // Check if category has products
         const category = await prisma.category.findUnique({
             where: { id },
-            include: {
-                _count: {
-                    select: { products: true }
-                }
-            }
+
         })
 
         if (!category) {
             return { success: false, error: 'التصنيف غير موجود' }
         }
 
-        if (category._count.products > 0) {
-            return {
-                success: false,
-                error: `لا يمكن حذف هذا التصنيف لأنه مرتبط بـ ${category._count.products} منتج`
-            }
-        }
+
 
         await prisma.category.delete({
             where: { id },

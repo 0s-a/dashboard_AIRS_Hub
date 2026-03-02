@@ -1,75 +1,119 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-export async function toggleProductAvailability(id: string, currentStatus: boolean) {
-    try {
-        const updatedProduct = await prisma.product.update({
-            where: { id },
-            data: { isAvailable: !currentStatus },
-        })
+// ─────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────
 
-        revalidatePath('/inventory')
+export type PriceEntry = { label: string; value: number; currency?: string; unit?: string; quantity?: number }
+export type ImageEntry = { url?: string; alt?: string; isPrimary: boolean; order?: number; mediaImageId?: string }
 
-        return {
-            success: true,
-            data: {
-                ...updatedProduct,
-                price: Number(updatedProduct.price)
-            }
-        }
-    } catch (error) {
-        console.error('Failed to toggle availability:', error)
-        return { success: false, error: 'Failed to update status' }
+// Item number must be 3 segments separated by dashes (e.g. 001-BF-483)
+const ITEM_NUMBER_REGEX = /^\S+-\S+-\S+$/
+
+export interface ProductInput {
+    itemNumber: string
+    name: string
+    brand?: string | null
+    description?: string | null
+    isAvailable?: boolean
+    categoryId?: string | null
+    alternativeNames?: string[]
+    tags?: string[]
+    prices?: PriceEntry[]
+}
+
+// ─────────────────────────────────────────────
+// INTERNAL HELPERS
+// ─────────────────────────────────────────────
+
+// Standard include for product queries
+const PRODUCT_INCLUDE = {
+    productImages: { include: { mediaImage: true, variants: { select: { id: true } } } },
+    variants: {
+        orderBy: { order: 'asc' as const },
+        include: { variantImages: { include: { mediaImage: true } } },
+    },
+}
+
+function serializeProduct(product: any) {
+    // Flatten productImages junction into flat image records
+    const mediaImages = (product.productImages || []).map((pi: any) => ({
+        id: pi.id,
+        mediaImageId: pi.mediaImageId,
+        url: pi.mediaImage.url,
+        filename: pi.mediaImage.filename,
+        alt: pi.mediaImage.alt,
+        isPrimary: pi.isPrimary,
+        order: pi.order,
+        width: pi.mediaImage.width,
+        height: pi.mediaImage.height,
+        sizeBytes: pi.mediaImage.sizeBytes,
+        variantIds: (pi.variants || []).map((v: any) => v.id),
+    }))
+
+    // Variants with their linked images
+    const variants = (product.variants || []).map((v: any) => ({
+        id: v.id,
+        variantNumber: v.variantNumber,
+        suffix: v.suffix,
+        name: v.name,
+        type: v.type,
+        hex: v.hex,
+        order: v.order,
+        isDefault: v.isDefault,
+        imageCount: (v.variantImages || []).length,
+        images: (v.variantImages || []).map((vi: any) => ({
+            id: vi.id,
+            url: vi.mediaImage.url,
+            filename: vi.mediaImage.filename,
+            alt: vi.mediaImage.alt,
+        })),
+    }))
+
+    const { productImages: _, variants: __, ...rest } = product
+
+    return {
+        ...rest,
+        variants,
+        mediaImages,
+        prices: (product.prices as PriceEntry[] | null) ?? [],
     }
 }
 
-export async function updateProductDescription(id: string, description: string) {
-    try {
-        const updatedProduct = await prisma.product.update({
-            where: { id },
-            data: { description },
-        })
-
-        revalidatePath('/inventory')
-        return {
-            success: true,
-            data: {
-                ...updatedProduct,
-                price: Number(updatedProduct.price)
-            }
-        }
-    } catch (error) {
-        console.error('Failed to update description:', error)
-        return { success: false, error: 'Failed to update description' }
-    }
+/** Fetch a raw product by id (throws if not found) */
+async function requireProduct(id: string, tx?: Prisma.TransactionClient): Promise<any> {
+    const db = tx ?? prisma
+    const product = await prisma.product.findUnique({ 
+        where: { id },
+        include: PRODUCT_INCLUDE,
+    })
+    if (!product) throw new Error('المنتج غير موجود')
+    return product
 }
+
+function revalidateProduct(id: string) {
+    revalidatePath('/inventory')
+    revalidatePath(`/inventory/${id}`)
+}
+
+// ─────────────────────────────────────────────
+// QUERIES
+// ─────────────────────────────────────────────
 
 export async function getProducts() {
     try {
         const products = await prisma.product.findMany({
-            include: {
-                variants: true,
-                category: true
-            },
             orderBy: { createdAt: 'desc' },
+            include: PRODUCT_INCLUDE,
         })
-
-        // Serialize Decimal types to numbers for Client Components
-        const serializedProducts = products.map(product => ({
-            ...product,
-            price: Number(product.price),
-            variants: product.variants.map(v => ({
-                ...v,
-                price: v.price ? Number(v.price) : null
-            }))
-        }))
-
-        return { success: true, data: serializedProducts }
+        return { success: true, data: products.map(serializeProduct) }
     } catch (error) {
         console.error('Failed to fetch products:', error)
-        return { success: false, error: 'Failed to fetch products', data: [] }
+        return { success: false, error: 'فشل جلب المنتجات', data: [] }
     }
 }
 
@@ -77,578 +121,393 @@ export async function getProductById(id: string) {
     try {
         const product = await prisma.product.findUnique({
             where: { id },
-            include: {
-                variants: {
-                    orderBy: { createdAt: 'asc' }
-                },
-                category: true
-            }
+            include: PRODUCT_INCLUDE,
         })
-
-        if (!product) {
-            return { success: false, error: 'Product not found', data: null }
-        }
-
-        // Convert Decimal to string for serialization
-        const serializedProduct = {
-            ...product,
-            price: product.price.toString(),
-            variants: product.variants.map(v => ({
-                ...v,
-                price: v.price?.toString() || null
-            }))
-        }
-
-        return { success: true, data: serializedProduct }
+        if (!product) return { success: false, error: 'المنتج غير موجود', data: null }
+        return { success: true, data: serializeProduct(product) }
     } catch (error) {
         console.error('Failed to fetch product:', error)
-        return { success: false, error: 'Failed to fetch product', data: null }
+        return { success: false, error: 'فشل جلب المنتج', data: null }
     }
 }
 
-export async function createProduct(data: any) {
-    try {
-        const { variants, colors, alternativeNames, images, ...productData } = data
 
-        // Auto-sync imagePath from primary image
-        const primaryImage = images?.find((i: any) => i.isPrimary) || images?.[0]
-        if (primaryImage?.url && !productData.imagePath) {
-            productData.imagePath = primaryImage.url
+
+export async function searchProducts(query: string) {
+    try {
+        const q = query.trim()
+        if (!q) return getProducts()
+
+        const products = await prisma.product.findMany({
+            where: {
+                OR: [
+                    { name: { contains: q, mode: 'insensitive' } },
+                    { itemNumber: { contains: q, mode: 'insensitive' } },
+                    { brand: { contains: q, mode: 'insensitive' } },
+                    { description: { contains: q, mode: 'insensitive' } },
+                ],
+            },
+            orderBy: { name: 'asc' },
+            include: PRODUCT_INCLUDE,
+        })
+        return { success: true, data: products.map(serializeProduct) }
+    } catch (error) {
+        console.error('Failed to search products:', error)
+        return { success: false, error: 'فشل البحث عن المنتجات', data: [] }
+    }
+}
+
+// ─────────────────────────────────────────────
+// PRODUCT CRUD
+// ─────────────────────────────────────────────
+
+export async function createProduct(data: ProductInput) {
+    try {
+        if (!data.itemNumber?.trim()) return { success: false, error: 'رقم الصنف مطلوب' }
+        if (!data.name?.trim()) return { success: false, error: 'اسم المنتج مطلوب' }
+        if (!ITEM_NUMBER_REGEX.test(data.itemNumber.trim())) {
+            return { success: false, error: 'رقم الصنف يجب أن يتكون من 3 خانات مفصولة بشرطات (مثال: 001-BF-483)' }
         }
 
-        const product = await prisma.product.create({
+        const { alternativeNames, tags, prices, ...productData } = data
+
+        const product = await (prisma.product as any).create({
             data: {
                 ...productData,
-                price: parseFloat(productData.price),
-                colors: colors || null,
-                alternativeNames: alternativeNames || null,
-                images: images?.length > 0 ? images : null,
-                variants: variants?.length > 0 ? {
-                    create: variants.map((v: any) => ({
-                        name: v.name,
-                        imagePath: v.imagePath,
-                        price: v.price ? parseFloat(v.price) : null,
-                    }))
-                } : undefined
-            }
+                itemNumber: productData.itemNumber.trim(),
+                name: productData.name.trim(),
+                prices: prices?.length ? prices : Prisma.JsonNull,
+                alternativeNames: alternativeNames?.length ? alternativeNames : Prisma.JsonNull,
+                tags: tags?.length ? tags : Prisma.JsonNull,
+            },
+            include: PRODUCT_INCLUDE,
         })
+
         revalidatePath('/inventory')
-        return {
-            success: true,
-            data: {
-                ...product,
-                price: Number(product.price)
-            }
-        }
-    } catch (error) {
+        return { success: true, data: serializeProduct(product) }
+    } catch (error: any) {
         console.error('Failed to create product:', error)
-        return { success: false, error: 'Failed to create product' }
+        if (error?.code === 'P2002') return { success: false, error: 'رقم الصنف مستخدم بالفعل' }
+        return { success: false, error: 'فشل إنشاء المنتج' }
     }
 }
 
-export async function updateProduct(id: string, data: any) {
+export async function updateProduct(id: string, data: Partial<ProductInput>) {
     try {
-        const { variants, colors, alternativeNames, images, categoryId, category, ...productData } = data
+        const { alternativeNames, tags, prices, ...productData } = data as any
 
-        // Auto-sync imagePath from primary image
-        const primaryImage = images?.find((i: any) => i.isPrimary) || images?.[0]
-        if (primaryImage?.url) {
-            productData.imagePath = primaryImage.url
-        } else if (images?.length === 0) {
-            productData.imagePath = null
+        // Validate itemNumber format if provided
+        if (productData.itemNumber && !ITEM_NUMBER_REGEX.test(productData.itemNumber.trim())) {
+            return { success: false, error: 'رقم الصنف يجب أن يتكون من 3 خانات مفصولة بشرطات (مثال: 001-BF-483)' }
         }
 
-        // Handle itemNumber change: move images folder
+        // Handle itemNumber change → move images folder + update variant numbers
         if (productData.itemNumber) {
-            const currentProduct = await prisma.product.findUnique({
+            const current = await prisma.product.findUnique({
                 where: { id },
-                select: { itemNumber: true }
+                select: { itemNumber: true, variants: true },
             })
-            if (currentProduct && currentProduct.itemNumber !== productData.itemNumber) {
+            if (current && current.itemNumber !== productData.itemNumber) {
                 const { moveProductImages } = await import('./upload')
-                await moveProductImages(currentProduct.itemNumber, productData.itemNumber)
-            }
-        }
+                await moveProductImages(current.itemNumber, productData.itemNumber)
 
-        // Use a transaction to update product and its variants
-        const product = await prisma.$transaction(async (tx) => {
-            // Delete variants not in the new list
-            const currentVariants = await tx.variant.findMany({ where: { productId: id } })
-            const currentVariantIds = currentVariants.map(v => v.id)
-            const incomingVariantIds = variants?.filter((v: any) => v.id).map((v: any) => v.id) || []
-
-            const variantIdsToDelete = currentVariantIds.filter(vid => !incomingVariantIds.includes(vid))
-
-            if (variantIdsToDelete.length > 0) {
-                await tx.variant.deleteMany({
-                    where: { id: { in: variantIdsToDelete } }
-                })
-            }
-
-            // Create or update incoming variants
-            if (variants && variants.length > 0) {
-                for (const v of variants) {
-                    if (v.id) {
-                        await tx.variant.update({
-                            where: { id: v.id },
-                            data: {
-                                name: v.name,
-                                imagePath: v.imagePath,
-                                price: v.price ? parseFloat(v.price) : null,
-                            }
-                        })
-                    } else {
-                        await tx.variant.create({
-                            data: {
-                                productId: id,
-                                name: v.name,
-                                imagePath: v.imagePath,
-                                price: v.price ? parseFloat(v.price) : null,
-                            }
-                        })
-                    }
+                // Update all variant numbers
+                for (const v of current.variants) {
+                    await prisma.variant.update({
+                        where: { id: v.id },
+                        data: { variantNumber: `${productData.itemNumber}-${v.suffix}` },
+                    })
                 }
             }
+        }
 
-            return await tx.product.update({
-                where: { id },
-                data: {
-                    ...productData,
-                    price: parseFloat(productData.price),
-                    colors: colors || null,
-                    alternativeNames: alternativeNames || null,
-                    images: images?.length > 0 ? images : null,
-                    category: categoryId ? {
-                        connect: { id: categoryId }
-                    } : undefined,
-                },
-                include: { variants: true }
-            })
+        const product = await (prisma.product as any).update({
+            where: { id },
+            data: {
+                ...productData,
+                prices: prices !== undefined ? (prices?.length ? prices : Prisma.JsonNull) : undefined,
+                alternativeNames: alternativeNames !== undefined ? (alternativeNames?.length ? alternativeNames : Prisma.JsonNull) : undefined,
+                tags: tags !== undefined ? (tags?.length ? tags : Prisma.JsonNull) : undefined,
+            },
+            include: PRODUCT_INCLUDE,
         })
 
         revalidatePath('/inventory')
-        return {
-            success: true,
-            data: {
-                ...product,
-                price: Number(product.price),
-                variants: product.variants?.map(v => ({
-                    ...v,
-                    price: v.price ? Number(v.price) : null
-                })) || []
-            }
-        }
-    } catch (error) {
+        revalidatePath(`/inventory/${id}`)
+        return { success: true, data: serializeProduct(product) }
+    } catch (error: any) {
         console.error('Failed to update product:', error)
-        return { success: false, error: 'Failed to update product' }
+        if (error?.code === 'P2002') return { success: false, error: 'رقم الصنف مستخدم بالفعل' }
+        return { success: false, error: 'فشل تحديث المنتج' }
     }
 }
+
 export async function deleteProduct(id: string) {
     try {
-        await prisma.product.delete({
+        const product = await prisma.product.findUnique({
             where: { id },
+            select: { itemNumber: true }
         })
+
+        await prisma.product.delete({ where: { id } })
+
+        // Clean up product images folder
+        if (product?.itemNumber) {
+            try {
+                const { deleteProductFolder } = await import('./upload')
+                await deleteProductFolder(product.itemNumber)
+            } catch {
+                // Non-fatal: images cleanup failure shouldn't block deletion
+            }
+        }
+
         revalidatePath('/inventory')
         return { success: true }
     } catch (error) {
         console.error('Failed to delete product:', error)
-        return { success: false, error: 'Failed to delete product' }
+        return { success: false, error: 'فشل حذف المنتج' }
     }
 }
 
-export async function addAlternativeNameToProduct(productId: string, newAlternativeName: string) {
+export async function duplicateProduct(id: string) {
     try {
-        // Validate input
-        const trimmedName = newAlternativeName.trim()
-        if (!trimmedName) {
-            return { success: false, error: 'الاسم البديل لا يمكن أن يكون فارغاً' }
-        }
+        const source = await prisma.product.findUnique({ where: { id } })
+        if (!source) return { success: false, error: 'المنتج غير موجود' }
 
-        // Get current product
-        const product = await prisma.product.findUnique({
-            where: { id: productId }
+        const newItemNumber = `${source.itemNumber}-copy-${Date.now().toString(36).slice(-4)}`
+        const { id: _id, createdAt: _c, updatedAt: _u, ...sourceData } = source
+
+        const duplicate = await (prisma.product as any).create({
+            data: {
+                ...sourceData,
+                itemNumber: newItemNumber,
+                name: `${source.name} (نسخة)`,
+                isAvailable: false,
+            },
         })
 
-        if (!product) {
-            return { success: false, error: 'المنتج غير موجود' }
+        revalidatePath('/inventory')
+        return { success: true, data: serializeProduct(duplicate) }
+    } catch (error: any) {
+        console.error('Failed to duplicate product:', error)
+        return { success: false, error: 'فشل نسخ المنتج' }
+    }
+}
+
+export async function toggleProductAvailability(id: string, currentStatus: boolean) {
+    try {
+        const updated = await prisma.product.update({
+            where: { id },
+            data: { isAvailable: !currentStatus },
+        })
+        revalidatePath('/inventory')
+        revalidatePath(`/inventory/${id}`)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error) {
+        console.error('Failed to toggle availability:', error)
+        return { success: false, error: 'فشل تحديث حالة التوفر' }
+    }
+}
+
+export async function updateProductDescription(id: string, description: string) {
+    try {
+        const updated = await prisma.product.update({
+            where: { id },
+            data: { description },
+        })
+        revalidateProduct(id)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error) {
+        console.error('Failed to update description:', error)
+        return { success: false, error: 'فشل تحديث الوصف' }
+    }
+}
+
+// ─────────────────────────────────────────────
+// PRICES CRUD
+// ─────────────────────────────────────────────
+
+export async function addPrice(productId: string, entry: PriceEntry) {
+    try {
+        const label = entry.label.trim()
+        if (!label) return { success: false, error: 'التسمية مطلوبة' }
+        if (isNaN(entry.value) || entry.value < 0) return { success: false, error: 'القيمة غير صحيحة' }
+
+        const product = await requireProduct(productId)
+        const current = (product.prices as PriceEntry[]) ?? []
+
+        if (current.some(p => p.label.toLowerCase() === label.toLowerCase())) {
+            return { success: false, error: 'هذه التسمية موجودة بالفعل' }
         }
 
-        // Get current alternative names
-        const currentNames = (product.alternativeNames as string[]) || []
+        const updated = await (prisma.product as any).update({
+            where: { id: productId },
+            data: { prices: [...current, { label, value: entry.value, currency: entry.currency, unit: entry.unit, quantity: entry.quantity }] },
+        })
 
-        // Check for duplicates
-        if (currentNames.some(name => name.toLowerCase() === trimmedName.toLowerCase())) {
+        revalidatePath('/inventory')
+        revalidatePath(`/inventory/${productId}`)
+        revalidatePath(`/inventory/${productId}/pricing`)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error: any) {
+        console.error('Failed to add price:', error)
+        return { success: false, error: error?.message ?? 'فشل إضافة السعر' }
+    }
+}
+
+export async function updatePrice(productId: string, index: number, entry: Partial<PriceEntry>) {
+    try {
+        const product = await requireProduct(productId)
+        const current = (product.prices as PriceEntry[]) ?? []
+        if (index < 0 || index >= current.length) return { success: false, error: 'السعر غير موجود' }
+
+        const updated = [...current]
+        updated[index] = {
+            label: entry.label !== undefined ? entry.label.trim() : current[index].label,
+            value: entry.value !== undefined ? entry.value : current[index].value,
+            currency: entry.currency !== undefined ? entry.currency : current[index].currency,
+            unit: entry.unit !== undefined ? entry.unit : current[index].unit,
+            quantity: entry.quantity !== undefined ? entry.quantity : current[index].quantity,
+        }
+
+        const updatedProduct = await (prisma.product as any).update({
+            where: { id: productId },
+            data: { prices: updated },
+        })
+
+        revalidatePath('/inventory')
+        revalidatePath(`/inventory/${productId}`)
+        revalidatePath(`/inventory/${productId}/pricing`)
+        return { success: true, data: serializeProduct(updatedProduct) }
+    } catch (error: any) {
+        console.error('Failed to update price:', error)
+        return { success: false, error: error?.message ?? 'فشل تحديث السعر' }
+    }
+}
+
+export async function deletePrice(productId: string, index: number) {
+    try {
+        const product = await requireProduct(productId)
+        const current = (product.prices as PriceEntry[]) ?? []
+        if (index < 0 || index >= current.length) return { success: false, error: 'السعر غير موجود' }
+
+        const remaining = current.filter((_, i) => i !== index)
+        const updatedProduct = await (prisma.product as any).update({
+            where: { id: productId },
+            data: { prices: remaining.length ? remaining : Prisma.JsonNull },
+        })
+
+        revalidatePath('/inventory')
+        revalidatePath(`/inventory/${productId}`)
+        revalidatePath(`/inventory/${productId}/pricing`)
+        return { success: true, data: serializeProduct(updatedProduct) }
+    } catch (error: any) {
+        console.error('Failed to delete price:', error)
+        return { success: false, error: error?.message ?? 'فشل حذف السعر' }
+    }
+}
+
+// ─────────────────────────────────────────────
+// ALTERNATIVE NAMES CRUD
+// ─────────────────────────────────────────────
+
+export async function addAlternativeNameToProduct(productId: string, newName: string) {
+    try {
+        const trimmed = newName.trim()
+        if (!trimmed) return { success: false, error: 'الاسم البديل لا يمكن أن يكون فارغاً' }
+
+        const product = await requireProduct(productId)
+        const current = (product.alternativeNames as string[]) ?? []
+
+        if (current.some(n => n.toLowerCase() === trimmed.toLowerCase())) {
             return { success: false, error: 'هذا الاسم البديل موجود بالفعل' }
         }
 
-        // Add new name
-        const updatedNames = [...currentNames, trimmedName]
-
-        // Update product
-        const updatedProduct = await prisma.product.update({
+        const updated = await prisma.product.update({
             where: { id: productId },
-            data: { alternativeNames: updatedNames }
+            data: { alternativeNames: [...current, trimmed] as any },
         })
 
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-
-        return {
-            success: true,
-            data: {
-                ...updatedProduct,
-                price: Number(updatedProduct.price)
-            }
-        }
-    } catch (error) {
+        revalidateProduct(productId)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error: any) {
         console.error('Failed to add alternative name:', error)
-        return { success: false, error: 'فشل إضافة الاسم البديل' }
+        return { success: false, error: error?.message ?? 'فشل إضافة الاسم البديل' }
     }
 }
 
-export async function addColorToProduct(
-    productId: string,
-    colorData: { itemNumber: string; name: string; code: string; imagePath?: string }
-) {
+export async function removeAlternativeNameFromProduct(productId: string, name: string) {
     try {
-        // Validate input
-        const trimmedItemNumber = colorData.itemNumber.trim()
-        const trimmedName = colorData.name.trim()
-        const trimmedCode = colorData.code.trim()
+        const product = await requireProduct(productId)
+        const current = (product.alternativeNames as string[]) ?? []
+        const remaining = current.filter(n => n !== name)
 
-        if (!trimmedItemNumber) {
-            return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
+        if (remaining.length === current.length) {
+            return { success: false, error: 'الاسم البديل غير موجود' }
         }
 
-        if (!trimmedName) {
-            return { success: false, error: '\u0627\u0633\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
-        }
-
-        if (!trimmedCode) {
-            return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
-        }
-
-        // Validate hex color code
-        const hexRegex = /^#[0-9A-Fa-f]{6}$/
-        if (!hexRegex.test(trimmedCode)) {
-            return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0628\u0635\u064a\u063a\u0629 hex \u0635\u062d\u064a\u062d\u0629 (\u0645\u062b\u0627\u0644: #ff0000)' }
-        }
-
-        // Get current product
-        const product = await prisma.product.findUnique({
-            where: { id: productId }
-        })
-
-        if (!product) {
-            return { success: false, error: '\u0627\u0644\u0645\u0646\u062a\u062c \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
-        }
-
-        // Get current colors
-        const currentColors = (product.colors as any[]) || []
-
-        // Check if itemNumber already exists
-        const itemNumberExists = currentColors.some(
-            (color: any) => color.itemNumber === trimmedItemNumber
-        )
-        if (itemNumberExists) {
-            return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0645\u0648\u062c\u0648\u062f \u0628\u0627\u0644\u0641\u0639\u0644' }
-        }
-
-        // Check for duplicate name
-        const isDuplicateName = currentColors.some(
-            (color: any) => color.name.toLowerCase() === trimmedName.toLowerCase()
-        )
-        if (isDuplicateName) {
-            return { success: false, error: '\u0647\u0630\u0627 \u0627\u0644\u0644\u0648\u0646 \u0645\u0648\u062c\u0648\u062f \u0628\u0627\u0644\u0641\u0639\u0644' }
-        }
-
-        // Check for duplicate code
-        const isDuplicateCode = currentColors.some(
-            (color: any) => color.code.toLowerCase() === trimmedCode.toLowerCase()
-        )
-        if (isDuplicateCode) {
-            return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0647\u0630\u0627 \u0645\u0633\u062a\u062e\u062f\u0645 \u0628\u0627\u0644\u0641\u0639\u0644' }
-        }
-
-        // Add new color with itemNumber
-        const newColor = {
-            itemNumber: trimmedItemNumber,
-            name: trimmedName,
-            code: trimmedCode,
-            imagePath: colorData.imagePath || null
-        }
-        const updatedColors = [...currentColors, newColor]
-
-        // Update product
-        const updatedProduct = await prisma.product.update({
+        const updated = await prisma.product.update({
             where: { id: productId },
-            data: { colors: updatedColors }
+            data: { alternativeNames: remaining.length ? (remaining as any) : Prisma.JsonNull },
         })
 
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-
-        return {
-            success: true,
-            data: {
-                ...updatedProduct,
-                price: Number(updatedProduct.price)
-            }
-        }
-    } catch (error) {
-        console.error('Failed to add color:', error)
-        return { success: false, error: '\u0641\u0634\u0644 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0644\u0648\u0646' }
+        revalidateProduct(productId)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error: any) {
+        console.error('Failed to remove alternative name:', error)
+        return { success: false, error: error?.message ?? 'فشل حذف الاسم البديل' }
     }
 }
 
+// ─────────────────────────────────────────────
+// TAGS CRUD
+// ─────────────────────────────────────────────
 
-/**
- * Update color in product by itemNumber
- */
-export async function updateColorInProduct(
-    productId: string,
-    colorItemNumber: string,
-    colorData: { itemNumber?: string; name?: string; code?: string; imagePath?: string | null }
-) {
+export async function addTagToProduct(productId: string, newTag: string) {
     try {
-        // Get current product
-        const product = await prisma.product.findUnique({
-            where: { id: productId }
-        })
+        const trimmed = newTag.trim()
+        if (!trimmed) return { success: false, error: 'الوسم لا يمكن أن يكون فارغاً' }
 
-        if (!product) {
-            return { success: false, error: '\u0627\u0644\u0645\u0646\u062a\u062c \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
+        const product = await requireProduct(productId)
+        const current = (product.tags as string[]) ?? []
+
+        if (current.some(t => t.toLowerCase() === trimmed.toLowerCase())) {
+            return { success: false, error: 'هذا الوسم موجود بالفعل' }
         }
 
-        // Get current colors
-        const currentColors = (product.colors as any[]) || []
-
-        // Find color index
-        const colorIndex = currentColors.findIndex(
-            (color: any) => color.itemNumber === colorItemNumber
-        )
-
-        if (colorIndex === -1) {
-            return { success: false, error: '\u0627\u0644\u0644\u0648\u0646 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
-        }
-
-        // Get current color
-        const currentColor = currentColors[colorIndex]
-
-        // Validate itemNumber if provided
-        if (colorData.itemNumber !== undefined) {
-            const trimmedItemNumber = colorData.itemNumber.trim()
-            if (!trimmedItemNumber) {
-                return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
-            }
-
-            // Check if new itemNumber already exists (excluding current color)
-            const itemNumberExists = currentColors.some(
-                (color: any, idx: number) =>
-                    idx !== colorIndex &&
-                    color.itemNumber === trimmedItemNumber
-            )
-            if (itemNumberExists) {
-                return { success: false, error: '\u0631\u0642\u0645 \u0627\u0644\u0644\u0648\u0646 \u0645\u0648\u062c\u0648\u062f \u0628\u0627\u0644\u0641\u0639\u0644' }
-            }
-        }
-
-        // Validate name if provided
-        if (colorData.name !== undefined) {
-            const trimmedName = colorData.name.trim()
-            if (!trimmedName) {
-                return { success: false, error: '\u0627\u0633\u0645 \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
-            }
-
-            // Check for duplicate name (excluding current color)
-            const isDuplicateName = currentColors.some(
-                (color: any, idx: number) =>
-                    idx !== colorIndex &&
-                    color.name.toLowerCase() === trimmedName.toLowerCase()
-            )
-            if (isDuplicateName) {
-                return { success: false, error: '\u0647\u0630\u0627 \u0627\u0644\u0627\u0633\u0645 \u0645\u0633\u062a\u062e\u062f\u0645 \u0628\u0627\u0644\u0641\u0639\u0644' }
-            }
-        }
-
-        // Validate code if provided
-        if (colorData.code !== undefined) {
-            const trimmedCode = colorData.code.trim()
-            if (!trimmedCode) {
-                return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0644\u0627 \u064a\u0645\u0643\u0646 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0641\u0627\u0631\u063a\u0627\u064b' }
-            }
-
-            // Validate hex color code
-            const hexRegex = /^#[0-9A-Fa-f]{6}$/
-            if (!hexRegex.test(trimmedCode)) {
-                return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0628\u0635\u064a\u063a\u0629 hex \u0635\u062d\u064a\u062d\u0629 (\u0645\u062b\u0627\u0644: #ff0000)' }
-            }
-
-            // Check for duplicate code (excluding current color)
-            const isDuplicateCode = currentColors.some(
-                (color: any, idx: number) =>
-                    idx !== colorIndex &&
-                    color.code.toLowerCase() === trimmedCode.toLowerCase()
-            )
-            if (isDuplicateCode) {
-                return { success: false, error: '\u0643\u0648\u062f \u0627\u0644\u0644\u0648\u0646 \u0647\u0630\u0627 \u0645\u0633\u062a\u062e\u062f\u0645 \u0628\u0627\u0644\u0641\u0639\u0644' }
-            }
-        }
-
-        // Update color
-        const updatedColor = {
-            ...currentColor,
-            itemNumber: colorData.itemNumber !== undefined ? colorData.itemNumber.trim() : currentColor.itemNumber,
-            name: colorData.name !== undefined ? colorData.name.trim() : currentColor.name,
-            code: colorData.code !== undefined ? colorData.code.trim() : currentColor.code,
-            imagePath: colorData.imagePath !== undefined ? colorData.imagePath : currentColor.imagePath
-        }
-
-        // Update colors array
-        const updatedColors = [...currentColors]
-        updatedColors[colorIndex] = updatedColor
-
-        // Update product
-        const updatedProduct = await prisma.product.update({
+        const updated = await prisma.product.update({
             where: { id: productId },
-            data: { colors: updatedColors }
+            data: { tags: [...current, trimmed] as any },
         })
 
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-
-        return {
-            success: true,
-            data: {
-                ...updatedProduct,
-                price: Number(updatedProduct.price)
-            }
-        }
-    } catch (error) {
-        console.error('Failed to update color:', error)
-        return { success: false, error: '\u0641\u0634\u0644 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0644\u0648\u0646' }
+        revalidateProduct(productId)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error: any) {
+        console.error('Failed to add tag:', error)
+        return { success: false, error: error?.message ?? 'فشل إضافة الوسم' }
     }
 }
 
-
-/**
- * Delete color from product by itemNumber
- */
-export async function deleteColorFromProduct(
-    productId: string,
-    colorItemNumber: string
-) {
+export async function removeTagFromProduct(productId: string, tag: string) {
     try {
-        // Get current product
-        const product = await prisma.product.findUnique({
-            where: { id: productId }
-        })
+        const product = await requireProduct(productId)
+        const current = (product.tags as string[]) ?? []
+        const remaining = current.filter(t => t !== tag)
 
-        if (!product) {
-            return { success: false, error: 'المنتج غير موجود' }
+        if (remaining.length === current.length) {
+            return { success: false, error: 'الوسم غير موجود' }
         }
 
-        // Get current colors
-        const currentColors = (product.colors as any[]) || []
-
-        // Find color
-        const colorToDelete = currentColors.find(
-            (color: any) => color.itemNumber === colorItemNumber
-        )
-
-        if (!colorToDelete) {
-            return { success: false, error: 'اللون غير موجود' }
-        }
-
-        // Delete color image if exists
-        if (colorToDelete.imagePath) {
-            const { deleteOldImage } = await import('./upload')
-            await deleteOldImage(colorToDelete.imagePath)
-        }
-
-        // Remove color from array
-        const updatedColors = currentColors.filter(
-            (color: any) => color.itemNumber !== colorItemNumber
-        )
-
-        // Update product
-        const updatedProduct = await prisma.product.update({
+        const updated = await prisma.product.update({
             where: { id: productId },
-            data: { colors: updatedColors }
+            data: { tags: remaining.length ? (remaining as any) : Prisma.JsonNull },
         })
 
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-
-        return {
-            success: true,
-            data: {
-                ...updatedProduct,
-                price: Number(updatedProduct.price)
-            }
-        }
-    } catch (error) {
-        console.error('Failed to delete color:', error)
-        return { success: false, error: 'فشل حذف اللون' }
+        revalidateProduct(productId)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error: any) {
+        console.error('Failed to remove tag:', error)
+        return { success: false, error: error?.message ?? 'فشل حذف الوسم' }
     }
 }
 
-
-export async function addVariantToProduct(
-    productId: string,
-    variantData: { name: string; price?: string; imagePath?: string }
-) {
-    try {
-        // Validate input
-        const trimmedName = variantData.name.trim()
-
-        if (!trimmedName) {
-            return { success: false, error: 'اسم الخيار لا يمكن أن يكون فارغاً' }
-        }
-
-        // Check if product exists
-        const product = await prisma.product.findUnique({
-            where: { id: productId },
-            include: { variants: true }
-        })
-
-        if (!product) {
-            return { success: false, error: 'المنتج غير موجود' }
-        }
-
-        // Check for duplicate variant name
-        const isDuplicate = product.variants.some(
-            (v) => v.name.toLowerCase() === trimmedName.toLowerCase()
-        )
-        if (isDuplicate) {
-            return { success: false, error: 'خيار بنفس الاسم موجود بالفعل' }
-        }
-
-        // Parse price if provided
-        const parsedPrice = variantData.price ? parseFloat(variantData.price) : null
-
-        // Create variant
-        const newVariant = await prisma.variant.create({
-            data: {
-                productId: productId,
-                name: trimmedName,
-                price: parsedPrice,
-                imagePath: variantData.imagePath || null
-            }
-        })
-
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-
-        return {
-            success: true,
-            data: {
-                ...newVariant,
-                price: newVariant.price ? Number(newVariant.price) : null
-            }
-        }
-    } catch (error) {
-        console.error('Failed to add variant:', error)
-        return { success: false, error: 'فشل إضافة الخيار' }
-    }
-}

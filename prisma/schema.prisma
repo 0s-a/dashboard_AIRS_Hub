@@ -8,36 +8,21 @@ datasource db {
 }
 
 model Product {
-  id          String    @id @default(uuid())
-  itemNumber  String    @unique
-  name        String
-  brand       String?
-  description String?
-  unit        String
-  tier        String?
-  packaging   String?
-  price       Decimal   @db.Decimal(10, 2)
-  isAvailable Boolean   @default(true)
-  imagePath        String?   // legacy - primary image URL (auto-updated)
-  images           Json?     // [{url, alt, isPrimary, order}]
-  colors           Json?
+  id               String         @id @default(uuid())
+  itemNumber       String         @unique
+  name             String
+  brand            String?
+  description      String?
+  prices           Json? // [{label: string, value: number, unit?: string, quantity?: number}]
+  isAvailable      Boolean        @default(true)
   alternativeNames Json?
-  createdAt        DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  categoryId  String?
-  category    Category? @relation(fields: [categoryId], references: [id])
-  variants    Variant[]
-}
-
-model Variant {
-  id        String   @id @default(uuid())
-  productId String
-  name      String
-  imagePath String?
-  price     Decimal? @db.Decimal(10, 2)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tags             Json? // ["tag1", "tag2", ...]
+  categoryId       String?
+  category         Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  productImages    ProductImage[]
+  variants         Variant[]
 }
 
 model Category {
@@ -52,13 +37,100 @@ model Category {
   products    Product[]
 }
 
-model Customer {
+model Person {
   id              String   @id @default(uuid())
-  phoneNumber     String   @unique
   name            String?
-  totalOrders     Int      @default(0)
+  address         String?
+  notes           String?
+  type            String?  @default("عادي")
+  source          String?
+  contacts        Json? // [{type: "phone"|"email"|"whatsapp", value, label, isPrimary}]
+  tags            Json? // ["tag1", "tag2"]
   isActive        Boolean  @default(true)
   lastInteraction DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  groups          Group[] // Many-to-many relationship with Group
+
+  @@map("Customer")
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  number    String   @unique
+  tags      Json? // ["tag1", "tag2", ...]
+  isActive  Boolean  @default(true)
+  category  String?
+  persons   Person[] // Many-to-many relationship with Person
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Pure image storage — no product-specific data
+model MediaImage {
+  id            String         @id @default(uuid())
+  url           String
+  filename      String
+  alt           String?
+  sizeBytes     Int?
+  width         Int?
+  height        Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  productImages ProductImage[]
+}
+
+// Junction table: links products to images
+model ProductImage {
+  id           String     @id @default(uuid())
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaImageId String
+  mediaImage   MediaImage @relation(fields: [mediaImageId], references: [id], onDelete: Cascade)
+  variants     Variant[]  @relation("VariantToProductImages")
+  isPrimary    Boolean    @default(false)
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@unique([productId, mediaImageId])
+}
+
+// Variants table: colors, sizes, custom variants
+model Variant {
+  id            String         @id @default(uuid())
+  variantNumber String         @unique // "001-BF-483-01" — globally unique
+  suffix        String // "01", "أسود", "XL" — user-entered 4th segment
+  name          String // display name
+  type          String         @default("color") // "color" | "size" | "custom"
+  hex           String? // CSS hex color (for type=color only)
+  price         Float? // Variant-specific price override
+  order         Int            @default(0)
+  isDefault     Boolean        @default(false)
+  productId     String
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  variantImages ProductImage[] @relation("VariantToProductImages")
+
+  @@unique([productId, suffix])
+}
+
+// Price label names for product pricing
+model PriceLabel {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Person type classifications
+model PersonType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

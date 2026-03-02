@@ -12,12 +12,10 @@ import {
     Edit,
     Trash2,
     Tag,
-    Layers,
-    Box,
+    Hash,
     ArrowRight,
     Share2,
     Loader2,
-    Palette,
     FileText,
     Plus,
     X,
@@ -29,16 +27,15 @@ import { Badge } from "@/components/ui/badge"
 import { AvailabilityToggle } from "@/components/inventory/availability-toggle"
 import { ProductSheet } from "@/components/inventory/product-sheet"
 import { QuickAddAlternativeName } from "@/components/inventory/quick-add-alternative-name"
-import { QuickAddColor } from "@/components/inventory/quick-add-color"
-import { QuickAddVariant } from "@/components/inventory/quick-add-variant"
-import { EditColorDialog } from "@/components/inventory/edit-color-dialog"
+import { QuickAddTag } from "@/components/inventory/quick-add-tag"
+import { VariantManagement } from "@/components/inventory/variant-management"
+import type { VariantWithImages } from "@/components/inventory/variant-management"
+import type { VariantRecord } from "@/lib/actions/variants"
+import { PricingSection } from "@/components/inventory/pricing-client"
 import { deleteProduct } from "@/lib/actions/inventory"
+import { ImageGalleryUpload } from "@/components/ui/image-gallery-upload"
+import type { ProductImageRecord } from "@/lib/actions/product-images"
 import { toast } from "sonner"
-import {
-    Dialog,
-    DialogContent,
-    DialogTrigger,
-} from "@/components/ui/dialog"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -58,41 +55,22 @@ type ProductData = {
     brand: string | null
     description: string | null
     unit: string
-    tier: string | null
     packaging: string | null
-    price: string
+    prices: Array<{ label: string; value: number, currency?: string }> | null
     isAvailable: boolean
-    imagePath: string | null
-    colors: Array<{
-        itemNumber: string
-        name: string
-        code: string
-        imagePath: string | null
-    }> | null
-    images: Array<{
-        url: string
-        alt?: string
-        isPrimary: boolean
-        order?: number
-    }> | null
+    variants: VariantWithImages[]
+    mediaImages: ProductImageRecord[]
     alternativeNames: string[] | null
+    tags: string[] | null
+    productTags: Array<{
+        id: string
+        name: string
+        color: string | null
+    }>
     createdAt: Date
     updatedAt: Date
-    categoryId: string | null
-    category: {
-        id: string
-        name: string
-        icon: string | null
-    } | null
-    variants: Array<{
-        id: string
-        name: string
-        imagePath: string | null
-        price: string | null
-        createdAt: Date
-        updatedAt: Date
-    }>
 }
+
 
 interface ProductDetailsClientProps {
     product: ProductData
@@ -103,7 +81,6 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     const [isDeleting, setIsDeleting] = useState(false)
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
-    const [activeImageIndex, setActiveImageIndex] = useState(0)
     const [copiedItemNumber, setCopiedItemNumber] = useState(false)
 
     const copyItemNumber = async () => {
@@ -112,7 +89,6 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
             setCopiedItemNumber(true)
             setTimeout(() => setCopiedItemNumber(false), 2000)
         } catch {
-            // fallback for older browsers
             const el = document.createElement('textarea')
             el.value = product.itemNumber
             document.body.appendChild(el)
@@ -123,40 +99,21 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
             setTimeout(() => setCopiedItemNumber(false), 2000)
         }
     }
-    const [selectedColor, setSelectedColor] = useState<{
-        itemNumber: string
-        name: string
-        code: string
-        imagePath: string | null
-    } | null>(null)
-    const [editColorOpen, setEditColorOpen] = useState(false)
 
-    // Build gallery images from images array or fallback to imagePath
-    const galleryImages = (() => {
-        if (product.images && product.images.length > 0) {
-            return [...product.images].sort((a, b) => {
-                if (a.isPrimary) return -1
-                if (b.isPrimary) return 1
-                return (a.order ?? 0) - (b.order ?? 0)
-            })
-        }
-        if (product.imagePath) {
-            return [{ url: product.imagePath, alt: product.name, isPrimary: true }]
-        }
-        return []
-    })()
+    // Build gallery images from mediaImages, sorted: primary first, then by order
+    const galleryImages = [...product.mediaImages].sort((a, b) => {
+        if (a.isPrimary) return -1
+        if (b.isPrimary) return 1
+        return a.order - b.order
+    })
+
+    const handleImagesChange = () => {
+        router.refresh()
+    }
 
     const openLightbox = (index: number) => {
         setLightboxIndex(index)
         setLightboxOpen(true)
-    }
-
-    const formatPrice = (price: string) => {
-        return new Intl.NumberFormat('ar-SA', {
-            style: 'currency',
-            currency: 'SAR',
-            minimumFractionDigits: 2
-        }).format(Number(price))
     }
 
     const formatDate = (date: Date) => {
@@ -268,30 +225,17 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         )}
                     </div>
 
-                    {/* Thumbnail Strip */}
-                    {galleryImages.length > 1 && (
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                            {galleryImages.map((img, idx) => (
-                                <button
-                                    key={img.url}
-                                    type="button"
-                                    onClick={() => openLightbox(idx)}
-                                    className={`relative shrink-0 h-16 w-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${idx === 0
-                                        ? 'border-primary shadow-md shadow-primary/20'
-                                        : 'border-border/50 hover:border-primary/50'
-                                        }`}
-                                >
-                                    <Image
-                                        src={img.url}
-                                        alt={img.alt || `صورة ${idx + 1}`}
-                                        fill
-                                        className="object-cover"
-                                        sizes="64px"
-                                    />
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                    {/* Interactive Image Manager */}
+                    <div className="pt-2">
+                        <ImageGalleryUpload
+                            images={galleryImages}
+                            productId={product.id}
+                            productItemNumber={product.itemNumber}
+                            variants={product.variants || []}
+                            maxImages={10}
+                            onImagesChange={handleImagesChange}
+                        />
+                    </div>
                 </div>
 
                 {/* Lightbox */}
@@ -352,7 +296,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                                 {galleryImages.map((img, idx) => (
                                     <button
-                                        key={img.url}
+                                        key={img.id}
                                         onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx) }}
                                         className={`h-12 w-12 rounded-lg overflow-hidden border-2 transition-all ${idx === lightboxIndex ? 'border-white scale-110' : 'border-white/30 opacity-60 hover:opacity-100'
                                             }`}
@@ -396,12 +340,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                         <Copy className="h-3 w-3 text-muted-foreground/50" />
                                     )}
                                 </Badge>
-                                {product.category && (
-                                    <Badge className="gap-1.5 bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all">
-                                        <Layers className="h-3 w-3" />
-                                        {product.category.name}
-                                    </Badge>
-                                )}
+
                             </div>
                         </div>
 
@@ -488,129 +427,62 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             </div>
                         )}
 
-                        {/* Colors Display */}
-                        {product.colors && product.colors.length > 0 && (
-                            <div className="space-y-3 pt-4 border-t border-border/50">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <Palette className="h-4 w-4 text-primary" />
-                                        <h3 className="text-sm font-semibold text-muted-foreground">الألوان المتاحة</h3>
-                                    </div>
-                                    <QuickAddColor
-                                        productId={product.id}
-                                        productName={product.name}
-                                        productItemNumber={product.itemNumber}
-                                        currentColors={product.colors}
-                                    />
+                        {/* Tags Display */}
+                        <div className="space-y-3 pt-4 border-t border-border/50">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Hash className="h-4 w-4 text-violet-600" />
+                                    <h3 className="text-sm font-semibold text-muted-foreground">الوسوم</h3>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    {product.colors.map((color, idx) => (
-                                        <div
-                                            key={color.itemNumber || idx}
-                                            onClick={() => {
-                                                setSelectedColor(color)
-                                                setEditColorOpen(true)
-                                            }}
-                                            className="group relative rounded-xl border border-border/50 overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 cursor-pointer hover:-translate-y-1"
+                                <QuickAddTag
+                                    productId={product.id}
+                                    productName={product.name}
+                                    currentTags={product.tags}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 px-3 text-xs bg-linear-to-r from-violet-500/10 to-purple-500/10 hover:from-violet-500/20 hover:to-purple-500/20 border-violet-300 text-violet-700 hover:text-violet-800 transition-all"
                                         >
-                                            {/* Color Preview Area */}
-                                            <div className="aspect-square relative">
-                                                {color.imagePath ? (
-                                                    <>
-                                                        <Image
-                                                            src={color.imagePath}
-                                                            alt={color.name}
-                                                            fill
-                                                            className="object-cover transition-all duration-500 group-hover:scale-105 group-hover:brightness-105"
-                                                        />
-                                                        {/* Color swatch badge overlay */}
-                                                        <div
-                                                            className="absolute top-2 right-2 h-5 w-5 rounded-full border-2 border-white shadow-md z-10 transition-transform group-hover:scale-125"
-                                                            style={{ backgroundColor: color.code }}
-                                                            title={color.code}
-                                                        />
-                                                    </>
-                                                ) : (
-                                                    <div
-                                                        className="w-full h-full transition-all duration-300"
-                                                        style={{ backgroundColor: color.code }}
-                                                    >
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <div className="h-10 w-10 rounded-full border-4 border-white/40 animate-pulse" />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {/* Edit overlay */}
-                                                <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                    <div className="absolute bottom-2 right-2">
-                                                        <Badge variant="secondary" className="text-xs font-mono opacity-90 backdrop-blur-sm">
-                                                            <Edit className="h-3 w-3 mr-1" />
-                                                            تعديل
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {/* Color Info Footer */}
-                                            <div className="p-3 bg-background/95 backdrop-blur-sm border-t border-border/50 space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <div
-                                                        className="h-3 w-3 rounded-full shrink-0 border border-border/50"
-                                                        style={{ backgroundColor: color.code }}
-                                                    />
-                                                    <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors">{color.name}</p>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground font-mono pr-5">{color.code}</p>
-                                                {color.itemNumber && (
-                                                    <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5">
-                                                        {color.itemNumber}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </div>
+                                            <Plus className="h-3.5 w-3.5 ml-1" />
+                                            إضافة
+                                        </Button>
+                                    }
+                                />
+                            </div>
+                            {product.tags && product.tags.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {product.tags.map((tag) => (
+                                        <Badge
+                                            key={tag}
+                                            variant="outline"
+                                            className="px-3 py-1.5 text-sm hover:shadow-md transition-all duration-300 cursor-default hover:-translate-y-0.5 gap-1.5 text-violet-700 border-violet-300 bg-violet-500/5"
+                                        >
+                                            <Hash className="h-3 w-3 text-violet-500" />
+                                            {tag}
+                                        </Badge>
                                     ))}
                                 </div>
-                            </div>
-                        )}
-                        {/* Colors - Empty State */}
-                        {(!product.colors || product.colors.length === 0) && (
-                            <div className="space-y-3 pt-4 border-t border-border/50">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <Palette className="h-4 w-4 text-primary" />
-                                        <h3 className="text-sm font-semibold text-muted-foreground">الألوان المتاحة</h3>
-                                    </div>
-                                    <QuickAddColor
-                                        productId={product.id}
-                                        productName={product.name}
-                                        productItemNumber={product.itemNumber}
-                                        currentColors={null}
-                                        trigger={
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8 px-3 text-xs bg-linear-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20 border-primary/30 text-primary hover:text-primary/90 transition-all"
-                                            >
-                                                <Plus className="h-3.5 w-3.5 ml-1" />
-                                                إضافة لون
-                                            </Button>
-                                        }
-                                    />
-                                </div>
-                                <p className="text-sm text-muted-foreground italic">لا توجد ألوان لهذا المنتج</p>
-                            </div>
-                        )}
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">لا توجد وسوم لهذا المنتج.</p>
+                            )}
+                        </div>
+
+                        {/* Variants Display */}
+                        <div className="pt-4 border-t border-border/50">
+                            <VariantManagement
+                                productId={product.id}
+                                itemNumber={product.itemNumber}
+                                variants={product.variants || []}
+                            />
+                        </div>
 
                         {/* Section Divider */}
                         <div className="border-t border-border/20 my-6" />
 
-                        {/* Price */}
+                        {/* Prices */}
                         <div className="pt-4 border-t border-border/50">
-                            <div className="flex items-baseline gap-2 p-4 rounded-xl bg-linear-to-l from-primary/10 to-indigo-500/10 border border-primary/20">
-                                <span className="text-sm text-muted-foreground">السعر:</span>
-                                <span className="text-4xl font-black bg-linear-to-l from-primary via-primary to-indigo-400 bg-clip-text text-transparent">
-                                    {formatPrice(product.price)}
-                                </span>
-                            </div>
+                            <PricingSection product={product as any} />
                         </div>
 
                         {/* Product Details */}
@@ -619,12 +491,6 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                 <p className="text-xs text-muted-foreground">الوحدة</p>
                                 <p className="font-semibold">{product.unit}</p>
                             </div>
-                            {product.tier && (
-                                <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors">
-                                    <p className="text-xs text-muted-foreground">التصنيف</p>
-                                    <p className="font-semibold">{product.tier}</p>
-                                </div>
-                            )}
                             {product.packaging && (
                                 <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors col-span-2">
                                     <p className="text-xs text-muted-foreground">التعبئة</p>
@@ -665,7 +531,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>هل أنت متأكد من حذف هذا المنتج؟</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            سيؤدي هذا الإجراء إلى حذف المنتج "{product.name}" نهائياً من قاعدة البيانات وجميع الأشكال المرتبطة به. لا يمكن التراجع عن هذا الإجراء.
+                                            سيؤدي هذا الإجراء إلى حذف المنتج &quot;{product.name}&quot; نهائياً من قاعدة البيانات وجميع الأشكال المرتبطة به. لا يمكن التراجع عن هذا الإجراء.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter className="gap-2 sm:gap-0">
@@ -685,19 +551,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
-                <div className="glass-panel rounded-xl p-6 border border-border/50 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">عدد الأشكال</p>
-                            <h3 className="text-3xl font-bold mt-2 group-hover:text-primary transition-colors">{product.variants.length}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-linear-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Box className="size-6 text-primary" />
-                        </div>
-                    </div>
-                </div>
-
+            <div className="grid gap-4 md:grid-cols-2">
                 <div className="glass-panel rounded-xl p-6 border border-border/50 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5 transition-all duration-300 group">
                     <div className="flex items-center justify-between">
                         <div>
@@ -722,88 +576,6 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                     </div>
                 </div>
             </div>
-
-            {/* Variants Section */}
-            {product.variants.length > 0 && (
-                <div className="glass-panel rounded-2xl p-6 border border-border/50">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-bold flex items-center gap-2">
-                            <Box className="h-6 w-6 text-primary" />
-                            أشكال المنتج
-                        </h2>
-                        <QuickAddVariant
-                            productId={product.id}
-                            productName={product.name}
-                            basePrice={Number(product.price)}
-                            currentVariants={product.variants}
-                        />
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {product.variants.map((variant) => (
-                            <Dialog key={variant.id}>
-                                <DialogTrigger asChild>
-                                    <div className="group relative rounded-xl border border-border/50 bg-muted/20 overflow-hidden hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 cursor-pointer hover:-translate-y-1">
-                                        {/* Variant Image */}
-                                        <div className="aspect-square relative bg-muted/30">
-                                            {variant.imagePath ? (
-                                                <Image
-                                                    src={variant.imagePath}
-                                                    alt={variant.name}
-                                                    fill
-                                                    className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
-                                                />
-                                            ) : (
-                                                <div className="flex items-center justify-center h-full bg-linear-to-br from-muted/50 to-muted/20">
-                                                    <Package className="h-16 w-16 text-muted-foreground/30" />
-                                                </div>
-                                            )}
-                                            <div className="absolute inset-0 bg-linear-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                        </div>
-                                        {/* Variant Info */}
-                                        <div className="p-4 space-y-2 bg-linear-to-t from-background/80 to-background/50 backdrop-blur-sm">
-                                            <h3 className="font-semibold group-hover:text-primary transition-colors">{variant.name}</h3>
-                                            {variant.price && (
-                                                <p className="text-lg font-bold bg-linear-to-l from-primary to-indigo-400 bg-clip-text text-transparent">
-                                                    {formatPrice(variant.price)}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-5xl border-none bg-black/95 p-0">
-                                    <div className="relative aspect-square w-full">
-                                        {variant.imagePath ? (
-                                            <Image
-                                                src={variant.imagePath}
-                                                alt={variant.name}
-                                                fill
-                                                className="object-contain"
-                                                priority
-                                            />
-                                        ) : (
-                                            <div className="flex items-center justify-center h-full">
-                                                <Package className="h-32 w-32 text-white/30" />
-                                            </div>
-                                        )}
-                                    </div>
-                                </DialogContent>
-                            </Dialog>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Color Dialog */}
-            {selectedColor && (
-                <EditColorDialog
-                    productId={product.id}
-                    productItemNumber={product.itemNumber}
-                    productName={product.name}
-                    color={selectedColor}
-                    open={editColorOpen}
-                    onOpenChange={setEditColorOpen}
-                />
-            )}
         </div>
     )
 }

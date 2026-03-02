@@ -5,6 +5,7 @@ import { join } from 'path'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { processImageToWebP } from '@/lib/utils/image-processor'
+import { prisma } from '@/lib/prisma'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ export async function uploadProductImage(
     slot: string = 'main',
     subFolder?: string,
     oldImagePath?: string | null
-): Promise<{ success: boolean; url?: string; error?: string }> {
+): Promise<{ success: boolean; url?: string; mediaId?: string; error?: string }> {
     try {
         // ── Validation ──────────────────────────────────────────────────────
         if (!file || file.size === 0) {
@@ -134,13 +135,27 @@ export async function uploadProductImage(
         await writeFile(filePath, buffer)
 
         const url = getProductImageUrl(itemNumber, filename, subFolder)
+
+        // CREATE MediaImage record
+        const mediaImage = await prisma.mediaImage.create({
+            data: {
+                url,
+                filename,
+                sizeBytes: size,
+                width: width || null,
+                height: height || null,
+                // Notice: productId is not filled yet because we might not have a target Product ID 
+                // when uploading images for a new product just being created.
+            }
+        })
+
         console.log(
             wasConverted
-                ? `✓ Image uploaded: ${url} | ${width}×${height} | ${(size / 1024).toFixed(0)}KB | saved ${savedPercent}%`
-                : `⚠ Image saved as-is: ${url} | ${(size / 1024).toFixed(0)}KB (format not convertible)`
+                ? `✓ Image uploaded & logged: ${url} | ${width}×${height} | ${(size / 1024).toFixed(0)}KB | saved ${savedPercent}%`
+                : `⚠ Image saved as-is & logged: ${url} | ${(size / 1024).toFixed(0)}KB (format not convertible)`
         )
 
-        return { success: true, url }
+        return { success: true, url, mediaId: mediaImage.id }
     } catch (error) {
         console.error('Image upload error:', error)
         return {
@@ -158,7 +173,7 @@ export async function uploadProductImages(
     files: File[],
     itemNumber: string,
     startIndex: number = 0
-): Promise<{ success: boolean; urls?: string[]; errors?: string[] }> {
+): Promise<{ success: boolean; urls?: string[]; mediaIds?: string[]; errors?: string[] }> {
     const results = await Promise.all(
         files.map((file, i) => {
             const slot = startIndex === 0 && i === 0 ? 'main' : `gallery-${startIndex + i}`
@@ -167,11 +182,13 @@ export async function uploadProductImages(
     )
 
     const urls: string[] = []
+    const mediaIds: string[] = []
     const errors: string[] = []
 
     results.forEach((r, i) => {
         if (r.success && r.url) {
             urls.push(r.url)
+            if (r.mediaId) mediaIds.push(r.mediaId)
         } else {
             errors.push(`الصورة ${i + 1}: ${r.error}`)
         }
@@ -180,7 +197,42 @@ export async function uploadProductImages(
     return {
         success: errors.length === 0,
         urls,
+        mediaIds,
         errors: errors.length > 0 ? errors : undefined,
+    }
+}
+
+/**
+ * Upload an image to the standalone gallery (not tied to a product).
+ * Saves to public/uploads/gallery/{uuid}.webp
+ * Returns url, filename, width, height, sizeBytes for MediaImage record.
+ */
+export async function uploadGalleryImage(
+    file: File
+): Promise<{ success: boolean; url?: string; filename?: string; width?: number; height?: number; sizeBytes?: number; error?: string }> {
+    try {
+        if (!file || file.size === 0) return { success: false, error: 'لم يتم اختيار ملف' }
+        if (file.size > MAX_FILE_SIZE) return { success: false, error: `حجم الملف يتجاوز 20MB` }
+        if (!isValidImageType(file)) return { success: false, error: 'صيغة الملف غير مدعومة' }
+
+        const uploadDir = join(getPublicDir(), 'uploads', 'gallery')
+        await mkdir(uploadDir, { recursive: true })
+
+        const rawBuffer = Buffer.from(await file.arrayBuffer())
+        const { buffer, width, height, size } = await processImageToWebP(rawBuffer)
+
+        const { v4: uuidv4 } = await import('crypto').then(m => ({ v4: () => m.randomUUID() }))
+        const filename = `${uuidv4()}.webp`
+        const filePath = join(uploadDir, filename)
+        await writeFile(filePath, buffer)
+
+        const url = `/uploads/gallery/${filename}`
+        console.log(`✓ Gallery image uploaded: ${url} | ${width}×${height} | ${(size / 1024).toFixed(0)}KB`)
+
+        return { success: true, url, filename, width, height, sizeBytes: size }
+    } catch (error) {
+        console.error('Gallery upload error:', error)
+        return { success: false, error: 'تعذّر رفع الصورة' }
     }
 }
 

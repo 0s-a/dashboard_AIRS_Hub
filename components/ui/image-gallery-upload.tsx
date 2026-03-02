@@ -11,11 +11,27 @@ import {
     ImageIcon,
     GripVertical,
     AlertCircle,
+    Tag,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { uploadProductImage } from "@/lib/actions/upload"
-import type { ProductImage } from "@/lib/types/product"
+import {
+    addProductImage,
+    removeProductImage,
+    setPrimaryProductImage,
+    reorderProductImages,
+    toggleVariantForProductImage,
+} from "@/lib/actions/product-images"
+import type { ProductImageRecord } from "@/lib/actions/product-images"
+import type { VariantRecord } from "@/lib/actions/variants"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,26 +44,33 @@ interface UploadingImage {
 }
 
 interface ImageGalleryUploadProps {
-    images: ProductImage[]
-    onChange: (images: ProductImage[]) => void
+    images: ProductImageRecord[]
+    productId: string
     productItemNumber: string
+    variants?: VariantRecord[]
     maxImages?: number
     disabled?: boolean
     className?: string
+    onImagesChange?: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ImageGalleryUpload({
     images,
-    onChange,
+    productId,
     productItemNumber,
+    variants = [],
     maxImages = 10,
     disabled = false,
     className,
+    onImagesChange,
 }: ImageGalleryUploadProps) {
     const [uploading, setUploading] = useState<UploadingImage[]>([])
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+    const [removingId, setRemovingId] = useState<string | null>(null)
+    const [settingPrimary, setSettingPrimary] = useState<string | null>(null)
+    const [updatingVariantId, setUpdatingVariantId] = useState<string | null>(null)
     const dragItem = useRef<number | null>(null)
 
     const canUploadMore = images.length + uploading.length < maxImages
@@ -56,11 +79,6 @@ export function ImageGalleryUpload({
 
     const onDrop = useCallback(
         async (acceptedFiles: File[]) => {
-            if (!productItemNumber?.trim()) {
-                toast.error('حقل مطلوب', { description: 'يُرجى إدخال رقم الصنف أولاً قبل رفع الصور' })
-                return
-            }
-
             const remaining = maxImages - images.length - uploading.length
             const filesToUpload = acceptedFiles.slice(0, remaining)
 
@@ -82,61 +100,46 @@ export function ImageGalleryUpload({
 
             setUploading((prev) => [...prev, ...newUploading])
 
-            // Upload each file
-            const results = await Promise.all(
-                newUploading.map(async (item, i) => {
-                    const isFirst = images.length === 0 && i === 0
-                    const slot = isFirst ? "main" : `gallery-${Date.now()}-${i}`
+            // Upload each file via server action
+            let uploadedCount = 0
+            for (const item of newUploading) {
+                setUploading((prev) =>
+                    prev.map((u) => (u.id === item.id ? { ...u, progress: 30 } : u))
+                )
 
-                    // Simulate progress
-                    setUploading((prev) =>
-                        prev.map((u) => (u.id === item.id ? { ...u, progress: 30 } : u))
+                const result = await addProductImage(productId, item.file)
+
+                setUploading((prev) =>
+                    prev.map((u) =>
+                        u.id === item.id
+                            ? { ...u, progress: result.success ? 100 : 0, error: result.error }
+                            : u
                     )
+                )
 
-                    const result = await uploadProductImage(item.file, productItemNumber, slot)
-
-                    setUploading((prev) =>
-                        prev.map((u) =>
-                            u.id === item.id
-                                ? { ...u, progress: result.success ? 100 : 0, error: result.error }
-                                : u
-                        )
-                    )
-
-                    return { item, result, isFirst }
-                })
-            )
-
-            // Add successful uploads to images
-            const newImages: ProductImage[] = []
-            results.forEach(({ item, result, isFirst }) => {
-                if (result.success && result.url) {
-                    newImages.push({
-                        url: result.url,
-                        alt: "",
-                        isPrimary: isFirst && images.length === 0,
-                        order: images.length + newImages.length,
-                    })
+                if (result.success) {
+                    uploadedCount++
                 } else if (result.error) {
                     toast.error('فشل رفع صورة', { description: result.error })
                 }
-                URL.revokeObjectURL(item.preview)
-            })
 
-            if (newImages.length > 0) {
-                onChange([...images, ...newImages])
-                toast.success(
-                    newImages.length === 1 ? 'تم رفع الصورة' : `تم رفع ${newImages.length} صور`,
-                    { description: 'تم ضغط الصور وتحويلها إلى WebP تلقائياً' }
-                )
+                URL.revokeObjectURL(item.preview)
             }
 
-            // Clear uploading state for completed items
+            if (uploadedCount > 0) {
+                toast.success(
+                    uploadedCount === 1 ? 'تم رفع الصورة' : `تم رفع ${uploadedCount} صور`,
+                    { description: 'تم ضغط الصور وتحويلها إلى WebP تلقائياً' }
+                )
+                onImagesChange?.()
+            }
+
+            // Clear uploading state
             setUploading((prev) =>
                 prev.filter((u) => !newUploading.find((n) => n.id === u.id))
             )
         },
-        [images, uploading, onChange, productItemNumber, maxImages]
+        [images, uploading, productId, maxImages, onImagesChange]
     )
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -160,18 +163,38 @@ export function ImageGalleryUpload({
 
     // ── Actions ───────────────────────────────────────────────────────────────
 
-    const setPrimary = (index: number) => {
-        const updated = images.map((img, i) => ({ ...img, isPrimary: i === index }))
-        onChange(updated)
+    const handleSetPrimary = async (imageId: string) => {
+        setSettingPrimary(imageId)
+        const result = await setPrimaryProductImage(imageId)
+        setSettingPrimary(null)
+        if (result.success) {
+            onImagesChange?.()
+        } else {
+            toast.error('فشل تعيين الصورة الرئيسية', { description: result.error })
+        }
     }
 
-    const removeImage = (index: number) => {
-        const updated = images.filter((_, i) => i !== index)
-        // Ensure there's still a primary if we removed it
-        if (images[index].isPrimary && updated.length > 0) {
-            updated[0] = { ...updated[0], isPrimary: true }
+    const handleRemoveImage = async (imageId: string) => {
+        setRemovingId(imageId)
+        const result = await removeProductImage(imageId)
+        setRemovingId(null)
+        if (result.success) {
+            toast.success('تم حذف الصورة')
+            onImagesChange?.()
+        } else {
+            toast.error('فشل حذف الصورة', { description: result.error })
         }
-        onChange(updated.map((img, i) => ({ ...img, order: i })))
+    }
+
+    const handleSetVariant = async (imageId: string, variantId: string) => {
+        setUpdatingVariantId(imageId)
+        const result = await toggleVariantForProductImage(imageId, variantId)
+        setUpdatingVariantId(null)
+        if (result.success) {
+            onImagesChange?.()
+        } else {
+            toast.error('فشل تحديث المتغير', { description: result.error })
+        }
     }
 
     // ── Drag to reorder ───────────────────────────────────────────────────────
@@ -184,7 +207,7 @@ export function ImageGalleryUpload({
         setDragOverIndex(index)
     }
 
-    const handleDragEnd = () => {
+    const handleDragEnd = async () => {
         if (dragItem.current === null || dragOverIndex === null) {
             dragItem.current = null
             setDragOverIndex(null)
@@ -198,7 +221,10 @@ export function ImageGalleryUpload({
             const reordered = [...images]
             const [moved] = reordered.splice(from, 1)
             reordered.splice(to, 0, moved)
-            onChange(reordered.map((img, i) => ({ ...img, order: i })))
+
+            // Send new order to server
+            await reorderProductImages(reordered.map(img => img.id))
+            onImagesChange?.()
         }
 
         dragItem.current = null
@@ -222,7 +248,7 @@ export function ImageGalleryUpload({
                 </div>
                 {images.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                        اضغط ⭐ لتعيين الصورة الرئيسية
+                        رتب الصور أو اسحبها لتعيين العلاقة مع المتغيرات
                     </p>
                 )}
             </div>
@@ -231,72 +257,152 @@ export function ImageGalleryUpload({
             {(images.length > 0 || uploading.length > 0) && (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {/* Existing images */}
-                    {images.map((img, index) => (
-                        <div
-                            key={img.url}
-                            draggable
-                            onDragStart={() => handleDragStart(index)}
-                            onDragEnter={() => handleDragEnter(index)}
-                            onDragEnd={handleDragEnd}
-                            onDragOver={(e) => e.preventDefault()}
-                            className={cn(
-                                "group relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-grab active:cursor-grabbing",
-                                img.isPrimary
-                                    ? "border-primary shadow-md shadow-primary/20"
-                                    : "border-border/50 hover:border-primary/40",
-                                dragOverIndex === index && "border-primary border-dashed scale-95 opacity-70"
-                            )}
-                        >
-                            <Image
-                                src={img.url}
-                                alt={img.alt || `صورة ${index + 1}`}
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 640px) 33vw, 25vw"
-                            />
+                    {images.map((img, index) => {
+                        const linkedVariants = variants.filter(v => img.variantIds?.includes(v.id))
+                        
+                        return (
+                            <div
+                                key={img.id}
+                                draggable
+                                onDragStart={() => handleDragStart(index)}
+                                onDragEnter={() => handleDragEnter(index)}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={(e) => e.preventDefault()}
+                                className={cn(
+                                    "group relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-grab active:cursor-grabbing",
+                                    img.isPrimary
+                                        ? "border-primary shadow-md shadow-primary/20"
+                                        : linkedVariants.length > 0
+                                            ? "border-primary/40 shadow-sm"
+                                            : "border-border/50 hover:border-primary/40",
+                                    dragOverIndex === index && "border-primary border-dashed scale-95 opacity-70",
+                                    (removingId === img.id || updatingVariantId === img.id) && "opacity-50 pointer-events-none"
+                                )}
+                            >
+                                <Image
+                                    src={img.url}
+                                    alt={img.alt || `صورة ${index + 1}`}
+                                    fill
+                                    className="object-cover"
+                                    sizes="(max-width: 640px) 33vw, 25vw"
+                                />
 
-                            {/* Overlay */}
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-1.5">
-                                {/* Set primary */}
-                                <button
-                                    type="button"
-                                    onClick={() => setPrimary(index)}
-                                    className={cn(
-                                        "opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full",
-                                        img.isPrimary
-                                            ? "bg-primary text-white opacity-100"
-                                            : "bg-white/90 text-amber-500 hover:bg-amber-50"
+                                {/* Overlay Buttons (Visible on hover) */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex flex-col items-center justify-center gap-1.5 p-1">
+                                    <div className="flex gap-1.5">
+                                        {/* Set primary */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetPrimary(img.id)}
+                                            disabled={settingPrimary === img.id}
+                                            className={cn(
+                                                "opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full",
+                                                img.isPrimary
+                                                    ? "bg-primary text-white opacity-100"
+                                                    : "bg-white/90 text-amber-500 hover:bg-amber-50"
+                                            )}
+                                            title={img.isPrimary ? "الصورة الرئيسية" : "تعيين كصورة رئيسية"}
+                                        >
+                                            {settingPrimary === img.id ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                                <Star className={cn("h-3.5 w-3.5", img.isPrimary && "fill-current")} />
+                                            )}
+                                        </button>
+
+                                        {/* Delete */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveImage(img.id)}
+                                            disabled={removingId === img.id}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full bg-destructive/90 text-white hover:bg-destructive"
+                                            title="حذف الصورة"
+                                        >
+                                            {removingId === img.id ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                                <X className="h-3.5 w-3.5" />
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* Variant Selector Button */}
+                                    {variants.length > 0 && (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button
+                                                    className={cn(
+                                                        "opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold shadow-sm whitespace-nowrap",
+                                                        linkedVariants.length > 0 
+                                                            ? "bg-primary text-white" 
+                                                            : "bg-white/90 text-foreground hover:bg-white"
+                                                    )}
+                                                >
+                                                    {updatingVariantId === img.id ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Tag className="h-3 w-3" />
+                                                    )}
+                                                    {linkedVariants.length > 0 ? `${linkedVariants.length} متغيرات` : "ربط بمتغير"}
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="center" className="w-48">
+                                                <DropdownMenuLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                    اختر المتغير
+                                                </DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                {variants.map(v => (
+                                                    <DropdownMenuItem 
+                                                        key={v.id} 
+                                                        onClick={(e) => {
+                                                            e.preventDefault() // prevent closing menu
+                                                            handleSetVariant(img.id, v.id)
+                                                        }}
+                                                        className="flex items-center gap-2 cursor-pointer"
+                                                    >
+                                                        {v.hex ? (
+                                                            <div className="h-3 w-3 rounded-full border border-black/10" style={{ backgroundColor: v.hex }} />
+                                                        ) : (
+                                                            <div className="h-3 w-3 rounded-full bg-muted border border-border" />
+                                                        )}
+                                                        <span className="flex-1">{v.name}</span>
+                                                        <span className="text-[10px] font-mono text-muted-foreground">{v.suffix}</span>
+                                                        {img.variantIds?.includes(v.id) && <Check className="h-3 w-3 ml-auto text-primary" />}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     )}
-                                    title={img.isPrimary ? "الصورة الرئيسية" : "تعيين كصورة رئيسية"}
-                                >
-                                    <Star className={cn("h-3.5 w-3.5", img.isPrimary && "fill-current")} />
-                                </button>
-
-                                {/* Delete */}
-                                <button
-                                    type="button"
-                                    onClick={() => removeImage(index)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full bg-destructive/90 text-white hover:bg-destructive"
-                                    title="حذف الصورة"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-
-                            {/* Primary badge */}
-                            {img.isPrimary && (
-                                <div className="absolute top-1.5 right-1.5 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                                    <Star className="h-2.5 w-2.5 fill-current" />
-                                    رئيسية
                                 </div>
-                            )}
 
-                            {/* Drag handle */}
-                            <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-60 transition-opacity">
-                                <GripVertical className="h-3.5 w-3.5 text-white" />
+                                {/* Persistent Badges (Always visible) */}
+                                <div className="absolute top-1 right-1 flex flex-col items-end gap-1 pointer-events-none">
+                                    {/* Primary badge */}
+                                    {img.isPrimary && (
+                                        <div className="bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-sm">
+                                            <Star className="h-2 w-2 fill-current" />
+                                            رئيسية
+                                        </div>
+                                    )}
+                                    
+                                    {/* Variant Badges */}
+                                    {linkedVariants.map(v => (
+                                        <div key={v.id} className="bg-background/90 backdrop-blur-sm text-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-border/50 shadow-sm flex items-center gap-1">
+                                            {v.hex && (
+                                                <div className="h-2 w-2 rounded-full border border-black/10" style={{ backgroundColor: v.hex }} />
+                                            )}
+                                            {v.name}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Drag handle */}
+                                <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-60 transition-opacity">
+                                    <GripVertical className="h-3.5 w-3.5 text-white" />
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        )
+                    })}
 
                     {/* Uploading placeholders */}
                     {uploading.map((item) => (
@@ -383,14 +489,25 @@ export function ImageGalleryUpload({
                     </div>
                 </div>
             )}
-
-            {/* Warning: no itemNumber */}
-            {!productItemNumber?.trim() && (
-                <p className="text-xs text-amber-600 flex items-center gap-1.5">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    أدخل رقم الصنف أولاً لتتمكن من رفع الصور
-                </p>
-            )}
         </div>
+    )
+}
+
+function Check(props: React.SVGProps<SVGSVGElement>) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <polyline points="20 6 9 17 4 12" />
+        </svg>
     )
 }

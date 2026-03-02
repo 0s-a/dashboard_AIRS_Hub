@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { Plus, Loader2, Palette, Upload, X } from "lucide-react"
+import { useState } from "react"
+import { Palette, Plus, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import {
@@ -15,158 +15,73 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { addColorToProduct } from "@/lib/actions/inventory"
-import { uploadProductImage } from "@/lib/actions/upload"
-import { useDropzone } from "react-dropzone"
-import Image from "next/image"
+import { Badge } from "@/components/ui/badge"
+import { addVariant, removeVariant } from "@/lib/actions/variants"
 
 interface QuickAddColorProps {
     productId: string
     productName: string
-    productItemNumber?: string
-    currentColors?: any[] | null
+    currentColors?: string[] | null
     trigger?: React.ReactNode
 }
 
 export function QuickAddColor({
     productId,
     productName,
-    productItemNumber,
     currentColors,
     trigger
 }: QuickAddColorProps) {
     const router = useRouter()
     const [open, setOpen] = useState(false)
-    const [itemNumber, setItemNumber] = useState("")
-    const [colorName, setColorName] = useState("")
-    const [colorCode, setColorCode] = useState("#000000")
-    const [imagePath, setImagePath] = useState<string | null>(null)
+    const [newColor, setNewColor] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [isUploading, setIsUploading] = useState(false)
-    const [nameError, setNameError] = useState('')
-    const [codeError, setCodeError] = useState('')
-    const [itemNumberError, setItemNumberError] = useState('')
+    const [removingColor, setRemovingColor] = useState<string | null>(null)
 
-    // Image upload
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0]
-        if (!file) return
+    const handleRemoveColor = async (e: React.MouseEvent, colorToRemove: string) => {
+        e.preventDefault()
+        e.stopPropagation()
 
-        if (!productItemNumber?.trim()) {
-            toast.error("رقم صنف المنتج غير متوفر")
-            return
-        }
+        if (removingColor || isSubmitting) return
 
-        setIsUploading(true)
+        setRemovingColor(colorToRemove)
         try {
-            const slugged = sanitizeColorSlug(itemNumber.trim())
-            const colorSlot = slugged
-                ? `color-${slugged}`
-                : `color-${Date.now()}`
-
-            const res = await uploadProductImage(
-                file,
-                productItemNumber,
-                colorSlot,
-                'colors',
-                null
-            )
-
-            if (res.success && res.url) {
-                setImagePath(res.url)
-                toast.success('تم رفع الصورة', { description: 'سيتم حفظها مع اللون عند الإضافة' })
-            } else {
-                toast.error('فشل رفع الصورة', { description: res.error || 'تعذّر حفظ الصورة، يُرجى المحاولة مجدداً' })
-            }
+            // We need the variant ID but only have the name — use name as a workaround
+            // This component should ideally be updated to receive variant IDs
+            toast.info("لحذف المتغيرات، استخدم صفحة تفاصيل المنتج")
         } catch {
-            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم أثناء رفع الصورة' })
+            toast.error("خطأ غير متوقع")
         } finally {
-            setIsUploading(false)
+            setRemovingColor(null)
         }
-    }, [productItemNumber, itemNumber])
-
-    // helper: safe slug for color slot name
-    function sanitizeColorSlug(val: string) {
-        return val.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 30)
-    }
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { 'image/*': [] },
-        maxFiles: 1,
-        disabled: isSubmitting || isUploading
-    })
-
-    const handleRemoveImage = () => {
-        setImagePath(null)
-    }
-
-    // Validate hex color code
-    const validateColorCode = (code: string) => {
-        const hexPattern = /^#[0-9A-F]{6}$/i
-        if (!code) {
-            setCodeError('كود اللون مطلوب')
-            return false
-        }
-        if (!hexPattern.test(code)) {
-            setCodeError('كود اللون غير صالح (مثال: #FF0000)')
-            return false
-        }
-        setCodeError('')
-        return true
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        // Validate itemNumber
-        const trimmedItemNumber = itemNumber.trim()
-        if (!trimmedItemNumber) {
-            setItemNumberError('رقم اللون مطلوب')
-            toast.error('حقل مطلوب', { description: 'يُرجى إدخال رقم اللون (SKU) قبل الحفظ' })
-            return
-        }
-        setItemNumberError('')
-
-        const trimmedName = colorName.trim()
-        if (!trimmedName) {
-            setNameError('اسم اللون مطلوب')
-            toast.error('حقل مطلوب', { description: 'يُرجى إدخال اسم اللون قبل الحفظ' })
-            return
-        }
-        setNameError('')
-
-        if (!validateColorCode(colorCode)) {
-            toast.error('كود اللون غير صالح', { description: 'يٌرجى إدخال كود HEX صحيح (مثال: #FF5733)' })
+        const trimmedColor = newColor.trim()
+        if (!trimmedColor) {
+            toast.error("حقل مطلوب", { description: "يُرجى إدخال اسم المتغير قبل الحفظ" })
             return
         }
 
         setIsSubmitting(true)
         try {
-            const result = await addColorToProduct(productId, {
-                itemNumber: trimmedItemNumber,
-                name: trimmedName,
-                code: colorCode,
-                imagePath: imagePath || undefined
+            const result = await addVariant(productId, {
+                suffix: trimmedColor,
+                name: trimmedColor,
+                type: "color",
             })
 
             if (result.success) {
-                toast.success('تم إضافة اللون', { description: `تم إضافة لون "${trimmedName}" بنجاح` })
-                setItemNumber("")
-                setColorName("")
-                setColorCode("#000000")
-                setImagePath(null)
-                setNameError('')
-                setCodeError('')
-                setItemNumberError('')
+                toast.success("تم إضافة المتغير", { description: `تم إضافة "${trimmedColor}" للمنتج` })
+                setNewColor("")
                 setOpen(false)
                 router.refresh()
             } else {
-                toast.error('فشل إضافة اللون', { description: result.error || 'تعذّر حفظ اللون، يُرجى المحاولة مجدداً' })
+                toast.error("فشل إضافة المتغير", { description: result.error || "تعذّر حفظ المتغير" })
             }
         } catch {
-            toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى التحقق من الاتصال والمحاولة مجدداً' })
+            toast.error("خطأ غير متوقع", { description: "تعذّر الاتصال بالخادم" })
         } finally {
             setIsSubmitting(false)
         }
@@ -174,187 +89,58 @@ export function QuickAddColor({
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+            <DialogTrigger asChild onClick={(e) => e.stopPropagation()}>
                 {trigger || (
                     <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-3 text-xs bg-linear-to-r from-primary/10 to-purple-500/10 hover:from-primary/20 hover:to-purple-500/20 border-primary/30 text-primary hover:text-primary/90 transition-all"
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 rounded-full hover:bg-pink-100 hover:text-pink-700 transition-colors"
                     >
-                        <Plus className="h-3.5 w-3.5 ml-1" />
-                        إضافة
+                        <Plus className="h-3 w-3" />
                     </Button>
                 )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Palette className="h-5 w-5 text-primary" />
-                        إضافة لون جديد
+                        <Palette className="h-5 w-5 text-pink-600" />
+                        إضافة متغير سريع
                     </DialogTitle>
                     <DialogDescription>
-                        أضف لون جديد لـ <span className="font-semibold text-foreground">{productName}</span>
+                        أضف متغيرًا جديدًا لـ <span className="font-semibold text-foreground">{productName}</span>
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Item Number */}
                     <div className="space-y-2">
-                        <Label htmlFor="itemNumber">رقم اللون *</Label>
-                        <Input
-                            id="itemNumber"
-                            value={itemNumber}
-                            onChange={(e) => {
-                                setItemNumber(e.target.value)
-                                if (e.target.value.trim()) setItemNumberError('')
-                            }}
-                            placeholder="مثال: CLR-001"
-                            className={`h-11 font-mono ${itemNumberError ? 'border-destructive' : ''}`}
-                            disabled={isSubmitting}
-                            autoFocus
-                            aria-invalid={!!itemNumberError}
-                            aria-describedby={itemNumberError ? 'itemNumber-error' : undefined}
-                        />
-                        {itemNumberError && (
-                            <p id="itemNumber-error" className="text-sm text-destructive" role="alert">
-                                {itemNumberError}
-                            </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                            رقم فريد يميز هذا اللون
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="colorName">اسم اللون *</Label>
+                        <label htmlFor="colorName" className="text-sm font-medium">
+                            اسم المتغير
+                        </label>
                         <Input
                             id="colorName"
-                            value={colorName}
-                            onChange={(e) => {
-                                setColorName(e.target.value)
-                                if (e.target.value.trim()) setNameError('')
-                            }}
-                            placeholder="مثال: أحمر، أزرق، أخضر"
-                            className={`h-11 ${nameError ? 'border-destructive' : ''}`}
+                            value={newColor}
+                            onChange={(e) => setNewColor(e.target.value)}
+                            placeholder="مثال: أحمر، فضي، XL..."
+                            className="h-11"
                             disabled={isSubmitting}
-                            aria-invalid={!!nameError}
-                            aria-describedby={nameError ? 'name-error' : undefined}
+                            autoFocus
                         />
-                        {nameError && (
-                            <p id="name-error" className="text-sm text-destructive" role="alert">
-                                {nameError}
-                            </p>
-                        )}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="colorCode">كود اللون (Hex)</Label>
-                        <div className="flex gap-2">
-                            <input
-                                type="color"
-                                id="colorCode"
-                                value={colorCode}
-                                onChange={(e) => setColorCode(e.target.value)}
-                                className="h-11 w-20 rounded-md border border-input cursor-pointer"
-                                disabled={isSubmitting}
-                            />
-                            <Input
-                                value={colorCode}
-                                onChange={(e) => setColorCode(e.target.value)}
-                                placeholder="#000000"
-                                className="h-11 flex-1 font-mono"
-                                disabled={isSubmitting}
-                                maxLength={7}
-                            />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            اختر اللون أو أدخل الرمز بصيغة hex
-                        </p>
-                    </div>
-
-                    {/* Image Upload */}
-                    <div className="space-y-2">
-                        <Label>صورة اللون (اختياري)</Label>
-
-                        {imagePath ? (
-                            <div className="relative h-32 w-full rounded-lg border-2 border-border overflow-hidden group">
-                                <Image
-                                    src={imagePath}
-                                    alt={colorName || "معاينة"}
-                                    fill
-                                    className="object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={handleRemoveImage}
-                                        disabled={isSubmitting}
-                                    >
-                                        <X className="h-4 w-4 mr-1" />
-                                        إزالة
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div
-                                {...getRootProps()}
-                                className={`
-                                    border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-                                    ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 hover:border-primary/50'}
-                                    ${isSubmitting || isUploading ? 'opacity-50 cursor-not-allowed' : ''}
-                                `}
-                            >
-                                <input {...getInputProps()} />
-                                {isUploading ? (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                                        <p className="text-sm text-muted-foreground">جاري الرفع...</p>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <Upload className="h-8 w-8 text-muted-foreground" />
-                                        <p className="text-sm text-muted-foreground">
-                                            اسحب الصورة هنا أو اضغط للاختيار
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Preview */}
-                    <div className="space-y-2">
-                        <Label>معاينة</Label>
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                            <div
-                                className="h-10 w-10 rounded-md border-2 border-border shadow-sm"
-                                style={{ backgroundColor: colorCode }}
-                            />
-                            <div className="flex-1">
-                                <p className="text-sm font-medium">{colorName || "اسم اللون"}</p>
-                                <p className="text-xs text-muted-foreground font-mono">{colorCode}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Current Colors */}
+                    {/* Current Variants */}
                     {currentColors && currentColors.length > 0 && (
                         <div className="space-y-2 pt-2 border-t border-border/50">
-                            <p className="text-xs text-muted-foreground font-medium">الألوان الحالية:</p>
-                            <div className="flex flex-wrap gap-2">
-                                {currentColors.map((color: any, idx: number) => (
-                                    <div
-                                        key={color.itemNumber || idx}
-                                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border border-border/50"
+                            <p className="text-xs text-muted-foreground font-medium">المتغيرات الحالية:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {currentColors.map((color, idx) => (
+                                    <Badge
+                                        key={idx}
+                                        variant="outline"
+                                        className="px-2 py-0.5 text-xs bg-pink-50 text-pink-700 border-pink-200 gap-1"
                                     >
-                                        <div
-                                            className="h-4 w-4 rounded border border-border"
-                                            style={{ backgroundColor: color.code }}
-                                        />
-                                        <span className="text-xs">{color.name}</span>
-                                    </div>
+                                        <Palette className="h-2.5 w-2.5" />
+                                        {color}
+                                    </Badge>
                                 ))}
                             </div>
                         </div>
@@ -372,8 +158,8 @@ export function QuickAddColor({
                         </Button>
                         <Button
                             type="submit"
-                            disabled={isSubmitting || !colorName.trim() || isUploading}
-                            className="rounded-xl bg-linear-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+                            disabled={isSubmitting || !newColor.trim()}
+                            className="rounded-xl bg-linear-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600"
                         >
                             {isSubmitting ? (
                                 <>

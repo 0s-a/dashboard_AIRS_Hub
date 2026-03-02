@@ -19,10 +19,9 @@ export async function GET(req: NextRequest) {
                 id: true,
                 itemNumber: true,
                 name: true,
-                category: true,
                 description: true,
-                price: true,
-                imagePath: true
+                prices: true,
+                productImages: { include: { mediaImage: { select: { url: true } } }, where: { isPrimary: true }, take: 1 }
             }
         })
 

@@ -1,0 +1,77 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { prisma } from '@/lib/prisma'
+
+export async function getPersonTypes() {
+    try {
+        const types = await (prisma as any).personType.findMany({
+            orderBy: { name: 'asc' },
+        })
+        return { success: true, data: types }
+    } catch (error) {
+        console.error('Failed to fetch person types:', error)
+        return { success: false, error: 'Failed to fetch person types', data: [] as any[] }
+    }
+}
+
+export async function getPersonTypeById(id: string) {
+    try {
+        const type = await (prisma as any).personType.findUnique({
+            where: { id },
+        })
+        return { success: true, data: type }
+    } catch (error) {
+        console.error('Failed to fetch person type:', error)
+        return { success: false, error: 'Failed to fetch person type', data: null }
+    }
+}
+
+export async function createPersonType(data: {
+    name: string
+    description?: string | null
+    notes?: string | null
+}) {
+    try {
+        const type = await (prisma as any).personType.create({
+            data: {
+                name: data.name,
+                description: data.description,
+                notes: data.notes,
+            }
+        })
+        revalidatePath('/person-types')
+        return { success: true, data: type }
+    } catch (error: any) {
+        console.error('Failed to create person type:', error)
+        if (error.code === 'P2002') {
+            return { success: false, error: 'اسم النوع موجود بالفعل' }
+        }
+        return { success: false, error: 'Failed to create person type' }
+    }
+}
+
+export async function updatePersonType(id: string, data: {
+    name?: string
+    description?: string | null
+    notes?: string | null
+}) {
+    try {
+        const type = await (prisma as any).personType.update({
+            where: { id },
+            data: {
+                name: data.name,
+                description: data.description,
+                notes: data.notes,
+            }
+        })
+        revalidatePath('/person-types')
+        return { success: true, data: type }
+    } catch (error: any) {
+        console.error('Failed to update person type:', error)
+        if (error.code === 'P2002') {
+            return { success: false, error: 'اسم النوع موجود بالفعل' }
+        }
+        return { success: false, error: 'Failed to update person type' }
+    }
+}

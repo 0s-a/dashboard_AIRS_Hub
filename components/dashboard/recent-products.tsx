@@ -3,16 +3,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { Package as PackageIcon } from "lucide-react"
+import { Package as PackageIcon, Box } from "lucide-react"
 import Link from "next/link"
 
 interface Product {
     id: string
     name: string
-    category: string
-    price: number
-    imagePath: string | null
+    prices: Array<{ label: string; value: number, currency?: string }>
+    mediaImages: Array<{ url: string; isPrimary: boolean }> | null
     isAvailable: boolean
+    unit: string
+    packaging?: string | null
     createdAt: Date
 }
 
@@ -63,18 +64,22 @@ export function RecentProducts({ products }: RecentProductsProps) {
                             className="group flex items-center gap-4 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/30 hover:border-primary/30 transition-all duration-200"
                         >
                             <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50">
-                                {product.imagePath ? (
-                                    <Image
-                                        src={product.imagePath}
-                                        alt={product.name}
-                                        fill
-                                        className="object-cover group-hover:scale-110 transition-transform duration-300"
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center h-full w-full">
-                                        <PackageIcon className="h-5 w-5 text-muted-foreground/40" />
-                                    </div>
-                                )}
+                                {(() => {
+                                    const imgs = product.mediaImages
+                                    const src = imgs?.find(i => i.isPrimary)?.url ?? imgs?.[0]?.url
+                                    return src ? (
+                                        <Image
+                                            src={src}
+                                            alt={product.name}
+                                            fill
+                                            className="object-cover group-hover:scale-110 transition-transform duration-300"
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center h-full w-full">
+                                            <PackageIcon className="h-5 w-5 text-muted-foreground/40" />
+                                        </div>
+                                    )
+                                })()}
                             </div>
 
                             <div className="flex-1 min-w-0">
@@ -88,14 +93,19 @@ export function RecentProducts({ products }: RecentProductsProps) {
                                         </Badge>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground">{product.category}</p>
                             </div>
 
-                            <div className="text-left">
-                                <p className="font-mono font-bold text-sm text-primary">
-                                    {Number(product.price).toFixed(2)}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">ريال</p>
+                            <div className="text-left flex flex-col items-end gap-1">
+                                {product.prices && product.prices.length > 0 ? (
+                                    <div className="flex flex-col items-end">
+                                        <p className="font-mono font-bold text-sm text-primary">
+                                            {product.prices[0].value.toFixed(2)} {product.prices[0].currency || 'ر.ي'}
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground">{product.prices[0].label || 'سعر'}</p>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground italic mt-1">لا يوجد سعر</p>
+                                )}
                             </div>
                         </div>
                     ))}

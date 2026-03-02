@@ -2,174 +2,248 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import type { ProductImage } from '@/lib/types/product'
-import { validateProductImages } from '@/lib/types/product'
+import { uploadProductImage, deleteProductImage as deleteImageFile } from './upload'
 
-/**
- * Add image to product
- */
-export async function addProductImage(
-    productId: string,
-    image: ProductImage
-) {
-    try {
-        const product = await prisma.product.findUnique({
-            where: { id: productId },
-            select: { images: true }
-        })
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-        if (!product) {
-            return { success: false, error: '\u0627\u0644\u0645\u0646\u062a\u062c \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
-        }
+export type ProductImageRecord = {
+    id: string          // ProductImage junction record id
+    mediaImageId: string
+    url: string
+    filename: string
+    alt: string | null
+    isPrimary: boolean
+    order: number
+    width: number | null
+    height: number | null
+    sizeBytes: number | null
+    variantIds: string[]
+}
 
-        const currentImages = (product.images as ProductImage[]) || []
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-        // If this is the first image or should be primary, adjust
-        if (currentImages.length === 0) {
-            image.isPrimary = true
-        } else if (image.isPrimary) {
-            // Remove isPrimary from other images
-            currentImages.forEach(img => img.isPrimary = false)
-        }
+function revalidateProduct(productId: string) {
+    revalidatePath('/inventory')
+    revalidatePath(`/inventory/${productId}`)
+}
 
-        const updatedImages = [...currentImages, image]
-
-        // Validate
-        const validation = validateProductImages(updatedImages)
-        if (!validation.valid) {
-            return { success: false, error: validation.error }
-        }
-
-        await prisma.product.update({
-            where: { id: productId },
-            data: { images: updatedImages as any }
-        })
-
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-
-        return { success: true }
-    } catch (error) {
-        console.error('Failed to add product image:', error)
-        return { success: false, error: '\u0641\u0634\u0644 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0635\u0648\u0631\u0629' }
+/** Map a productImage + nested mediaImage into a flat record */
+function mapRecord(pi: any): ProductImageRecord {
+    return {
+        id: pi.id,
+        mediaImageId: pi.mediaImageId,
+        url: pi.mediaImage.url,
+        filename: pi.mediaImage.filename,
+        alt: pi.mediaImage.alt,
+        isPrimary: pi.isPrimary,
+        order: pi.order,
+        width: pi.mediaImage.width,
+        height: pi.mediaImage.height,
+        sizeBytes: pi.mediaImage.sizeBytes,
+        variantIds: (pi.variants || []).map((v: any) => v.id),
     }
 }
 
-/**
- * Remove image from product
- */
-export async function removeProductImage(
+// Include clause used consistently
+const INCLUDE_MEDIA = { mediaImage: true, variants: { select: { id: true } } } as const
+
+// ─── Queries ──────────────────────────────────────────────────────────────────
+
+export async function getProductImages(productId: string): Promise<{ success: boolean; data: ProductImageRecord[]; error?: string }> {
+    try {
+        const pis = await prisma.productImage.findMany({
+            where: { productId },
+            include: INCLUDE_MEDIA,
+            orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { createdAt: 'asc' }],
+        })
+
+        return { success: true, data: pis.map(mapRecord) }
+    } catch (error) {
+        console.error('Failed to get product images:', error)
+        return { success: false, data: [], error: 'فشل جلب الصور' }
+    }
+}
+
+// ─── CRUD ─────────────────────────────────────────────────────────────────────
+
+export async function addProductImage(
     productId: string,
-    imageUrl: string
-) {
+    file: File
+): Promise<{ success: boolean; data?: ProductImageRecord; error?: string }> {
     try {
         const product = await prisma.product.findUnique({
             where: { id: productId },
-            select: { images: true }
+            select: { itemNumber: true },
+        })
+        if (!product) return { success: false, error: 'المنتج غير موجود' }
+
+        const existingCount = await prisma.productImage.count({ where: { productId } })
+        if (existingCount >= 10) {
+            return { success: false, error: 'الحد الأقصى 10 صور للمنتج الواحد' }
+        }
+
+        const slot = `${product.itemNumber}-${existingCount + 1}`
+        const isFirst = existingCount === 0
+
+        // Upload the file → creates a MediaImage record
+        const result = await uploadProductImage(file, product.itemNumber, slot)
+        if (!result.success || !result.mediaId) {
+            return { success: false, error: result.error || 'فشل رفع الصورة' }
+        }
+
+        // Create the junction record linking product ↔ image
+        const pi = await prisma.productImage.create({
+            data: {
+                productId,
+                mediaImageId: result.mediaId,
+                isPrimary: isFirst,
+                order: existingCount,
+            },
+            include: INCLUDE_MEDIA,
         })
 
-        if (!product) {
-            return { success: false, error: '\u0627\u0644\u0645\u0646\u062a\u062c \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
-        }
+        revalidateProduct(productId)
+        return { success: true, data: mapRecord(pi) }
+    } catch (error) {
+        console.error('Failed to add product image:', error)
+        return { success: false, error: 'فشل إضافة الصورة' }
+    }
+}
 
-        const currentImages = (product.images as ProductImage[]) || []
-        const imageToRemove = currentImages.find(img => img.url === imageUrl)
-
-        if (!imageToRemove) {
-            return { success: false, error: '\u0627\u0644\u0635\u0648\u0631\u0629 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f\u0629' }
-        }
-
-        const updatedImages = currentImages.filter(img => img.url !== imageUrl)
-
-        // If removed image was primary and there are other images, make first one primary
-        if (imageToRemove.isPrimary && updatedImages.length > 0) {
-            updatedImages[0].isPrimary = true
-        }
-
-        await prisma.product.update({
-            where: { id: productId },
-            data: { images: updatedImages.length > 0 ? updatedImages as any : null }
+export async function removeProductImage(
+    productImageId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const pi = await prisma.productImage.findUnique({
+            where: { id: productImageId },
+            include: INCLUDE_MEDIA,
         })
+        if (!pi) return { success: false, error: 'الصورة غير موجودة' }
 
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
+        const { productId, isPrimary: wasPrimary } = pi
 
+        // Delete the file from disk
+        await deleteImageFile(pi.mediaImage.url)
+
+        // Delete the MediaImage record (cascade deletes the junction record too)
+        await prisma.mediaImage.delete({ where: { id: pi.mediaImageId } })
+
+        // If deleted image was primary, make the first remaining one primary
+        if (wasPrimary) {
+            const first = await prisma.productImage.findFirst({
+                where: { productId },
+                orderBy: { order: 'asc' },
+            })
+            if (first) {
+                await prisma.productImage.update({
+                    where: { id: first.id },
+                    data: { isPrimary: true },
+                })
+            }
+        }
+
+        // Re-order remaining
+        const remaining = await prisma.productImage.findMany({
+            where: { productId },
+            orderBy: { order: 'asc' },
+        })
+        for (let i = 0; i < remaining.length; i++) {
+            if (remaining[i].order !== i) {
+                await prisma.productImage.update({
+                    where: { id: remaining[i].id },
+                    data: { order: i },
+                })
+            }
+        }
+
+        revalidateProduct(productId)
         return { success: true }
     } catch (error) {
         console.error('Failed to remove product image:', error)
-        return { success: false, error: '\u0641\u0634\u0644 \u062d\u0630\u0641 \u0627\u0644\u0635\u0648\u0631\u0629' }
+        return { success: false, error: 'فشل حذف الصورة' }
     }
 }
 
-/**
- * Set primary product image
- */
 export async function setPrimaryProductImage(
-    productId: string,
-    imageUrl: string
-) {
+    productImageId: string
+): Promise<{ success: boolean; error?: string }> {
     try {
-        const product = await prisma.product.findUnique({
-            where: { id: productId },
-            select: { images: true }
+        const pi = await prisma.productImage.findUnique({
+            where: { id: productImageId },
+        })
+        if (!pi) return { success: false, error: 'الصورة غير موجودة' }
+
+        // Unset all, then set this one
+        await prisma.productImage.updateMany({
+            where: { productId: pi.productId },
+            data: { isPrimary: false },
+        })
+        await prisma.productImage.update({
+            where: { id: productImageId },
+            data: { isPrimary: true },
         })
 
-        if (!product) {
-            return { success: false, error: '\u0627\u0644\u0645\u0646\u062a\u062c \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' }
-        }
-
-        const currentImages = (product.images as ProductImage[]) || []
-
-        if (!currentImages.find(img => img.url === imageUrl)) {
-            return { success: false, error: '\u0627\u0644\u0635\u0648\u0631\u0629 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f\u0629' }
-        }
-
-        // Update isPrimary for all images
-        const updatedImages = currentImages.map(img => ({
-            ...img,
-            isPrimary: img.url === imageUrl
-        }))
-
-        await prisma.product.update({
-            where: { id: productId },
-            data: { images: updatedImages as any }
-        })
-
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-
+        revalidateProduct(pi.productId)
         return { success: true }
     } catch (error) {
         console.error('Failed to set primary image:', error)
-        return { success: false, error: '\u0641\u0634\u0644 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629' }
+        return { success: false, error: 'فشل تحديث الصورة الرئيسية' }
     }
 }
 
-/**
- * Reorder product images
- */
 export async function reorderProductImages(
-    productId: string,
-    images: ProductImage[]
-) {
+    productImageIds: string[]
+): Promise<{ success: boolean; error?: string }> {
     try {
-        // Validate
-        const validation = validateProductImages(images)
-        if (!validation.valid) {
-            return { success: false, error: validation.error }
+        await Promise.all(
+            productImageIds.map((id, index) =>
+                prisma.productImage.update({
+                    where: { id },
+                    data: { order: index },
+                })
+            )
+        )
+
+        if (productImageIds.length > 0) {
+            const first = await prisma.productImage.findUnique({ where: { id: productImageIds[0] } })
+            if (first) revalidateProduct(first.productId)
         }
-
-        await prisma.product.update({
-            where: { id: productId },
-            data: { images: images as any }
-        })
-
-        revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
 
         return { success: true }
     } catch (error) {
         console.error('Failed to reorder images:', error)
-        return { success: false, error: '\u0641\u0634\u0644 \u0625\u0639\u0627\u062f\u0629 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u0635\u0648\u0631' }
+        return { success: false, error: 'فشل إعادة ترتيب الصور' }
     }
 }
+
+export async function toggleVariantForProductImage(
+    productImageId: string,
+    variantId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const current = await prisma.productImage.findUnique({
+            where: { id: productImageId },
+            include: { variants: { select: { id: true } } }
+        })
+        
+        if (!current) return { success: false, error: 'الصورة غير موجودة' }
+        
+        const hasVariant = current.variants.some((v: any) => v.id === variantId)
+        
+        const pi = await prisma.productImage.update({
+            where: { id: productImageId },
+            data: {
+                variants: hasVariant 
+                  ? { disconnect: { id: variantId } } 
+                  : { connect: { id: variantId } }
+            },
+        })
+
+        revalidateProduct(pi.productId)
+        return { success: true }
+    } catch (error) {
+        console.error('Failed to toggle variant for image:', error)
+        return { success: false, error: 'فشل ربط المتغير بالصورة' }
+    }
+}
+

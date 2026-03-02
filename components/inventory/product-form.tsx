@@ -15,14 +15,17 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import { createProduct, updateProduct } from "@/lib/actions/inventory"
-import { uploadProductImage } from "@/lib/actions/upload"
 import { getCategories } from "@/lib/actions/categories"
-import { ImageGalleryUpload } from "@/components/ui/image-gallery-upload"
+
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Product, Category } from "@prisma/client"
-import { useState, useCallback, useEffect } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import React from "react"
 import {
     Select,
     SelectContent,
@@ -30,128 +33,25 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useDropzone } from "react-dropzone"
-import Image from "next/image"
-import { Loader2, UploadCloud, X, Trash2, Plus } from "lucide-react"
-import type { ProductImage } from "@/lib/types/product"
+import { Loader2, X, Trash2, Plus, Hash } from "lucide-react"
 
 
-// Helper component for Variant Image Upload
-function VariantImageUpload({
-    value,
-    onChange,
-    productItemNumber,
-    variantName,
-}: {
-    value?: string | null
-    onChange: (url: string) => void
-    productItemNumber?: string
-    variantName?: string
-}) {
-    const [isUploading, setIsUploading] = useState(false)
-
-    const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        const file = acceptedFiles[0]
-        if (!file) return
-
-        if (!productItemNumber?.trim()) {
-            toast.error('حقل مطلوب', { description: 'يُرجى إدخال رقم الصنف أولاً قبل رفع صورة الخيار' })
-            return
-        }
-
-        setIsUploading(true)
-        const slot = variantName ? `variant-${variantName.toLowerCase().replace(/\s+/g, '-')}` : `variant-${Date.now()}`
-        const res = await uploadProductImage(file, productItemNumber, slot, 'variants', value || null)
-        if (res.success && res.url) {
-            onChange(res.url)
-            toast.success('تم رفع الصورة', { description: 'تم حفظ صورة الخيار بنجاح وتحويلها إلى WebP' })
-        } else {
-            toast.error('فشل رفع الصورة', { description: res.error || 'تعذّر حفظ الصورة، يُرجى المحاولة مجدداً' })
-        }
-        setIsUploading(false)
-    }, [onChange, productItemNumber, variantName, value])
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif', '.bmp', '.tiff'] },
-        maxFiles: 1,
-        maxSize: 20 * 1024 * 1024,
-        onDropRejected: (r) => {
-            const err = r[0]?.errors[0]
-            if (err?.code === 'file-too-large') toast.error('الملف كبير جداً', { description: 'الحد الأقصى المسموح هو 20MB' })
-            else toast.error('صيغة غير مدعومة', { description: 'يُرجى استخدام JPG أو PNG أو WEBP أو AVIF' })
-        }
-    })
-
-    if (value) {
-        return (
-            <div className="relative h-20 w-20 shrink-0">
-                <Image
-                    src={value}
-                    alt="Variant"
-                    fill
-                    className="object-cover rounded-lg border border-border"
-                />
-                <button
-                    type="button"
-                    onClick={() => onChange("")}
-                    className="absolute -top-2 -right-2 h-5 w-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors"
-                >
-                    <X className="h-3 w-3" />
-                </button>
-            </div>
-        )
-    }
-
-    return (
-        <div
-            {...getRootProps()}
-            className={`
-                h-20 w-20 shrink-0 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors
-                ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 hover:border-primary/50'}
-            `}
-        >
-            <input {...getInputProps()} />
-            {isUploading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            ) : (
-                <UploadCloud className="h-5 w-5 text-muted-foreground" />
-            )}
-        </div>
-    )
-}
 
 const formSchema = z.object({
     itemNumber: z.string().min(1, { message: "رقم الصنف مطلوب" }),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     brand: z.string().optional().nullable(),
-    unit: z.string().min(1, { message: "الوحدة مطلوبة" }),
-    categoryId: z.string().min(1, { message: "التصنيف مطلوب" }),
-    tier: z.string().optional().nullable(),
-    packaging: z.string().optional().nullable(),
-    imagePath: z.string().optional().nullable(),
-    images: z.array(z.object({
-        url: z.string(),
-        alt: z.string().optional(),
-        isPrimary: z.boolean(),
-        order: z.number().optional(),
-    })).optional(),
     description: z.string().optional().nullable(),
-    price: z.preprocess((val) => Number(val), z.number().min(0, { message: "السعر يجب أن يكون أكبر من 0" })),
     isAvailable: z.boolean().default(true),
-    variants: z.array(z.object({
-        id: z.string().optional(),
-        name: z.string().min(1, "اسم الخيار مطلوب"),
-        price: z.union([z.string(), z.number()]).optional().nullable(),
-        imagePath: z.string().optional().nullable(),
-    })).optional(),
+    categoryId: z.string().optional().nullable(),
     alternativeNames: z.array(z.string().min(1, "الاسم البديل لا يمكن أن يكون فارغاً")).optional(),
+    tags: z.array(z.string().min(1, "التاغ لا يمكن أن يكون فارغاً")).optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 interface ProductFormProps {
-    product?: Product & { variants?: any[] }
+    product?: Product
     onSuccess?: () => void
 }
 
@@ -176,51 +76,24 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             itemNumber: product?.itemNumber || "",
             name: product?.name || "",
             brand: (product as any)?.brand || "",
-            unit: product?.unit || "",
-            categoryId: (product as any)?.categoryId || "",
-            tier: product?.tier || "",
-            packaging: product?.packaging || "",
-            imagePath: (product as any)?.imagePath || "",
-            images: ((product as any)?.images as ProductImage[]) || [],
             description: product?.description || "",
-            price: product ? Number(product.price) : 0,
+
             isAvailable: product?.isAvailable ?? true,
-            variants: product?.variants?.map((v: any) => ({
-                id: v.id,
-                name: v.name,
-                price: v.price ? Number(v.price) : "",
-                imagePath: v.imagePath,
-            })) || [],
             alternativeNames: (product as any)?.alternativeNames || [],
+            tags: (product as any)?.tags || [],
         },
     } as any)
 
 
 
-    const { fields, append, remove } = useFieldArray({
-        control: form.control,
-        name: "variants",
-    })
+
 
     const { fields: alternativeNameFields, append: appendAlternativeName, remove: removeAlternativeName } = useFieldArray({
         control: form.control,
         name: "alternativeNames",
     })
 
-    // Watch images and sync imagePath from primary
-    const watchedImages = form.watch('images') as ProductImage[] | undefined
-    const watchedItemNumber = form.watch('itemNumber')
 
-    // Auto-sync imagePath from primary image
-    useEffect(() => {
-        const imgs = watchedImages || []
-        const primary = imgs.find(i => i.isPrimary) || imgs[0]
-        if (primary?.url) {
-            form.setValue('imagePath', primary.url)
-        } else if (imgs.length === 0) {
-            form.setValue('imagePath', '')
-        }
-    }, [watchedImages, form])
 
     async function onSubmit(values: FormValues) {
         try {
@@ -247,29 +120,49 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         }
     }
 
+    function onInvalid() {
+        toast.error("راجع البيانات المدخلة", { description: "توجد حقول إجبارية لم تقم بتعبئتها أو تم تعبئتها بشكل خاطئ في إحدى التبويبات." })
+    }
+
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
-                {/* Multi-Image Gallery Upload */}
-                <FormField
-                    control={form.control}
-                    name="images"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormControl>
-                                <ImageGalleryUpload
-                                    images={(field.value as ProductImage[]) || []}
-                                    onChange={field.onChange}
-                                    productItemNumber={watchedItemNumber || ""}
-                                    maxImages={10}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+            <form onSubmit={form.handleSubmit(onSubmit as any, onInvalid)} className="space-y-8 pb-20 relative">
+                
+                {/* Sticky Action Bar */}
+                <div className="sticky top-0 z-10 -mx-6 px-6 py-4 bg-background/80 backdrop-blur-md border-b flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-xl font-bold tracking-tight">
+                            {product ? "تعديل المنتج" : "منتج جديد"}
+                        </h2>
+                        <p className="text-sm text-muted-foreground hidden sm:block">
+                            {product ? "قم بتحديث بيانات المنتج والأسعار المرتبطة به" : "أدخل بيانات المنتج الجديد ومواصفاته"}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Button type="button" variant="outline" onClick={() => router.back()}>
+                            إلغاء
+                        </Button>
+                        <Button type="submit">
+                            {product ? "حفظ التعديلات" : "إضافة المنتج"}
+                        </Button>
+                    </div>
+                </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <Tabs defaultValue="basic" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 mb-8">
+                        <TabsTrigger value="basic">المعلومات الأساسية</TabsTrigger>
+                        <TabsTrigger value="indexing">الوصف والفهرسة</TabsTrigger>
+                    </TabsList>
+
+                    {/* TAB 1: Basic Info */}
+                    <TabsContent value="basic" className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>البيانات الأساسية</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+
+                <div className="grid grid-cols-1 gap-4">
                     <FormField
                         control={form.control}
                         name="itemNumber"
@@ -344,67 +237,19 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                         )}
                     />
                 </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="unit"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>الوحدة</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="حبة، كرتون..." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="tier"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>المستوى (Tier)</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Tier A, B..." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="packaging"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>العبوة</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="مثلاً: 12x500ml" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>السعر (ريال)</FormLabel>
-                                <FormControl>
-                                    <Input type="number" step="0.01" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
+                    {/* TAB 3: Indexing */}
+                    <TabsContent value="indexing" className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>تفاصيل وفهرسة</CardTitle>
+                                <CardDescription>البيانات الوصفية التي تساعد في البحث والأرشفة</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
 
                 <FormField
                     control={form.control}
@@ -443,7 +288,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
 
 
                 {/* Alternative Names Section */}
-                <div className="space-y-4">
+                <div className="space-y-4 pt-4 border-t">
                     <div className="flex items-center justify-between">
                         <FormLabel className="text-base font-semibold">الأسماء البديلة (تسميات أخرى)</FormLabel>
                         <Button
@@ -493,91 +338,106 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                     )}
                 </div>
 
-                {/* Variants Section */}
-                <div className="space-y-4">
+                                {/* Tags Section */}
+                <div className="space-y-4 pt-4 border-t">
                     <div className="flex items-center justify-between">
-                        <FormLabel className="text-base font-semibold">الخيارات / المتغيرات (ألوان، أنواع...)</FormLabel>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => append({ name: "", price: "", imagePath: "" })}
-                            className="bg-secondary/50 border-dashed"
-                        >
-                            <Plus className="mr-2 h-3.5 w-3.5" />
-                            إضافة خيار
-                        </Button>
+                        <FormLabel className="text-base font-semibold flex items-center gap-2">
+                            <Hash className="h-4 w-4 text-violet-500" />
+                            الوسوم (Tags)
+                        </FormLabel>
                     </div>
 
-                    {fields.length > 0 ? (
-                        <div className="grid gap-3">
-                            {fields.map((field, index) => (
-                                <div key={field.id} className="flex items-start gap-3 p-3 rounded-xl border border-border/60 bg-muted/10 animate-in fade-in slide-in-from-top-2">
-                                    {/* Variant Image */}
-                                    <FormField
-                                        control={form.control}
-                                        name={`variants.${index}.imagePath`}
-                                        render={({ field }) => (
-                                            <FormControl>
-                                                <VariantImageUpload
-                                                    value={field.value}
-                                                    onChange={field.onChange}
-                                                    productItemNumber={watchedItemNumber}
-                                                    variantName={form.watch(`variants.${index}.name`)}
-                                                />
-                                            </FormControl>
+                    <FormField
+                        control={form.control}
+                        name="tags"
+                        render={({ field }) => {
+                            const tags = (field.value as string[]) || []
+                            const [tagInput, setTagInput] = React.useState("")
+
+                            const addTag = (value: string) => {
+                                const trimmed = value.trim()
+                                if (trimmed && !tags.includes(trimmed)) {
+                                    field.onChange([...tags, trimmed])
+                                }
+                                setTagInput("")
+                            }
+
+                            const removeTag = (index: number) => {
+                                field.onChange(tags.filter((_: string, i: number) => i !== index))
+                            }
+
+                            const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+                                if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+                                    e.preventDefault()
+                                    addTag(tagInput)
+                                }
+                                if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+                                    removeTag(tags.length - 1)
+                                }
+                            }
+
+                            return (
+                                <FormItem>
+                                    <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-3">
+                                        {/* Tag Input */}
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                placeholder="اكتب الوسم واضغط Enter..."
+                                                value={tagInput}
+                                                onChange={(e) => setTagInput(e.target.value)}
+                                                onKeyDown={handleKeyDown}
+                                                className="h-9 flex-1"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => addTag(tagInput)}
+                                                disabled={!tagInput.trim()}
+                                                className="h-9 px-3 bg-violet-500/10 border-violet-300 text-violet-700 hover:bg-violet-500/20 hover:text-violet-800 transition-all"
+                                            >
+                                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                                إضافة
+                                            </Button>
+                                        </div>
+
+                                        {/* Tags Display */}
+                                        {tags.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {tags.map((tag: string, index: number) => (
+                                                    <Badge
+                                                        key={index}
+                                                        variant="outline"
+                                                        className="px-3 py-1.5 text-sm bg-linear-to-r from-violet-50 to-purple-50 text-violet-800 border-violet-200 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 transition-all duration-300 animate-in fade-in slide-in-from-left-2 gap-1.5 group"
+                                                    >
+                                                        <Hash className="h-3 w-3 text-violet-400" />
+                                                        {tag}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeTag(index)}
+                                                            className="ml-1 text-violet-400 hover:text-destructive transition-colors"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-center py-3 text-muted-foreground text-sm">
+                                                لا توجد وسوم مضافة. اكتب وسماً واضغط Enter أو زر إضافة.
+                                            </p>
                                         )}
-                                    />
-
-                                    <div className="flex-1 grid grid-cols-2 gap-3">
-                                        <FormField
-                                            control={form.control}
-                                            name={`variants.${index}.name`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input placeholder="الاسم (أحمر، كبير...)" className="h-9" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name={`variants.${index}.price`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input type="number" placeholder="السعر (اختياري)" className="h-9" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
                                     </div>
-
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => remove(index)}
-                                        className="text-muted-foreground hover:text-destructive shrink-0"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-6 border-2 border-dashed rounded-xl text-muted-foreground text-sm">
-                            لا توجد خيارات مضافة لهذا المنتج.
-                        </div>
-                    )}
+                                    <FormMessage />
+                                </FormItem>
+                            )
+                        }}
+                    />
                 </div>
-
-                <Button type="submit" className="w-full">
-                    {product ? "حفظ التعديلات" : "إضافة منتج جديد"}
-                </Button>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </form>
         </Form >
     )

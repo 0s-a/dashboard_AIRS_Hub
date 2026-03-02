@@ -38,21 +38,22 @@ model Category {
 }
 
 model Person {
-  id              String      @id @default(uuid())
+  id              String             @id @default(uuid())
   name            String?
   address         String?
   notes           String?
   personTypeId    String?
-  personType      PersonType? @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
-  type            String?     @default("عادي")
+  personType      PersonType?        @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
+  type            String?            @default("عادي")
   source          String?
   contacts        Json? // [{type: "phone"|"email"|"whatsapp", value, label, isPrimary}]
   tags            Json? // ["tag1", "tag2"]
-  isActive        Boolean     @default(true)
-  lastInteraction DateTime    @default(now())
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  isActive        Boolean            @default(true)
+  lastInteraction DateTime           @default(now())
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
   groups          Group[]
+  priceLabels     PersonPriceLabel[]
 
   @@map("Customer")
 }
@@ -121,11 +122,24 @@ model Variant {
 
 // Price label names for product pricing
 model PriceLabel {
-  id        String   @id @default(uuid())
-  name      String   @unique
+  id        String             @id @default(uuid())
+  name      String             @unique
   notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  persons   PersonPriceLabel[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+// Explicit join table for Person <-> PriceLabel
+model PersonPriceLabel {
+  person       Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId     String
+  priceLabel   PriceLabel @relation(fields: [priceLabelId], references: [id], onDelete: Cascade)
+  priceLabelId String
+
+  assignedAt DateTime @default(now())
+
+  @@id([personId, priceLabelId])
 }
 
 // Person type classifications
@@ -139,4 +153,16 @@ model PersonType {
   persons     Person[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Currency management
+model Currency {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. "ريال يمني"
+  code      String   @unique // e.g. "YER"
+  symbol    String // e.g. "ر.ي"
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

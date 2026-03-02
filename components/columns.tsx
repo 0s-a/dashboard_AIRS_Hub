@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { Person } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, ChevronRight, Layers } from "lucide-react"
+import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, ChevronRight, Layers, Wallet } from "lucide-react"
 import { softDeletePerson, hardDeletePerson, togglePersonActive } from "@/lib/actions/persons"
 import { ContactItem } from "@/lib/person-types"
 import { toast } from "sonner"
@@ -185,7 +185,7 @@ export const columns: ColumnDef<Person>[] = [
                         }}
                     >
                          {/* Animated glow effect on hover */}
-                        <div className="absolute inset-0 opacity-0 group-hover/type:opacity-20 transition-opacity duration-500 bg-gradient-to-r from-transparent via-white to-transparent -translate-x-full group-hover/type:translate-x-full blur-sm" />
+                        <div className="absolute inset-0 opacity-0 group-hover/type:opacity-20 transition-opacity duration-500 bg-linear-to-r from-transparent via-white to-transparent -translate-x-full group-hover/type:translate-x-full blur-sm" />
                         
                         <div 
                             className="h-1.5 w-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)] group-hover/type:scale-125 transition-transform" 
@@ -194,6 +194,41 @@ export const columns: ColumnDef<Person>[] = [
                         <TypeIcon className="h-3.5 w-3.5 opacity-80 group-hover/type:opacity-100 transition-opacity" />
                         <span className="tracking-tight">{typeName}</span>
                     </div>
+                </div>
+            )
+        }
+    },
+
+    // ──────────────────────────────────────
+    // Column 2.5: Price Labels
+    // ──────────────────────────────────────
+    {
+        id: "priceLabels",
+        header: "التسعيرات",
+        cell: ({ row }) => {
+            const priceLabels = (row.original as any).priceLabels || []
+            if (priceLabels.length === 0) return <span className="text-muted-foreground text-xs text-center block">-</span>
+
+            const displayLabels = priceLabels.slice(0, 2)
+            const remaining = priceLabels.length - 2
+
+            return (
+                <div className="flex flex-wrap gap-1.5 items-center justify-center max-w-[150px]">
+                    {displayLabels.map((pl: any, i: number) => (
+                        <Badge 
+                            key={i} 
+                            variant="secondary" 
+                            className="text-[10px] py-0 px-1.5 font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20 flex items-center gap-1"
+                        >
+                            <Wallet className="h-3 w-3 opacity-70" />
+                            <span className="truncate max-w-[80px]">{pl.priceLabel?.name || "بدون اسم"}</span>
+                        </Badge>
+                    ))}
+                    {remaining > 0 && (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-medium border-dashed text-muted-foreground">
+                            +{remaining}
+                        </Badge>
+                    )}
                 </div>
             )
         }

@@ -63,7 +63,12 @@ export async function getPersons() {
                 createdAt: true,
                 updatedAt: true,
                 groups: true,
-                personType: true
+                personType: true,
+                priceLabels: {
+                    include: {
+                        priceLabel: true
+                    }
+                }
             }
         })
         return { success: true, data: persons }
@@ -81,6 +86,8 @@ export interface CreatePersonData {
     source?: string | null
     contacts?: ContactItem[] | null
     tags?: string[] | null
+    personTypeId?: string | null
+    priceLabelIds?: string[] | null
 }
 
 export async function createPerson(data: CreatePersonData) {
@@ -91,10 +98,16 @@ export async function createPerson(data: CreatePersonData) {
                 address: data.address,
                 notes: data.notes,
                 type: data.type || 'عادي',
+                personTypeId: data.personTypeId,
                 source: data.source,
                 contacts: data.contacts as any,
                 tags: data.tags as any,
                 lastInteraction: new Date(),
+                priceLabels: data.priceLabelIds && data.priceLabelIds.length > 0 ? {
+                    create: data.priceLabelIds.map(id => ({
+                        priceLabel: { connect: { id } }
+                    }))
+                } : undefined
             }
         })
         revalidatePath('/dashboard/persons')
@@ -113,6 +126,8 @@ export interface UpdatePersonData {
     source?: string | null
     contacts?: ContactItem[] | null
     tags?: string[] | null
+    personTypeId?: string | null
+    priceLabelIds?: string[] | null
 }
 
 export async function updatePerson(id: string, data: UpdatePersonData) {
@@ -120,10 +135,23 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
         const person = await prisma.person.update({
             where: { id },
             data: {
-                ...data,
-                contacts: data.contacts as any,
-                tags: data.tags as any,
+                name: data.name,
+                address: data.address,
+                notes: data.notes,
+                type: data.type,
+                personTypeId: data.personTypeId,
+                source: data.source,
+                contacts: data.contacts !== undefined ? data.contacts as any : undefined,
+                tags: data.tags !== undefined ? data.tags as any : undefined,
                 lastInteraction: new Date(),
+                ...(data.priceLabelIds !== undefined && {
+                    priceLabels: {
+                        deleteMany: {}, // Clear existing
+                        create: data.priceLabelIds ? data.priceLabelIds.map(pid => ({
+                            priceLabel: { connect: { id: pid } }
+                        })) : []
+                    }
+                })
             }
         })
         revalidatePath('/dashboard/persons')

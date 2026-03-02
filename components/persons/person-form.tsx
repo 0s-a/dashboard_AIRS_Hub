@@ -23,12 +23,14 @@ import {
 } from "@/components/ui/select"
 import { createPerson, updatePerson } from "@/lib/actions/persons"
 import { getPersonTypes } from "@/lib/actions/person-types"
+import { getPriceLabels } from "@/lib/actions/price-labels"
 import { ContactItem } from "@/lib/person-types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Person } from "@prisma/client"
-import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe } from "lucide-react"
+import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe, Wallet } from "lucide-react"
 import { useState, useEffect } from "react"
+import { MultiSelect, OptionType } from "@/components/ui/multi-select"
 
 const contactSchema = z.object({
     type: z.enum(["phone", "email", "whatsapp"]),
@@ -46,6 +48,7 @@ const formSchema = z.object({
     source: z.string().optional(),
     contacts: z.array(contactSchema),
     tags: z.string().optional(), // comma-separated, parsed on submit
+    priceLabelIds: z.array(z.string()).optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -65,11 +68,17 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
     const router = useRouter()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [personTypes, setPersonTypes] = useState<{ id: string; name: string }[]>([])
+    const [priceLabels, setPriceLabels] = useState<OptionType[]>([])
 
     useEffect(() => {
         getPersonTypes().then((res) => {
             if (res.success && res.data) {
                 setPersonTypes(res.data)
+            }
+        })
+        getPriceLabels().then((res) => {
+            if (res.success && res.data) {
+                setPriceLabels(res.data.map(l => ({ label: l.name, value: l.id })))
             }
         })
     }, [])
@@ -91,6 +100,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                 ? existingContacts.map(c => ({ ...c, label: c.label || "" }))
                 : [{ type: "phone" as const, value: "", label: "", isPrimary: true }],
             tags: existingTags.join("، "),
+            priceLabelIds: (person as any)?.priceLabels?.map((pl: any) => pl.priceLabelId) || [],
         },
     })
 
@@ -126,6 +136,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                 source: values.source || null,
                 contacts: cleanContacts.length > 0 ? cleanContacts : null,
                 tags: parsedTags && parsedTags.length > 0 ? parsedTags : null,
+                priceLabelIds: values.priceLabelIds || null,
             }
 
             let res;
@@ -237,6 +248,29 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                             <SelectItem value="أخرى">أخرى</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="priceLabelIds"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                                        <Wallet className="h-3 w-3" />
+                                        تسعيرات العميل
+                                    </FormLabel>
+                                    <FormControl>
+                                        <MultiSelect
+                                            options={priceLabels}
+                                            selected={field.value || []}
+                                            onChange={field.onChange}
+                                            placeholder="اختر تسعيرة أو أكثر"
+                                            emptyMessage="لا توجد تسعيرات مضافة"
+                                        />
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}

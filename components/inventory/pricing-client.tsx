@@ -23,6 +23,7 @@ import { toast } from "sonner"
 import { addPrice, updatePrice, deletePrice } from "@/lib/actions/inventory"
 import type { PriceEntry } from "@/lib/actions/inventory"
 import { getPriceLabels } from "@/lib/actions/price-labels"
+import { getActiveCurrencies } from "@/lib/actions/currencies"
 import {
     Select,
     SelectContent,
@@ -74,12 +75,14 @@ export function PricingSection({ product }: PricingClientProps) {
     const [newQuantity, setNewQuantity] = useState("")
     const [isAdding, setIsAdding] = useState(false)
     const [priceLabels, setPriceLabels] = useState<{ id: string; name: string }[]>([])
+    const [currencies, setCurrencies] = useState<{ id: string; name: string; symbol: string }[]>([])
 
     useEffect(() => {
         getPriceLabels().then((res) => {
-            if (res.success && res.data) {
-                setPriceLabels(res.data)
-            }
+            if (res.success && res.data) setPriceLabels(res.data)
+        })
+        getActiveCurrencies().then((res) => {
+            if (res.success && res.data) setCurrencies(res.data)
         })
     }, [])
 
@@ -266,13 +269,23 @@ export function PricingSection({ product }: PricingClientProps) {
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-sm font-medium text-muted-foreground">العملة</label>
-                                            <Input
+                                            <Select
                                                 value={editing.currency}
-                                                onChange={(e) => setEditing({ ...editing, currency: e.target.value })}
-                                                placeholder="العملة (ر.ي)"
-                                                className="h-11 text-base font-semibold text-muted-foreground focus-visible:ring-primary text-center"
-                                                onKeyDown={(e) => { if (e.key === "Enter") handleUpdate() }}
-                                            />
+                                                onValueChange={(val) => setEditing({ ...editing, currency: val })}
+                                            >
+                                                <SelectTrigger className="h-11 text-base focus-visible:ring-primary">
+                                                    <SelectValue placeholder="اختر العملة" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {currencies.length === 0 ? (
+                                                        <div className="px-2 py-4 text-xs text-muted-foreground text-center">لا توجد عملات. أضف من صفحة العملات.</div>
+                                                    ) : currencies.map(c => (
+                                                        <SelectItem key={c.id} value={c.symbol}>
+                                                            {c.symbol} — {c.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 mt-2">
@@ -441,13 +454,23 @@ export function PricingSection({ product }: PricingClientProps) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-medium text-muted-foreground">العملة</label>
-                                    <Input
+                                    <Select
                                         value={newCurrency}
-                                        onChange={(e) => setNewCurrency(e.target.value)}
-                                        placeholder="ر.ي"
-                                        className="h-11 text-base font-semibold text-muted-foreground focus-visible:ring-primary text-center"
-                                        onKeyDown={(e) => { if (e.key === "Enter") handleAdd() }}
-                                    />
+                                        onValueChange={(val) => setNewCurrency(val)}
+                                    >
+                                        <SelectTrigger className="h-11 text-base focus-visible:ring-primary">
+                                            <SelectValue placeholder="اختر العملة" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {currencies.length === 0 ? (
+                                                <div className="px-2 py-4 text-xs text-muted-foreground text-center">لا توجد عملات. أضف من صفحة العملات.</div>
+                                            ) : currencies.map(c => (
+                                                <SelectItem key={c.id} value={c.symbol}>
+                                                    {c.symbol} — {c.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 shrink-0 mt-2">

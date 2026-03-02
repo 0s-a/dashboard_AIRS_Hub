@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog } from "lucide-react"
+import { usePathname } from "next/navigation"
+import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog, Coins, ArrowRight } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Button } from "@/components/ui/button"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export default function DashboardLayout({
     children,
@@ -21,12 +28,51 @@ export default function DashboardLayout({
         }
     }, [])
 
+    const pathname = usePathname()
+
     // Save sidebar state to localStorage
     const toggleSidebar = () => {
         const newState = !isCollapsed
         setIsCollapsed(newState)
         localStorage.setItem("sidebar-collapsed", String(newState))
     }
+
+    const navigationGroups = [
+        {
+            title: "الرئيسية",
+            items: [
+                { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
+            ]
+        },
+        {
+            title: "إدارة المخزون",
+            items: [
+                { href: "/inventory", label: "المخزون", icon: Package },
+                { href: "/categories", label: "التصنيفات", icon: Layers },
+            ]
+        },
+        {
+            title: "العملاء والشركاء",
+            items: [
+                { href: "/persons", label: "الأشخاص", icon: Users },
+                { href: "/groups", label: "المجموعات", icon: UserSquare2 },
+                { href: "/person-types", label: "أنواع الأشخاص", icon: UserCog },
+            ]
+        },
+        {
+            title: "النظام والتسعير",
+            items: [
+                { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
+                { href: "/currencies", label: "العملات", icon: Coins },
+            ]
+        },
+        {
+            title: "الوسائط",
+            items: [
+                { href: "/gallery", label: "معرض الصور", icon: Images },
+            ]
+        }
+    ]
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-background relative overflow-hidden">
@@ -38,100 +84,105 @@ export default function DashboardLayout({
 
             <div className="relative z-10 flex min-h-screen w-full flex-col">
                 <aside className={`fixed inset-y-0 right-0 z-20 hidden flex-col border-l glass-panel sm:flex transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-                    <div className="p-6 border-b border-border/50">
+                    <div className="p-6">
                         <div className={`flex items-center gap-3 px-2 ${isCollapsed ? 'justify-center' : ''}`}>
-                            <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0">
+                            <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0 group hover:rotate-12 transition-transform duration-500">
                                 <Wand2 className="size-6 text-white" />
                             </div>
                             <div className={`flex flex-col transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
-                                <span className="font-bold text-lg tracking-tight whitespace-nowrap">HUSAM-AI</span>
-                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest -mt-1 whitespace-nowrap">لوحة التحكم </span>
+                                <span className="font-bold text-lg tracking-tight whitespace-nowrap bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent italic">HUSAM-AI</span>
+                                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest -mt-1 whitespace-nowrap">إدارة المتاجر الذكية</span>
                             </div>
                         </div>
                     </div>
-                    <nav className="flex flex-col items-start gap-2 px-3 py-6">
-                        <Link
-                            href="/"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "لوحة التحكم" : ""}
-                        >
-                            <LayoutDashboard className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>لوحة التحكم</span>
-                        </Link>
-                        <Link
-                            href="/inventory"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "المخزون" : ""}
-                        >
-                            <Package className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>المخزون</span>
-                        </Link>
-                        <Link
-                            href="/persons"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "الأشخاص" : ""}
-                        >
-                            <Users className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>الأشخاص</span>
-                        </Link>
-                        <Link
-                            href="/groups"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "المجموعات" : ""}
-                        >
-                            <UserSquare2 className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>المجموعات</span>
-                        </Link>
-                        <Link
-                            href="/categories"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "التصنيفات" : ""}
-                        >
-                            <Layers className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>التصنيفات</span>
-                        </Link>
-                        <Link
-                            href="/price-labels"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "مسميات التسعيرات" : ""}
-                        >
-                            <Tag className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>مسميات التسعيرات</span>
-                        </Link>
-                        <Link
-                            href="/person-types"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "أنواع الأشخاص" : ""}
-                        >
-                            <UserCog className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>أنواع الأشخاص</span>
-                        </Link>
-                        <Link
-                            href="/gallery"
-                            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition-all hover:bg-primary/5 hover:text-primary group ${isCollapsed ? 'justify-center' : ''}`}
-                            title={isCollapsed ? "معرض الصور" : ""}
-                        >
-                            <Images className="h-5 w-5 group-hover:scale-110 transition-transform shrink-0" />
-                            <span className={`font-medium transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>معرض الصور</span>
-                        </Link>
 
-                    </nav>
-                    <div className={`mt-auto p-4 border-t border-border/50 ${isCollapsed ? 'hidden' : ''}`}>
-                        <div className="bg-muted/50 rounded-xl p-3 flex items-center gap-3">
-                            <div className="size-8 rounded-full bg-linear-to-tr from-primary to-indigo-400" />
-                            <div className="flex flex-col overflow-hidden">
-                                <span className="text-xs font-bold truncate">المتجر الرئيسي</span>
-                                <span className="text-[10px] text-muted-foreground truncate">خطة بريميوم</span>
-                            </div>
+                    <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-3 space-y-6">
+                        <TooltipProvider delayDuration={0}>
+                            {navigationGroups.map((group, groupIdx) => (
+                                <div key={groupIdx} className="space-y-1">
+                                    {!isCollapsed && (
+                                        <h3 className="px-4 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <span className="h-px bg-border/40 flex-1" />
+                                            {group.title}
+                                            <span className="h-px bg-border/40 flex-1 sm:hidden" />
+                                        </h3>
+                                    )}
+
+                                    <div className="space-y-0.5">
+                                        {group.items.map((item) => {
+                                            const isActive = pathname === item.href
+                                            const Icon = item.icon
+                                            return (
+                                                <Tooltip key={item.href}>
+                                                    <TooltipTrigger asChild>
+                                                        <Link
+                                                            href={item.href}
+                                                            className={`relative flex items-center gap-3 rounded-xl px-4 py-2.5 transition-all duration-300 group ${
+                                                                isActive 
+                                                                    ? 'bg-primary/10 text-primary shadow-sm shadow-primary/5' 
+                                                                    : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'
+                                                            } ${isCollapsed ? 'justify-center' : ''}`}
+                                                        >
+                                                            {/* Active Indicator Bar */}
+                                                            {isActive && (
+                                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-l-full bg-primary" />
+                                                            )}
+                                                            
+                                                            <Icon className={`h-5 w-5 transition-all duration-300 ${
+                                                                isActive ? 'scale-110 rotate-3' : 'group-hover:scale-110 group-hover:-rotate-3'
+                                                            } shrink-0`} />
+                                                            
+                                                            <span className={`text-[13px] font-semibold transition-all duration-300 ${
+                                                                isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+                                                            }`}>
+                                                                {item.label}
+                                                            </span>
+                                                        </Link>
+                                                    </TooltipTrigger>
+                                                    {isCollapsed && (
+                                                        <TooltipContent side="left" className="font-bold text-xs bg-primary text-white border-none shadow-xl">
+                                                            {item.label}
+                                                        </TooltipContent>
+                                                    )}
+                                                </Tooltip>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </TooltipProvider>
+                    </div>
+
+                    <div className="p-4 mt-auto">
+                        <div className={`relative overflow-hidden rounded-2xl p-4 transition-all duration-500 bg-linear-to-br from-primary/95 to-indigo-600 group shadow-lg shadow-primary/20 ${isCollapsed ? 'h-12 w-12 p-0 flex items-center justify-center' : ''}`}>
+                            {/* Decorative bubbles for footer card */}
+                            <div className="absolute -top-4 -right-4 size-16 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
+                            <div className="absolute -bottom-4 -left-4 size-16 bg-indigo-400/20 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
+                            
+                            {isCollapsed ? (
+                                <div className="size-2 rounded-full bg-white animate-pulse" />
+                            ) : (
+                                <div className="relative z-10 flex flex-col gap-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest italic">المتجر الحالي</span>
+                                        <div className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] animate-pulse" />
+                                    </div>
+                                    <span className="text-sm font-bold text-white truncate drop-shadow-sm">المتجر الرئيسي</span>
+                                    <div className="flex items-center justify-between mt-1">
+                                        <span className="text-[9px] font-medium text-white/60 bg-white/10 px-1.5 py-0.5 rounded-md uppercase">خطة بريميوم</span>
+                                        <ArrowRight className="size-3 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300 rtl:rotate-180" />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </aside>
                 <div className={`flex flex-col w-full transition-all duration-300 ${isCollapsed ? 'sm:pr-20' : 'sm:pr-64'}`}>
                     <header className="sticky z-30 flex h-20 items-center gap-4 px-6 sm:px-10 border-b glass-panel">
                         <div className="flex-1">
-                            <h2 className="text-sm font-semibold text-muted-foreground">مرحباً بك مجدداً</h2>
-                            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-tighter">آخر تحديث: {new Date().toLocaleDateString('ar-SA')}</p>
-                        </div>
+                                    <span className="text-sm font-semibold text-muted-foreground">التنقل السريع</span>
+                                    <p className="text-[9px] text-muted-foreground/60 uppercase tracking-tighter">نظام إدارة التوزيع الذكي • {new Date().toLocaleDateString('ar-SA')}</p>
+                                </div>
                         <div className="flex items-center gap-4">
                             <Button
                                 variant="ghost"

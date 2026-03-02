@@ -25,7 +25,11 @@ export async function getGroup(id: string) {
         const group = await prisma.group.findUnique({
             where: { id },
             include: {
-                person: true
+                person: {
+                    include: {
+                        personType: true
+                    }
+                }
             }
         })
         if (!group) return { success: false, error: 'المجموعة غير موجودة' }

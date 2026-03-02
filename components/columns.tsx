@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { Person } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power } from "lucide-react"
+import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, ChevronRight, Layers } from "lucide-react"
 import { softDeletePerson, hardDeletePerson, togglePersonActive } from "@/lib/actions/persons"
 import { ContactItem } from "@/lib/person-types"
 import { toast } from "sonner"
@@ -90,6 +90,29 @@ function copyToClipboard(text: string) {
 
 export const columns: ColumnDef<Person>[] = [
     // ──────────────────────────────────────
+    // Column 0: Expander
+    // ──────────────────────────────────────
+    {
+        id: "expander",
+        header: () => null,
+        cell: ({ row }) => {
+            const groups = (row.original as any).groups || []
+            if (groups.length === 0) return null
+
+            return (
+                <button
+                    onClick={row.getToggleExpandedHandler()}
+                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted text-muted-foreground transition-colors"
+                    title={row.getIsExpanded() ? "طي المجموعات" : "عرض المجموعات"}
+                >
+                    <ChevronRight 
+                        className={`h-4 w-4 transition-transform duration-200 ${row.getIsExpanded() ? "rotate-90 rtl:-rotate-90" : "rtl:rotate-180"}`} 
+                    />
+                </button>
+            )
+        },
+    },
+    // ──────────────────────────────────────
     // Column 1: Person Name + Avatar
     // ──────────────────────────────────────
     {
@@ -122,23 +145,12 @@ export const columns: ColumnDef<Person>[] = [
                     <div className="flex flex-col gap-1 min-w-0">
                         <span className="font-semibold text-sm truncate max-w-[160px]">{name || "بدون اسم"}</span>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                            {groups.map((group: any) => (
-                                <TooltipProvider key={group.id}>
-                                    <Tooltip delayDuration={300}>
-                                        <TooltipTrigger asChild>
-                                            <Link 
-                                                href={`/groups/${group.id}`}
-                                                className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-                                            >
-                                                {group.number}
-                                            </Link>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top" className="text-xs">
-                                            {group.name}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            ))}
+                            {groups.length > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
+                                    <Layers className="h-3 w-3" />
+                                    {groups.length} مجموعات
+                                </span>
+                            )}
                             {tags.slice(0, 2).map((tag, i) => (
                                 <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/5 text-blue-600 dark:text-blue-400 border border-blue-500/10">
                                     {tag}

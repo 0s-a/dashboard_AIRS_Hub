@@ -3,6 +3,7 @@ import { columns } from "../../../components/columns"
 import { getPersons } from "@/lib/actions/persons"
 import { PersonSheet } from "@/components/persons/person-sheet"
 import { Users, UserCheck, UserPlus, Layers } from "lucide-react"
+import { PersonExpandedRow } from "./components/person-expanded-row"
 
 export const dynamic = "force-dynamic"
 
@@ -89,6 +90,7 @@ export default async function CRMPage() {
                         { id: "isActive", label: "الحالة (نشط/غير نشط)" },
                         { id: "source", label: "المصدر" },
                     ]}
+                    renderSubComponent={PersonExpandedRow}
                 />
             </main>
         </div>

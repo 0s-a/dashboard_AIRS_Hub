@@ -89,21 +89,49 @@ export default async function GroupDetailsPage({ params }: { params: Promise<{ i
                     </div>
                 </div>
 
-                <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col items-center justify-center text-center relative overflow-hidden group hover:border-primary/50 transition-colors">
-                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <User className="size-10 mb-4 text-primary/80" />
-                    <h3 className="text-lg font-bold mb-1 relative z-10 text-foreground">
+                {/* Owner Premium Card */}
+                <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-xl text-card-foreground shadow-sm p-6 flex flex-col items-center justify-center text-center relative overflow-hidden group hover:shadow-lg transition-all duration-500">
+                    <div className="absolute inset-0 bg-linear-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    
+                    <div className="relative mb-4">
+                        <div className="absolute -inset-1 rounded-full bg-primary/20 blur-sm group-hover:bg-primary/30 transition-colors duration-500" />
+                        <div className="relative size-16 rounded-full bg-background flex items-center justify-center border-2 border-primary/20 shadow-sm">
+                            <User className="size-8 text-primary/80" />
+                        </div>
+                    </div>
+
+                    <h3 className="text-xl font-bold mb-1 relative z-10 text-foreground group-hover:text-primary transition-colors">
                         {person ? person.name : "لا يوجد مالك"}
                     </h3>
-                    <p className="text-sm font-medium text-muted-foreground relative z-10">
-                        {person?.type || "صاحب المجموعة"}
-                    </p>
+                    
                     {person && (
-                        <Button variant="link" asChild className="mt-2 h-auto p-0 relative z-10">
-                            <Link href={`/persons/${person.id}`}>
-                                عرض الملف الشخصي
-                            </Link>
-                        </Button>
+                        <>
+                            {person.personType ? (
+                                <Badge variant="outline" className="mb-4 bg-background/50 backdrop-blur-md font-medium" style={{ borderColor: `${person.personType.color}40`, color: person.personType.color || undefined }}>
+                                    {person.personType.name}
+                                </Badge>
+                            ) : (
+                                <Badge variant="secondary" className="mb-4 text-xs font-medium">
+                                    {person.type || "صاحب المجموعة"}
+                                </Badge>
+                            )}
+
+                            <div className="w-full h-px bg-border/40 my-2" />
+
+                            <div className="w-full flex items-center gap-2 mt-2">
+                                <Button variant="secondary" className="w-full rounded-xl bg-primary/10 text-primary hover:bg-primary/20 border-0" asChild>
+                                    <Link href={`/persons/${person.id}`}>
+                                        عرض الملف الشخصي
+                                    </Link>
+                                </Button>
+                            </div>
+                        </>
+                    )}
+                    
+                    {!person && (
+                         <p className="text-sm font-medium text-muted-foreground relative z-10 mt-1">
+                            يمكنك تعيين مالك لهذه المجموعة من صفحة التعديل
+                        </p>
                     )}
                 </div>
             </div>

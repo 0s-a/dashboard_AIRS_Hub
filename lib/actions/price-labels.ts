@@ -3,6 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 
+async function generatePriceLabelItemNumber(): Promise<string> {
+    const last = await prisma.priceLabel.findFirst({
+        orderBy: { itemNumber: 'desc' },
+        select: { itemNumber: true },
+    })
+    const next = last ? parseInt(last.itemNumber, 10) + 1 : 1
+    return String(next).padStart(4, '0')
+}
+
 export async function getPriceLabels() {
     try {
         const labels = await prisma.priceLabel.findMany({
@@ -29,12 +38,15 @@ export async function getPriceLabelById(id: string) {
 
 export async function createPriceLabel(data: {
     name: string
+    itemNumber?: string
     notes?: string | null
 }) {
     try {
+        const itemNumber = data.itemNumber?.trim() || await generatePriceLabelItemNumber()
         const label = await prisma.priceLabel.create({
             data: {
                 name: data.name,
+                itemNumber,
                 notes: data.notes,
             }
         })
@@ -43,7 +55,7 @@ export async function createPriceLabel(data: {
     } catch (error: any) {
         console.error('Failed to create price label:', error)
         if (error.code === 'P2002') {
-            return { success: false, error: 'اسم التسعيرة موجود بالفعل' }
+            return { success: false, error: 'اسم أو رقم التسعيرة موجود بالفعل' }
         }
         return { success: false, error: 'Failed to create price label' }
     }
@@ -51,6 +63,7 @@ export async function createPriceLabel(data: {
 
 export async function updatePriceLabel(id: string, data: {
     name?: string
+    itemNumber?: string
     notes?: string | null
 }) {
     try {
@@ -58,6 +71,7 @@ export async function updatePriceLabel(id: string, data: {
             where: { id },
             data: {
                 name: data.name,
+                itemNumber: data.itemNumber,
                 notes: data.notes,
             }
         })
@@ -66,7 +80,7 @@ export async function updatePriceLabel(id: string, data: {
     } catch (error: any) {
         console.error('Failed to update price label:', error)
         if (error.code === 'P2002') {
-            return { success: false, error: 'اسم التسعيرة موجود بالفعل' }
+            return { success: false, error: 'اسم أو رقم التسعيرة موجود بالفعل' }
         }
         return { success: false, error: 'Failed to update price label' }
     }
@@ -92,4 +106,8 @@ export async function deletePriceLabel(id: string) {
         console.error('Failed to delete price label:', error)
         return { success: false, error: 'Failed to delete price label' }
     }
+}
+
+export async function getNextPriceLabelItemNumber() {
+    return await generatePriceLabelItemNumber()
 }

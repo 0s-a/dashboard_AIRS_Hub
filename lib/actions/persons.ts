@@ -58,6 +58,7 @@ export async function getPersons() {
                 source: true,
                 contacts: true,
                 tags: true,
+                currencies: true,
                 isActive: true,
                 lastInteraction: true,
                 createdAt: true,
@@ -88,6 +89,7 @@ export interface CreatePersonData {
     tags?: string[] | null
     personTypeId?: string | null
     priceLabelIds?: string[] | null
+    currencyIds?: string[] | null
 }
 
 export async function createPerson(data: CreatePersonData) {
@@ -102,6 +104,7 @@ export async function createPerson(data: CreatePersonData) {
                 source: data.source,
                 contacts: data.contacts as any,
                 tags: data.tags as any,
+                currencies: data.currencyIds as any,
                 lastInteraction: new Date(),
                 priceLabels: data.priceLabelIds && data.priceLabelIds.length > 0 ? {
                     create: data.priceLabelIds.map(id => ({
@@ -128,6 +131,7 @@ export interface UpdatePersonData {
     tags?: string[] | null
     personTypeId?: string | null
     priceLabelIds?: string[] | null
+    currencyIds?: string[] | null
 }
 
 export async function updatePerson(id: string, data: UpdatePersonData) {
@@ -143,6 +147,7 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                 source: data.source,
                 contacts: data.contacts !== undefined ? data.contacts as any : undefined,
                 tags: data.tags !== undefined ? data.tags as any : undefined,
+                currencies: data.currencyIds !== undefined ? data.currencyIds as any : undefined,
                 lastInteraction: new Date(),
                 ...(data.priceLabelIds !== undefined && {
                     priceLabels: {

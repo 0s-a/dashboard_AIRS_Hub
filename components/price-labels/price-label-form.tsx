@@ -14,12 +14,14 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { createPriceLabel, updatePriceLabel } from "@/lib/actions/price-labels"
+import { createPriceLabel, updatePriceLabel, getNextPriceLabelItemNumber } from "@/lib/actions/price-labels"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { PriceLabel } from "@prisma/client"
+import { useEffect } from "react"
 
 const formSchema = z.object({
+    itemNumber: z.string().min(1, { message: "الرقم مطلوب" }).max(4, { message: "الرقم يجب أن يكون 4 أرقام كحد أقصى" }),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     notes: z.string().nullable().optional(),
 })
@@ -37,10 +39,19 @@ export function PriceLabelForm({ priceLabel, onSuccess }: PriceLabelFormProps) {
     const form = useForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
+            itemNumber: priceLabel?.itemNumber || "",
             name: priceLabel?.name || "",
             notes: priceLabel?.notes || "",
         },
     })
+
+    useEffect(() => {
+        if (!priceLabel) {
+            getNextPriceLabelItemNumber().then((num) => {
+                form.setValue("itemNumber", num)
+            })
+        }
+    }, [priceLabel, form])
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
@@ -66,6 +77,20 @@ export function PriceLabelForm({ priceLabel, onSuccess }: PriceLabelFormProps) {
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                    control={form.control}
+                    name="itemNumber"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>الرقم *</FormLabel>
+                            <FormControl>
+                                <Input placeholder="0001" {...field} className="font-mono" dir="ltr" maxLength={4} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
                 <FormField
                     control={form.control}
                     name="name"

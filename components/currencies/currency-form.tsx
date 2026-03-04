@@ -9,14 +9,15 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { createCurrency, updateCurrency } from "@/lib/actions/currencies"
+import { createCurrency, updateCurrency, getNextCurrencyItemNumber } from "@/lib/actions/currencies"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Currency } from "@prisma/client"
 import { Loader2 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 const formSchema = z.object({
+    itemNumber: z.string().min(1, "الرقم مطلوب").max(4, "الرقم يجب أن يكون 4 أرقام كحد أقصى"),
     name:      z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
     code:      z.string().min(2, "الكود يجب أن يكون حرفين على الأقل").max(10),
     symbol:    z.string().min(1, "الرمز مطلوب"),
@@ -38,6 +39,7 @@ export function CurrencyForm({ currency, onSuccess }: CurrencyFormProps) {
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
+            itemNumber: currency?.itemNumber || "",
             name:      currency?.name      || "",
             code:      currency?.code      || "",
             symbol:    currency?.symbol    || "",
@@ -45,6 +47,14 @@ export function CurrencyForm({ currency, onSuccess }: CurrencyFormProps) {
             isActive:  currency?.isActive  ?? true,
         },
     })
+
+    useEffect(() => {
+        if (!currency) {
+            getNextCurrencyItemNumber().then((num) => {
+                form.setValue("itemNumber", num)
+            })
+        }
+    }, [currency, form])
 
     async function onSubmit(values: FormValues) {
         setIsSubmitting(true)
@@ -71,6 +81,16 @@ export function CurrencyForm({ currency, onSuccess }: CurrencyFormProps) {
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                 <div className="grid grid-cols-1 gap-4">
+                    <FormField control={form.control} name="itemNumber" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>الرقم *</FormLabel>
+                            <FormControl>
+                                <Input placeholder="0001" {...field} className="font-mono" dir="ltr" maxLength={4} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+
                     <FormField control={form.control} name="name" render={({ field }) => (
                         <FormItem>
                             <FormLabel>اسم العملة *</FormLabel>

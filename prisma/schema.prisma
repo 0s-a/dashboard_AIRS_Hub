@@ -48,6 +48,7 @@ model Person {
   source          String?
   contacts        Json? // [{type: "phone"|"email"|"whatsapp", value, label, isPrimary}]
   tags            Json? // ["tag1", "tag2"]
+  currencies      Json? // ["currency-uuid-1", "currency-uuid-2"]
   isActive        Boolean            @default(true)
   lastInteraction DateTime           @default(now())
   createdAt       DateTime           @default(now())
@@ -55,7 +56,7 @@ model Person {
   groups          Group[]
   priceLabels     PersonPriceLabel[]
 
-  @@map("Customer")
+  @@map("Person")
 }
 
 model Group {
@@ -122,12 +123,13 @@ model Variant {
 
 // Price label names for product pricing
 model PriceLabel {
-  id        String             @id @default(uuid())
-  name      String             @unique
-  notes     String?
-  persons   PersonPriceLabel[]
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id         String             @id @default(uuid())
+  itemNumber String             @unique
+  name       String             @unique
+  notes      String?
+  persons    PersonPriceLabel[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
 }
 
 // Explicit join table for Person <-> PriceLabel
@@ -157,12 +159,13 @@ model PersonType {
 
 // Currency management
 model Currency {
-  id        String   @id @default(uuid())
-  name      String   @unique // e.g. "ريال يمني"
-  code      String   @unique // e.g. "YER"
-  symbol    String // e.g. "ر.ي"
-  isDefault Boolean  @default(false)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  itemNumber String   @unique
+  name       String   @unique // e.g. "ريال يمني"
+  code       String   @unique // e.g. "YER"
+  symbol     String // e.g. "ر.ي"
+  isDefault  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

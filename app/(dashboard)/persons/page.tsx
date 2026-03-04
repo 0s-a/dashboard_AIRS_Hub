@@ -1,6 +1,7 @@
 import { DataTable } from "@/components/ui/data-table"
 import { columns } from "../../../components/columns"
 import { getPersons } from "@/lib/actions/persons"
+import { getCurrencies } from "@/lib/actions/currencies"
 import { PersonSheet } from "@/components/persons/person-sheet"
 import { Users, UserCheck, UserPlus, Layers } from "lucide-react"
 import { PersonExpandedRow } from "./components/person-expanded-row"
@@ -9,7 +10,18 @@ export const dynamic = "force-dynamic"
 
 export default async function CRMPage() {
     const result = await getPersons()
-    const persons = (result.success ? result.data : []) as any[]
+    const currenciesResult = await getCurrencies()
+    const allCurrencies = (currenciesResult.success ? currenciesResult.data : []) as any[]
+    
+    // Build lookup map
+    const currencyMap = new Map(allCurrencies.map((c: any) => [c.id, { name: c.name, symbol: c.symbol, code: c.code }]))
+    
+    const rawPersons = (result.success ? result.data : []) as any[]
+    // Enrich persons with resolved currencies
+    const persons = rawPersons.map(p => ({
+        ...p,
+        resolvedCurrencies: ((p.currencies as string[]) || []).map((id: string) => currencyMap.get(id)).filter(Boolean)
+    }))
     
     const totalPersons = persons.length
     const activePersons = persons.filter(p => p.isActive).length

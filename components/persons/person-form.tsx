@@ -24,11 +24,12 @@ import {
 import { createPerson, updatePerson } from "@/lib/actions/persons"
 import { getPersonTypes } from "@/lib/actions/person-types"
 import { getPriceLabels } from "@/lib/actions/price-labels"
+import { getActiveCurrencies } from "@/lib/actions/currencies"
 import { ContactItem } from "@/lib/person-types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Person } from "@prisma/client"
-import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe, Wallet } from "lucide-react"
+import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins } from "lucide-react"
 import { useState, useEffect } from "react"
 import { MultiSelect, OptionType } from "@/components/ui/multi-select"
 
@@ -47,8 +48,9 @@ const formSchema = z.object({
     type: z.string().optional(), // backward compatibility
     source: z.string().optional(),
     contacts: z.array(contactSchema),
-    tags: z.string().optional(), // comma-separated, parsed on submit
+    tags: z.string().optional(),
     priceLabelIds: z.array(z.string()).optional(),
+    currencyIds: z.array(z.string()).optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -69,6 +71,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [personTypes, setPersonTypes] = useState<{ id: string; name: string }[]>([])
     const [priceLabels, setPriceLabels] = useState<OptionType[]>([])
+    const [currencyOptions, setCurrencyOptions] = useState<OptionType[]>([])
 
     useEffect(() => {
         getPersonTypes().then((res) => {
@@ -79,6 +82,11 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
         getPriceLabels().then((res) => {
             if (res.success && res.data) {
                 setPriceLabels(res.data.map(l => ({ label: l.name, value: l.id })))
+            }
+        })
+        getActiveCurrencies().then((res) => {
+            if (res.success && res.data) {
+                setCurrencyOptions(res.data.map(c => ({ label: `${c.symbol} — ${c.name}`, value: c.id })))
             }
         })
     }, [])
@@ -101,6 +109,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                 : [{ type: "phone" as const, value: "", label: "", isPrimary: true }],
             tags: existingTags.join("، "),
             priceLabelIds: (person as any)?.priceLabels?.map((pl: any) => pl.priceLabelId) || [],
+            currencyIds: (person?.currencies as string[] | null) || [],
         },
     })
 
@@ -137,6 +146,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                 contacts: cleanContacts.length > 0 ? cleanContacts : null,
                 tags: parsedTags && parsedTags.length > 0 ? parsedTags : null,
                 priceLabelIds: values.priceLabelIds || null,
+                currencyIds: values.currencyIds && values.currencyIds.length > 0 ? values.currencyIds : null,
             }
 
             let res;
@@ -269,6 +279,31 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                             onChange={field.onChange}
                                             placeholder="اختر تسعيرة أو أكثر"
                                             emptyMessage="لا توجد تسعيرات مضافة"
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <FormField
+                            control={form.control}
+                            name="currencyIds"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                                        <Coins className="h-3 w-3" />
+                                        عملات التعامل
+                                    </FormLabel>
+                                    <FormControl>
+                                        <MultiSelect
+                                            options={currencyOptions}
+                                            selected={field.value || []}
+                                            onChange={field.onChange}
+                                            placeholder="اختر عملة أو أكثر"
+                                            emptyMessage="لا توجد عملات مضافة"
                                         />
                                     </FormControl>
                                     <FormMessage />

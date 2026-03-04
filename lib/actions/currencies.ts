@@ -3,6 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 
+async function generateCurrencyItemNumber(): Promise<string> {
+    const last = await prisma.currency.findFirst({
+        orderBy: { itemNumber: 'desc' },
+        select: { itemNumber: true },
+    })
+    const next = last ? parseInt(last.itemNumber, 10) + 1 : 1
+    return String(next).padStart(4, '0')
+}
+
 export async function getCurrencies() {
     try {
         const currencies = await prisma.currency.findMany({
@@ -32,20 +41,30 @@ export async function createCurrency(data: {
     name: string
     code: string
     symbol: string
+    itemNumber?: string
     isDefault?: boolean
     isActive?: boolean
 }) {
     try {
         if (data.isDefault) {
-            // Un-set any existing default
             await prisma.currency.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
         }
-        const currency = await prisma.currency.create({ data })
+        const itemNumber = data.itemNumber?.trim() || await generateCurrencyItemNumber()
+        const currency = await prisma.currency.create({
+            data: {
+                name: data.name,
+                code: data.code,
+                symbol: data.symbol,
+                itemNumber,
+                isDefault: data.isDefault,
+                isActive: data.isActive,
+            }
+        })
         revalidatePath('/currencies')
         return { success: true, data: currency }
     } catch (error: any) {
         console.error('Failed to create currency:', error)
-        if (error.code === 'P2002') return { success: false, error: 'العملة (الاسم أو الكود) موجودة مسبقاً' }
+        if (error.code === 'P2002') return { success: false, error: 'العملة (الاسم أو الكود أو الرقم) موجودة مسبقاً' }
         return { success: false, error: 'تعذّر إنشاء العملة' }
     }
 }
@@ -54,6 +73,7 @@ export async function updateCurrency(id: string, data: {
     name?: string
     code?: string
     symbol?: string
+    itemNumber?: string
     isDefault?: boolean
     isActive?: boolean
 }) {
@@ -66,7 +86,7 @@ export async function updateCurrency(id: string, data: {
         return { success: true, data: currency }
     } catch (error: any) {
         console.error('Failed to update currency:', error)
-        if (error.code === 'P2002') return { success: false, error: 'العملة (الاسم أو الكود) موجودة مسبقاً' }
+        if (error.code === 'P2002') return { success: false, error: 'العملة (الاسم أو الكود أو الرقم) موجودة مسبقاً' }
         return { success: false, error: 'تعذّر تحديث العملة' }
     }
 }
@@ -103,4 +123,8 @@ export async function toggleCurrencyActive(id: string, isActive: boolean) {
         console.error('Failed to toggle currency:', error)
         return { success: false, error: 'تعذّر تغيير حالة العملة' }
     }
+}
+
+export async function getNextCurrencyItemNumber() {
+    return await generateCurrencyItemNumber()
 }

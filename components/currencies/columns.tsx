@@ -19,6 +19,16 @@ function dispatchEdit(currency: Currency) {
 
 export const columns: ColumnDef<Currency>[] = [
     {
+        accessorKey: "itemNumber",
+        header: "الرقم",
+        cell: ({ row }) => (
+            <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                {row.original.itemNumber}
+            </span>
+        ),
+        size: 80,
+    },
+    {
         accessorKey: "name",
         header: "العملة",
         cell: ({ row }) => {

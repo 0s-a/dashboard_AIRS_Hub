@@ -208,13 +208,25 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                     <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
                                         نوع الشخص
                                     </FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={(val) => {
+                                        if (val === "__none__") {
+                                            field.onChange("")
+                                            form.setValue("type", "عادي")
+                                        } else {
+                                            field.onChange(val)
+                                            const selectedType = personTypes.find(pt => pt.id === val)
+                                            if (selectedType) form.setValue("type", selectedType.name)
+                                        }
+                                    }} value={field.value || ""}>
                                         <FormControl>
                                             <SelectTrigger className="h-9">
                                                 <SelectValue placeholder="اختر نوع الشخص" />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
+                                            <SelectItem value="__none__">
+                                                <span className="text-muted-foreground">بدون تصنيف</span>
+                                            </SelectItem>
                                             {personTypes.length === 0 ? (
                                                 <div className="px-2 py-4 text-xs text-muted-foreground text-center">
                                                     لا توجد أنواع. أضف من صفحة أنواع الأشخاص.
@@ -244,7 +256,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                         <Globe className="h-3 w-3" />
                                         مصدر الشخص
                                     </FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value || ""}>
                                         <FormControl>
                                             <SelectTrigger className="h-9">
                                                 <SelectValue placeholder="اختر المصدر" />
@@ -346,7 +358,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                                 control={form.control}
                                                 name={`contacts.${index}.type`}
                                                 render={({ field }) => (
-                                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
                                                         <SelectTrigger className="h-8 w-[110px] text-xs">
                                                             <SelectValue />
                                                         </SelectTrigger>

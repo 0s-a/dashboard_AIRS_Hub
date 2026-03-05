@@ -68,6 +68,7 @@ export function ImageGalleryUpload({
 }: ImageGalleryUploadProps) {
     const [uploading, setUploading] = useState<UploadingImage[]>([])
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+    const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
     const [removingId, setRemovingId] = useState<string | null>(null)
     const [settingPrimary, setSettingPrimary] = useState<string | null>(null)
     const [updatingVariantId, setUpdatingVariantId] = useState<string | null>(null)
@@ -201,6 +202,7 @@ export function ImageGalleryUpload({
 
     const handleDragStart = (index: number) => {
         dragItem.current = index
+        setDraggingIndex(index)
     }
 
     const handleDragEnter = (index: number) => {
@@ -211,6 +213,7 @@ export function ImageGalleryUpload({
         if (dragItem.current === null || dragOverIndex === null) {
             dragItem.current = null
             setDragOverIndex(null)
+            setDraggingIndex(null)
             return
         }
 
@@ -229,6 +232,7 @@ export function ImageGalleryUpload({
 
         dragItem.current = null
         setDragOverIndex(null)
+        setDraggingIndex(null)
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -275,7 +279,8 @@ export function ImageGalleryUpload({
                                         : linkedVariants.length > 0
                                             ? "border-primary/40 shadow-sm"
                                             : "border-border/50 hover:border-primary/40",
-                                    dragOverIndex === index && "border-primary border-dashed scale-95 opacity-70",
+                                    dragOverIndex === index && draggingIndex !== index && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[0.97]",
+                                    draggingIndex === index && "opacity-40 scale-95 shadow-none",
                                     (removingId === img.id || updatingVariantId === img.id) && "opacity-50 pointer-events-none"
                                 )}
                             >
@@ -397,7 +402,7 @@ export function ImageGalleryUpload({
                                 </div>
 
                                 {/* Drag handle */}
-                                <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-60 transition-opacity">
+                                <div className="absolute bottom-1 left-1 opacity-40 group-hover:opacity-80 transition-opacity bg-black/30 rounded-md p-0.5">
                                     <GripVertical className="h-3.5 w-3.5 text-white" />
                                 </div>
                             </div>

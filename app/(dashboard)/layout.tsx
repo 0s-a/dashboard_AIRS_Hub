@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog, Coins, ArrowRight } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Button } from "@/components/ui/button"
+import { CommandPalette } from "@/components/command-palette"
 import {
     Tooltip,
     TooltipContent,
@@ -183,7 +184,8 @@ export default function DashboardLayout({
                                     <span className="text-sm font-semibold text-muted-foreground">التنقل السريع</span>
                                     <p className="text-[9px] text-muted-foreground/60 uppercase tracking-tighter">نظام إدارة التوزيع الذكي • {new Date().toLocaleDateString('ar-SA')}</p>
                                 </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            <CommandPalette />
                             <Button
                                 variant="ghost"
                                 size="icon"

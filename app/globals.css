@@ -72,31 +72,31 @@
   --glass-border: rgba(255, 255, 255, 0.2);
 }
 
-/* Dark Mode Overrides */
+/* Dark Mode Overrides — Refined for reduced eye strain */
 .dark {
-  --background: hsl(224 71% 4%);
-  --foreground: hsl(210 40% 98%);
-  --card: hsl(224 71% 4%);
-  --card-foreground: hsl(210 40% 98%);
-  --popover: hsl(224 71% 4%);
-  --popover-foreground: hsl(210 40% 98%);
-  --primary: hsl(142.1 76.2% 36.3%);
+  --background: hsl(222 47% 8%);
+  --foreground: hsl(210 40% 96%);
+  --card: hsl(222 44% 10%);
+  --card-foreground: hsl(210 40% 96%);
+  --popover: hsl(222 44% 10%);
+  --popover-foreground: hsl(210 40% 96%);
+  --primary: hsl(142.1 70% 40%);
   --primary-foreground: hsl(355.7 100% 97.3%);
-  --secondary: hsl(217.2 32.6% 17.5%);
-  --secondary-foreground: hsl(210 40% 98%);
-  --muted: hsl(217.2 32.6% 17.5%);
-  --muted-foreground: hsl(215 20.2% 65.1%);
-  --accent: hsl(217.2 32.6% 17.5%);
-  --accent-foreground: hsl(210 40% 98%);
-  --destructive: hsl(0 62.8% 30.6%);
-  --destructive-foreground: hsl(210 40% 98%);
-  --border: hsl(217.2 32.6% 17.5%);
-  --input: hsl(217.2 32.6% 17.5%);
-  --ring: hsl(142.4 71.8% 29.2%);
+  --secondary: hsl(220 30% 15%);
+  --secondary-foreground: hsl(210 40% 96%);
+  --muted: hsl(220 26% 14%);
+  --muted-foreground: hsl(215 20% 68%);
+  --accent: hsl(220 30% 15%);
+  --accent-foreground: hsl(210 40% 96%);
+  --destructive: hsl(0 62.8% 35%);
+  --destructive-foreground: hsl(210 40% 96%);
+  --border: hsl(220 20% 18%);
+  --input: hsl(220 20% 18%);
+  --ring: hsl(142.4 65% 34%);
 
-  /* Glass Variables Dark */
-  --glass-bg: rgba(2, 6, 23, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.1);
+  /* Glass Variables Dark — warmer, softer */
+  --glass-bg: rgba(10, 15, 30, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 @layer base {

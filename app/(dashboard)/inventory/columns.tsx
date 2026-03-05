@@ -312,7 +312,7 @@ export const columns: ColumnDef<Product>[] = [
                                         <TooltipContent>
                                             <div className="flex flex-col gap-1 text-xs">
                                                 {(product as any).variants.map((v: any, i: number) => {
-                                                    const priceToUse = v.price || (product as any).prices?.[0]?.value;
+                                                    const priceToUse = v.price || (product as any).productPrices?.[0]?.value;
                                                     return (
                                                         <span key={i} className="flex items-center justify-between gap-4">
                                                             <span>{v.name}</span>
@@ -423,54 +423,75 @@ export const columns: ColumnDef<Product>[] = [
     },
 
     {
-        accessorKey: "prices",
+        accessorKey: "productPrices",
         header: "الأسعار",
         cell: ({ row }) => {
             const product = row.original;
-            const prices: Array<{ label: string; value: number, currency?: string, unit?: string, quantity?: number }> = (product as any).prices || []
+            const prices: Array<{ 
+                id: string; 
+                priceLabelName: string; 
+                value: number; 
+                currencySymbol: string; 
+                unit: string | null; 
+                quantity: number | null 
+            }> = (product as any).productPrices || []
             
             if (prices.length === 0) {
                 return <span className="text-muted-foreground text-[11px] italic">لا يوجد تسعير</span>
             }
 
+            // Group prices by priceLabelName
+            const groupedPrices = prices.reduce((acc, price) => {
+                if (!acc[price.priceLabelName]) {
+                    acc[price.priceLabelName] = [];
+                }
+                acc[price.priceLabelName].push(price);
+                return acc;
+            }, {} as Record<string, typeof prices>);
+
             return (
-                <div className="flex flex-col gap-1.5 w-full min-w-[120px]">
-                    {prices.map((p, i) => (
+                <div className="flex flex-col gap-1.5 w-full min-w-[130px]">
+                    {Object.entries(groupedPrices).map(([labelName, labelPrices], idx) => (
                         <div 
-                            key={i} 
+                            key={labelName} 
                             className={cn(
-                                "flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg border transition-colors w-full",
-                                i === 0 
+                                "flex flex-col gap-1 px-2.5 py-1.5 rounded-lg border transition-colors w-full",
+                                idx === 0 
                                     ? "bg-linear-to-r from-emerald-500/10 to-teal-500/5 hover:from-emerald-500/20 hover:to-teal-500/10 border-emerald-500/30 shadow-xs" 
                                     : "bg-muted/30 hover:bg-muted/50 border-border/40"
                             )}
                         >
-                            <div className="flex flex-col flex-1 min-w-0 pr-2">
+                            <div className="flex items-center justify-between gap-2 border-b border-border/10 pb-0.5 mb-0.5">
                                 <span className={cn(
                                     "text-[10px] truncate",
-                                    i === 0 ? "font-bold text-emerald-700/90" : "font-semibold text-foreground/80"
-                                )} title={p.label}>
-                                    {p.label}
+                                    idx === 0 ? "font-bold text-emerald-700/90" : "font-semibold text-foreground/80"
+                                )} title={labelName}>
+                                    {labelName}
                                 </span>
-                                {p.unit && (
-                                    <span className="text-[8px] text-muted-foreground truncate">
-                                        {p.quantity ? `${p.quantity} ` : ''}{p.unit}
+                                {labelPrices[0].unit && (
+                                    <span className="text-[9px] text-muted-foreground/80 truncate">
+                                        {labelPrices[0].quantity ? `${labelPrices[0].quantity} ` : ''}{labelPrices[0].unit}
                                     </span>
                                 )}
                             </div>
-                            <div className="flex items-baseline gap-1 shrink-0">
-                                <span className={cn(
-                                    "font-mono tabular-nums",
-                                    i === 0 ? "text-[14px] font-extrabold text-emerald-700" : "text-[12px] font-bold text-foreground/90"
-                                )}>
-                                    {Number(p.value).toLocaleString('en-US')}
-                                </span>
-                                <span className={cn(
-                                    "text-[8px] font-bold uppercase mb-0.5",
-                                    i === 0 ? "text-emerald-600/80" : "text-muted-foreground/80"
-                                )}>
-                                    {p.currency || 'ر.ي'}
-                                </span>
+                            
+                            <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                {labelPrices.map((p) => (
+                                    <div key={p.id} className="flex items-baseline gap-1">
+                                        <span className={cn(
+                                            "font-mono tabular-nums",
+                                            idx === 0 ? "text-[13px] font-extrabold text-emerald-700" : "text-[11px] font-bold text-foreground/90"
+                                        )}>
+                                            {Number(p.value).toLocaleString('en-US')}
+                                        </span>
+                                        <span className={cn(
+                                            "text-[9px] font-bold uppercase",
+                                            idx === 0 ? "text-emerald-600/80" : "text-muted-foreground/80"
+                                        )}>
+                                            {p.currencySymbol}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ))}

@@ -56,7 +56,7 @@ type ProductData = {
     description: string | null
     unit: string
     packaging: string | null
-    prices: Array<{ label: string; value: number, currency?: string }> | null
+    productPrices: Array<{ id: string; priceLabelId: string; priceLabelName: string; currencyId: string; currencySymbol: string; currencyName: string; value: number; unit: string | null; quantity: number | null }>
     isAvailable: boolean
     variants: VariantWithImages[]
     mediaImages: ProductImageRecord[]

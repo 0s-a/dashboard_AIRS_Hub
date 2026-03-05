@@ -20,9 +20,9 @@ export async function GET(req: NextRequest) {
                 itemNumber: true,
                 name: true,
                 description: true,
-                prices: true,
-                productImages: { include: { mediaImage: { select: { url: true } } }, where: { isPrimary: true }, take: 1 }
-            }
+                productImages: { include: { mediaImage: { select: { url: true } } }, where: { isPrimary: true }, take: 1 },
+            },
+            orderBy: { name: 'asc' },
         })
 
         return NextResponse.json({ success: true, data: products })

@@ -26,7 +26,7 @@ export function InventoryTable({ products }: InventoryTableProps) {
             ]}
             renderSubComponent={({ row }) => {
                 const product = row.original as any
-                const primaryPrice = product.prices?.[0]?.value || null
+                const primaryPrice = product.productPrices?.[0]?.value || null
                 const primaryImage = product.mediaImages?.find((img: any) => img.isPrimary)?.url || product.mediaImages?.[0]?.url
 
                 const variantsWithDefaults = (product.variants || []).map((v: any) => ({

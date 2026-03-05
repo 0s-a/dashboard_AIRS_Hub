@@ -4,12 +4,24 @@ import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────
 // TYPES
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────
 
-export type PriceEntry = { label: string; value: number; currency?: string; unit?: string; quantity?: number }
 export type ImageEntry = { url?: string; alt?: string; isPrimary: boolean; order?: number; mediaImageId?: string }
+
+// Serialized price entry returned to the client
+export type SerializedPrice = {
+    id: string
+    priceLabelId: string
+    priceLabelName: string
+    currencyId: string
+    currencySymbol: string
+    currencyName: string
+    value: number
+    unit: string | null
+    quantity: number | null
+}
 
 // Item number must be 3 segments separated by dashes (e.g. 001-BF-483)
 const ITEM_NUMBER_REGEX = /^\S+-\S+-\S+$/
@@ -23,7 +35,6 @@ export interface ProductInput {
     categoryId?: string | null
     alternativeNames?: string[]
     tags?: string[]
-    prices?: PriceEntry[]
 }
 
 // ─────────────────────────────────────────────
@@ -36,6 +47,13 @@ const PRODUCT_INCLUDE = {
     variants: {
         orderBy: { order: 'asc' as const },
         include: { variantImages: { include: { mediaImage: true } } },
+    },
+    productPrices: {
+        include: {
+            priceLabel: true,
+            currency: true,
+        },
+        orderBy: { createdAt: 'asc' as const },
     },
 }
 
@@ -74,13 +92,26 @@ function serializeProduct(product: any) {
         })),
     }))
 
-    const { productImages: _, variants: __, ...rest } = product
+    const { productImages: _, variants: __, productPrices: _pp, ...rest } = product
+
+    // Serialize productPrices into a flat array
+    const productPrices: SerializedPrice[] = (product.productPrices || []).map((pp: any) => ({
+        id: pp.id,
+        priceLabelId: pp.priceLabelId,
+        priceLabelName: pp.priceLabel.name,
+        currencyId: pp.currencyId,
+        currencySymbol: pp.currency.symbol,
+        currencyName: pp.currency.name,
+        value: pp.value,
+        unit: pp.unit,
+        quantity: pp.quantity,
+    }))
 
     return {
         ...rest,
         variants,
         mediaImages,
-        prices: (product.prices as PriceEntry[] | null) ?? [],
+        productPrices,
     }
 }
 
@@ -169,14 +200,13 @@ export async function createProduct(data: ProductInput) {
             return { success: false, error: 'رقم الصنف يجب أن يتكون من 3 خانات مفصولة بشرطات (مثال: 001-BF-483)' }
         }
 
-        const { alternativeNames, tags, prices, ...productData } = data
+        const { alternativeNames, tags, ...productData } = data
 
         const product = await (prisma.product as any).create({
             data: {
                 ...productData,
                 itemNumber: productData.itemNumber.trim(),
                 name: productData.name.trim(),
-                prices: prices?.length ? prices : Prisma.JsonNull,
                 alternativeNames: alternativeNames?.length ? alternativeNames : Prisma.JsonNull,
                 tags: tags?.length ? tags : Prisma.JsonNull,
             },
@@ -194,7 +224,7 @@ export async function createProduct(data: ProductInput) {
 
 export async function updateProduct(id: string, data: Partial<ProductInput>) {
     try {
-        const { alternativeNames, tags, prices, ...productData } = data as any
+        const { alternativeNames, tags, ...productData } = data as any
 
         // Validate itemNumber format if provided
         if (productData.itemNumber && !ITEM_NUMBER_REGEX.test(productData.itemNumber.trim())) {
@@ -225,7 +255,6 @@ export async function updateProduct(id: string, data: Partial<ProductInput>) {
             where: { id },
             data: {
                 ...productData,
-                prices: prices !== undefined ? (prices?.length ? prices : Prisma.JsonNull) : undefined,
                 alternativeNames: alternativeNames !== undefined ? (alternativeNames?.length ? alternativeNames : Prisma.JsonNull) : undefined,
                 tags: tags !== undefined ? (tags?.length ? tags : Prisma.JsonNull) : undefined,
             },
@@ -271,11 +300,14 @@ export async function deleteProduct(id: string) {
 
 export async function duplicateProduct(id: string) {
     try {
-        const source = await prisma.product.findUnique({ where: { id } })
+        const source = await prisma.product.findUnique({
+            where: { id },
+            include: { productPrices: true },
+        })
         if (!source) return { success: false, error: 'المنتج غير موجود' }
 
         const newItemNumber = `${source.itemNumber}-copy-${Date.now().toString(36).slice(-4)}`
-        const { id: _id, createdAt: _c, updatedAt: _u, ...sourceData } = source
+        const { id: _id, createdAt: _c, updatedAt: _u, productPrices: sourcePrices, ...sourceData } = source
 
         const duplicate = await (prisma.product as any).create({
             data: {
@@ -283,7 +315,17 @@ export async function duplicateProduct(id: string) {
                 itemNumber: newItemNumber,
                 name: `${source.name} (نسخة)`,
                 isAvailable: false,
+                productPrices: sourcePrices.length > 0 ? {
+                    create: sourcePrices.map(pp => ({
+                        priceLabelId: pp.priceLabelId,
+                        currencyId: pp.currencyId,
+                        value: pp.value,
+                        unit: pp.unit,
+                        quantity: pp.quantity,
+                    }))
+                } : undefined,
             },
+            include: PRODUCT_INCLUDE,
         })
 
         revalidatePath('/inventory')
@@ -323,86 +365,95 @@ export async function updateProductDescription(id: string, description: string) 
     }
 }
 
-// ─────────────────────────────────────────────
-// PRICES CRUD
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────
+// PRODUCT PRICES CRUD (via ProductPrice table)
+// ─────────────────────────────────────────────────
 
-export async function addPrice(productId: string, entry: PriceEntry) {
+export async function addProductPrice(productId: string, data: {
+    priceLabelId: string
+    currencyId: string
+    value: number
+    unit?: string
+    quantity?: number
+}) {
     try {
-        const label = entry.label.trim()
-        if (!label) return { success: false, error: 'التسمية مطلوبة' }
-        if (isNaN(entry.value) || entry.value < 0) return { success: false, error: 'القيمة غير صحيحة' }
+        if (isNaN(data.value) || data.value < 0) return { success: false, error: 'القيمة غير صحيحة' }
+        if (!data.priceLabelId) return { success: false, error: 'مسمى التسعيرة مطلوب' }
+        if (!data.currencyId) return { success: false, error: 'العملة مطلوبة' }
 
-        const product = await requireProduct(productId)
-        const current = (product.prices as PriceEntry[]) ?? []
-
-        if (current.some(p => p.label.toLowerCase() === label.toLowerCase())) {
-            return { success: false, error: 'هذه التسمية موجودة بالفعل' }
-        }
-
-        const updated = await (prisma.product as any).update({
-            where: { id: productId },
-            data: { prices: [...current, { label, value: entry.value, currency: entry.currency, unit: entry.unit, quantity: entry.quantity }] },
+        await prisma.productPrice.create({
+            data: {
+                productId,
+                priceLabelId: data.priceLabelId,
+                currencyId: data.currencyId,
+                value: data.value,
+                unit: data.unit?.trim() || null,
+                quantity: data.quantity || null,
+            },
         })
 
+        // Re-fetch full product to return consistent data
+        const product = await requireProduct(productId)
         revalidatePath('/inventory')
         revalidatePath(`/inventory/${productId}`)
-        revalidatePath(`/inventory/${productId}/pricing`)
-        return { success: true, data: serializeProduct(updated) }
+        return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
-        console.error('Failed to add price:', error)
+        console.error('Failed to add product price:', error)
+        if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + العملة) موجود بالفعل' }
         return { success: false, error: error?.message ?? 'فشل إضافة السعر' }
     }
 }
 
-export async function updatePrice(productId: string, index: number, entry: Partial<PriceEntry>) {
+export async function updateProductPrice(priceId: string, data: {
+    value?: number
+    unit?: string | null
+    quantity?: number | null
+    priceLabelId?: string
+    currencyId?: string
+}) {
     try {
-        const product = await requireProduct(productId)
-        const current = (product.prices as PriceEntry[]) ?? []
-        if (index < 0 || index >= current.length) return { success: false, error: 'السعر غير موجود' }
-
-        const updated = [...current]
-        updated[index] = {
-            label: entry.label !== undefined ? entry.label.trim() : current[index].label,
-            value: entry.value !== undefined ? entry.value : current[index].value,
-            currency: entry.currency !== undefined ? entry.currency : current[index].currency,
-            unit: entry.unit !== undefined ? entry.unit : current[index].unit,
-            quantity: entry.quantity !== undefined ? entry.quantity : current[index].quantity,
+        if (data.value !== undefined && (isNaN(data.value) || data.value < 0)) {
+            return { success: false, error: 'القيمة غير صحيحة' }
         }
 
-        const updatedProduct = await (prisma.product as any).update({
-            where: { id: productId },
-            data: { prices: updated },
+        const existing = await prisma.productPrice.findUnique({ where: { id: priceId } })
+        if (!existing) return { success: false, error: 'السعر غير موجود' }
+
+        await prisma.productPrice.update({
+            where: { id: priceId },
+            data: {
+                value: data.value,
+                unit: data.unit !== undefined ? (data.unit?.trim() || null) : undefined,
+                quantity: data.quantity !== undefined ? (data.quantity || null) : undefined,
+                priceLabelId: data.priceLabelId,
+                currencyId: data.currencyId,
+            },
         })
 
+        const product = await requireProduct(existing.productId)
         revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-        revalidatePath(`/inventory/${productId}/pricing`)
-        return { success: true, data: serializeProduct(updatedProduct) }
+        revalidatePath(`/inventory/${existing.productId}`)
+        return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
-        console.error('Failed to update price:', error)
+        console.error('Failed to update product price:', error)
+        if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + العملة) موجود بالفعل' }
         return { success: false, error: error?.message ?? 'فشل تحديث السعر' }
     }
 }
 
-export async function deletePrice(productId: string, index: number) {
+export async function deleteProductPrice(priceId: string) {
     try {
-        const product = await requireProduct(productId)
-        const current = (product.prices as PriceEntry[]) ?? []
-        if (index < 0 || index >= current.length) return { success: false, error: 'السعر غير موجود' }
+        const existing = await prisma.productPrice.findUnique({ where: { id: priceId } })
+        if (!existing) return { success: false, error: 'السعر غير موجود' }
 
-        const remaining = current.filter((_, i) => i !== index)
-        const updatedProduct = await (prisma.product as any).update({
-            where: { id: productId },
-            data: { prices: remaining.length ? remaining : Prisma.JsonNull },
-        })
+        await prisma.productPrice.delete({ where: { id: priceId } })
 
+        const product = await requireProduct(existing.productId)
         revalidatePath('/inventory')
-        revalidatePath(`/inventory/${productId}`)
-        revalidatePath(`/inventory/${productId}/pricing`)
-        return { success: true, data: serializeProduct(updatedProduct) }
+        revalidatePath(`/inventory/${existing.productId}`)
+        return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
-        console.error('Failed to delete price:', error)
+        console.error('Failed to delete product price:', error)
         return { success: false, error: error?.message ?? 'فشل حذف السعر' }
     }
 }

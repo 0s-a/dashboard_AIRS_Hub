@@ -9,7 +9,7 @@ import Link from "next/link"
 interface Product {
     id: string
     name: string
-    prices: Array<{ label: string; value: number, currency?: string }>
+    productPrices: Array<{ priceLabelName: string; value: number; currencySymbol: string }>
     mediaImages: Array<{ url: string; isPrimary: boolean }> | null
     isAvailable: boolean
     unit: string
@@ -96,12 +96,12 @@ export function RecentProducts({ products }: RecentProductsProps) {
                             </div>
 
                             <div className="text-left flex flex-col items-end gap-1">
-                                {product.prices && product.prices.length > 0 ? (
+                                {product.productPrices && product.productPrices.length > 0 ? (
                                     <div className="flex flex-col items-end">
                                         <p className="font-mono font-bold text-sm text-primary">
-                                            {product.prices[0].value.toFixed(2)} {product.prices[0].currency || 'ر.ي'}
+                                            {product.productPrices[0].value.toFixed(2)} {product.productPrices[0].currencySymbol}
                                         </p>
-                                        <p className="text-[10px] text-muted-foreground">{product.prices[0].label || 'سعر'}</p>
+                                        <p className="text-[10px] text-muted-foreground">{product.productPrices[0].priceLabelName || 'سعر'}</p>
                                     </div>
                                 ) : (
                                     <p className="text-xs text-muted-foreground italic mt-1">لا يوجد سعر</p>

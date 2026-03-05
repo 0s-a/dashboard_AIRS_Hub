@@ -19,22 +19,64 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing phoneNumber or productId' }, { status: 400 })
         }
 
-        // 2. Get Product Price (Unified)
+        // 2. Get Product with prices (from ProductPrice table)
         const product = await prisma.product.findUnique({
-            where: { id: productId }
+            where: { id: productId },
+            include: {
+                productPrices: {
+                    include: {
+                        priceLabel: true,
+                        currency: true,
+                    },
+                    orderBy: { createdAt: 'asc' },
+                },
+            },
         })
 
         if (!product) {
             return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
+        // 3. Find person by phone number and get their price labels
+        const person = await prisma.person.findFirst({
+            where: {
+                contacts: { path: ['phones'], array_contains: phoneNumber },
+            },
+            include: {
+                priceLabels: {
+                    include: { priceLabel: true },
+                },
+            },
+        })
+
+        // 4. Filter prices based on person's assigned price labels
+        let filteredPrices = product.productPrices
+
+        if (person && person.priceLabels.length > 0) {
+            const allowedLabelIds = new Set(person.priceLabels.map(pl => pl.priceLabelId))
+            filteredPrices = product.productPrices.filter(pp => allowedLabelIds.has(pp.priceLabelId))
+        }
+
+        // 5. Format response
+        const prices = filteredPrices.map(pp => ({
+            label: pp.priceLabel.name,
+            value: pp.value,
+            currency: {
+                code: pp.currency.code,
+                symbol: pp.currency.symbol,
+                name: pp.currency.name,
+            },
+            unit: pp.unit,
+            quantity: pp.quantity,
+        }))
+
         return NextResponse.json({
             success: true,
             data: {
                 productId: product.id,
                 productName: product.name,
-                prices: product.prices || [],
-                currency: 'SAR'
+                personName: person?.name || null,
+                prices,
             }
         })
 
@@ -43,4 +85,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
-"@/components/inventory/product-sheet"

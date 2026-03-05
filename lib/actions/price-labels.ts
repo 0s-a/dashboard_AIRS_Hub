@@ -90,6 +90,7 @@ export async function deletePriceLabel(id: string) {
     try {
         const label = await prisma.priceLabel.findUnique({
             where: { id },
+            include: { _count: { select: { productPrices: true } } },
         })
 
         if (!label) {
@@ -101,10 +102,13 @@ export async function deletePriceLabel(id: string) {
         })
 
         revalidatePath('/price-labels')
-        return { success: true }
+        return {
+            success: true,
+            deletedPriceCount: (label as any)._count?.productPrices || 0,
+        }
     } catch (error) {
         console.error('Failed to delete price label:', error)
-        return { success: false, error: 'Failed to delete price label' }
+        return { success: false, error: 'تعذّر حذف مسمى التسعيرة' }
     }
 }
 

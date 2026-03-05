@@ -24,7 +24,13 @@ const getDashboardData = unstable_cache(
             prisma.product.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' },
-                include: { productImages: { include: { mediaImage: true } } },
+                include: {
+                    productImages: { include: { mediaImage: true } },
+                    productPrices: {
+                        include: { priceLabel: true, currency: true },
+                        orderBy: { createdAt: 'asc' },
+                    },
+                },
             }),
             // Get recent persons (last 5) - optimized with specific fields only
             prisma.person.findMany({
@@ -60,7 +66,11 @@ const getDashboardData = unstable_cache(
                     url: pi.mediaImage.url,
                     isPrimary: pi.isPrimary,
                 })),
-                prices: (p.prices as any) || []
+                productPrices: (p.productPrices || []).map((pp: any) => ({
+                    priceLabelName: pp.priceLabel.name,
+                    value: pp.value,
+                    currencySymbol: pp.currency.symbol,
+                })),
             })),
             recentPersons,
             activityData

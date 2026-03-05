@@ -13,7 +13,6 @@ model Product {
   name             String
   brand            String?
   description      String?
-  prices           Json? // [{label: string, value: number, unit?: string, quantity?: number}]
   isAvailable      Boolean        @default(true)
   alternativeNames Json?
   tags             Json? // ["tag1", "tag2", ...]
@@ -23,6 +22,7 @@ model Product {
   updatedAt        DateTime       @updatedAt
   productImages    ProductImage[]
   variants         Variant[]
+  productPrices    ProductPrice[]
 }
 
 model Category {
@@ -123,13 +123,14 @@ model Variant {
 
 // Price label names for product pricing
 model PriceLabel {
-  id         String             @id @default(uuid())
-  itemNumber String             @unique
-  name       String             @unique
-  notes      String?
-  persons    PersonPriceLabel[]
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id            String             @id @default(uuid())
+  itemNumber    String             @unique
+  name          String             @unique
+  notes         String?
+  persons       PersonPriceLabel[]
+  productPrices ProductPrice[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 }
 
 // Explicit join table for Person <-> PriceLabel
@@ -159,13 +160,32 @@ model PersonType {
 
 // Currency management
 model Currency {
-  id         String   @id @default(uuid())
-  itemNumber String   @unique
-  name       String   @unique // e.g. "ريال يمني"
-  code       String   @unique // e.g. "YER"
-  symbol     String // e.g. "ر.ي"
-  isDefault  Boolean  @default(false)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String         @id @default(uuid())
+  itemNumber    String         @unique
+  name          String         @unique // e.g. "ريال يمني"
+  code          String         @unique // e.g. "YER"
+  symbol        String // e.g. "ر.ي"
+  isDefault     Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  productPrices ProductPrice[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+// Product prices — normalized pricing with multi-currency support
+model ProductPrice {
+  id           String     @id @default(uuid())
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceLabelId String
+  priceLabel   PriceLabel @relation(fields: [priceLabelId], references: [id], onDelete: Cascade)
+  currencyId   String
+  currency     Currency   @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  value        Float
+  unit         String? // e.g. "حبة", "كرتون"
+  quantity     Int? // number of units
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([productId, priceLabelId, currencyId])
 }

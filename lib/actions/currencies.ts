@@ -93,6 +93,12 @@ export async function updateCurrency(id: string, data: {
 
 export async function deleteCurrency(id: string) {
     try {
+        // Check if currency is linked to any product prices
+        const linkedCount = await prisma.productPrice.count({ where: { currencyId: id } })
+        if (linkedCount > 0) {
+            return { success: false, error: `لا يمكن حذف هذه العملة — مرتبطة بـ ${linkedCount} تسعيرة منتج` }
+        }
+
         await prisma.currency.delete({ where: { id } })
         revalidatePath('/currencies')
         return { success: true }

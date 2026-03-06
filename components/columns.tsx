@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, ChevronRight, Layers, Wallet, Coins } from "lucide-react"
 import { softDeletePerson, hardDeletePerson, togglePersonActive } from "@/lib/actions/persons"
-import { ContactItem } from "@/lib/person-types"
+import { ContactRecord } from "@/lib/person-types"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { PersonSheet } from "@/components/persons/person-sheet"
@@ -48,13 +48,13 @@ const formatPhoneNumber = (phone: string) => {
     return phone
 }
 
-// Helper to extract contacts from JSON
-function getContacts(person: Person): ContactItem[] {
+// Helper to extract contacts from relation
+function getContacts(person: any): ContactRecord[] {
     if (!person.contacts || !Array.isArray(person.contacts)) return []
-    return person.contacts as unknown as ContactItem[]
+    return person.contacts as ContactRecord[]
 }
 
-function getContactsByType(contacts: ContactItem[], type: string): ContactItem[] {
+function getContactsByType(contacts: ContactRecord[], type: string): ContactRecord[] {
     return contacts.filter(c => c.type === type)
 }
 

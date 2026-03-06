@@ -61,27 +61,31 @@ async function main() {
         {
             id: 'seed-customer-001',
             name: 'أحمد القحطاني',
-            contacts: [
-                { type: 'phone', value: '+966500000001', label: 'شخصي', isPrimary: true }
-            ],
             isActive: true,
         },
         {
             id: 'seed-customer-002',
             name: 'سارة العتيبي',
-            contacts: [
-                { type: 'phone', value: '+966500000002', label: 'شخصي', isPrimary: true }
-            ],
             isActive: true,
         }
     ]
+
+    const personContacts: Record<string, { type: string; value: string; label: string; isPrimary: boolean }[]> = {
+        'seed-customer-001': [{ type: 'phone', value: '+966500000001', label: 'شخصي', isPrimary: true }],
+        'seed-customer-002': [{ type: 'phone', value: '+966500000002', label: 'شخصي', isPrimary: true }],
+    }
 
     console.log('\n👥 Seeding Persons...')
     for (const c of persons) {
         const person = await prisma.person.upsert({
             where: { id: c.id },
             update: {},
-            create: c,
+            create: {
+                ...c,
+                contacts: {
+                    create: personContacts[c.id] || []
+                }
+            },
         })
         console.log(`  └─ Created/Updated person: ${person.name}`)
     }

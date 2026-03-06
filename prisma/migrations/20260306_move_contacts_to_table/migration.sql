@@ -1,0 +1,2 @@
+-- Manual migration: Contact table created and data migrated via migrate_contacts.js
+-- This migration is empty because changes were applied manually.

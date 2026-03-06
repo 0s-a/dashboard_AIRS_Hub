@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import { columns, customGlobalFilterFn } from "./columns"
 import { VariantsList } from "@/components/inventory/variants-list"
@@ -10,10 +10,23 @@ interface InventoryTableProps {
 }
 
 export function InventoryTable({ products }: InventoryTableProps) {
+    const [isMounted, setIsMounted] = useState(false)
+
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
+
     const tableData = useMemo(() => {
-        // Clone and ensure variants/colors arrays are safely handled to prevent mutation
         return products.map(p => ({ ...p }))
     }, [products])
+
+    if (!isMounted) {
+        return (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+                جاري تحميل الجدول...
+            </div>
+        )
+    }
 
     return (
         <DataTable

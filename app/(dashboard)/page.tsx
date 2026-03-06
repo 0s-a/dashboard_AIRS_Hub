@@ -14,12 +14,14 @@ const getDashboardData = unstable_cache(
             productCount,
             personCount,
             activePersonCount,
+            groupCount,
             recentProducts,
             recentPersons
         ] = await Promise.all([
             prisma.product.count(),
             prisma.person.count(),
             prisma.person.count({ where: { isActive: true } }),
+            prisma.group.count(),
             // Get recent products (last 5)
             prisma.product.findMany({
                 take: 5,
@@ -32,21 +34,21 @@ const getDashboardData = unstable_cache(
                     },
                 },
             }),
-            // Get recent persons (last 5) - optimized with specific fields only
+            // Get recent persons (last 5) - with personType and contacts
             prisma.person.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 select: {
                     id: true,
                     name: true,
-                    contacts: true,
+                    contacts: { select: { id: true, type: true, value: true, isPrimary: true } },
+                    personType: { select: { id: true, name: true, color: true, icon: true } },
                     isActive: true,
-                    createdAt: true
+                    createdAt: true,
                 }
             })
         ])
 
-        // Low stock count (mock for now)
         const lowStockCount = 0
 
 
@@ -58,6 +60,7 @@ const getDashboardData = unstable_cache(
                 productCount,
                 personCount,
                 activePersonCount,
+                groupCount,
                 lowStockCount
             },
             recentProducts: recentProducts.map((p: any) => ({
@@ -154,6 +157,13 @@ export default async function DashboardPage() {
                     iconName="trending-up"
                     description="شخص نشط"
                     colorScheme="green"
+                />
+                <StatCard
+                    title="عدد المجموعات"
+                    value={stats.groupCount}
+                    iconName="layers"
+                    description="مجموعة مسجلة"
+                    colorScheme="purple"
                 />
                 <StatCard
                     title="مخزون منخفض"

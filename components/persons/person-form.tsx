@@ -25,7 +25,7 @@ import { createPerson, updatePerson } from "@/lib/actions/persons"
 import { getPersonTypes } from "@/lib/actions/person-types"
 import { getPriceLabels } from "@/lib/actions/price-labels"
 import { getActiveCurrencies } from "@/lib/actions/currencies"
-import { ContactItem } from "@/lib/person-types"
+import { ContactInput } from "@/lib/person-types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Person } from "@prisma/client"
@@ -91,8 +91,15 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
         })
     }, [])
 
-    // Parse existing contacts from person
-    const existingContacts = (person?.contacts as ContactItem[] | null) || []
+    // Parse existing contacts from person (relational — has id, type, value, label, isPrimary)
+    const existingContacts: ContactInput[] = Array.isArray((person as any)?.contacts)
+        ? (person as any).contacts.map((c: any) => ({
+            type: c.type as 'phone' | 'email' | 'whatsapp',
+            value: c.value,
+            label: c.label || '',
+            isPrimary: c.isPrimary,
+        }))
+        : []
     const existingTags = (person?.tags as string[] | null) || []
 
     const form = useForm<FormValues>({
@@ -127,7 +134,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                 : null
 
             // Clean contacts
-            const cleanContacts: ContactItem[] = (values.contacts || [])
+            const cleanContacts: ContactInput[] = (values.contacts || [])
                 .filter(c => c.value.trim() !== "")
                 .map(c => ({
                     type: c.type,

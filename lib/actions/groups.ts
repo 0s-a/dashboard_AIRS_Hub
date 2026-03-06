@@ -8,7 +8,13 @@ export async function getGroups() {
         const groups = await prisma.group.findMany({
             include: {
                 person: {
-                    select: { id: true, name: true, type: true }
+                    select: {
+                        id: true,
+                        name: true,
+                        type: true,
+                        personType: { select: { id: true, name: true, color: true, icon: true } },
+                        contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
+                    }
                 }
             },
             orderBy: { createdAt: 'desc' }
@@ -27,7 +33,8 @@ export async function getGroup(id: string) {
             include: {
                 person: {
                     include: {
-                        personType: true
+                        personType: true,
+                        contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
                     }
                 }
             }

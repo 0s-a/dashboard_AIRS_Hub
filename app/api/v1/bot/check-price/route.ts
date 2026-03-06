@@ -37,10 +37,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
-        // 3. Find person by phone number and get their price labels
+        // 3. Find person by phone number (via Contact relation)
         const person = await prisma.person.findFirst({
             where: {
-                contacts: { path: ['phones'], array_contains: phoneNumber },
+                contacts: {
+                    some: {
+                        type: 'phone',
+                        value: phoneNumber,
+                    }
+                }
             },
             include: {
                 priceLabels: {

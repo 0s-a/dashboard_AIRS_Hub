@@ -46,7 +46,7 @@ model Person {
   personType      PersonType?        @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
   type            String?            @default("عادي")
   source          String?
-  contacts        Json? // [{type: "phone"|"email"|"whatsapp", value, label, isPrimary}]
+  contacts        Contact[]
   tags            Json? // ["tag1", "tag2"]
   currencies      Json? // ["currency-uuid-1", "currency-uuid-2"]
   isActive        Boolean            @default(true)
@@ -156,6 +156,20 @@ model PersonType {
   persons     Person[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Contact information (phone, email, whatsapp) — normalized
+model Contact {
+  id        String   @id @default(uuid())
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  type      String // "phone" | "email" | "whatsapp"
+  value     String // the actual number or email
+  label     String? // "جوال", "عمل", etc.
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([type, value])
 }
 
 // Currency management

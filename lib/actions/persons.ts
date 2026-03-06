@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { ContactItem } from '@/lib/person-types'
+import type { ContactInput } from '@/lib/person-types'
 
 export async function softDeletePerson(id: string) {
     try {
@@ -56,7 +56,7 @@ export async function getPersons() {
                 notes: true,
                 type: true,
                 source: true,
-                contacts: true,
+                contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
                 tags: true,
                 currencies: true,
                 isActive: true,
@@ -85,7 +85,7 @@ export interface CreatePersonData {
     notes?: string | null
     type?: string | null
     source?: string | null
-    contacts?: ContactItem[] | null
+    contacts?: ContactInput[] | null
     tags?: string[] | null
     personTypeId?: string | null
     priceLabelIds?: string[] | null
@@ -102,7 +102,14 @@ export async function createPerson(data: CreatePersonData) {
                 type: data.type || 'عادي',
                 personTypeId: data.personTypeId,
                 source: data.source,
-                contacts: data.contacts as any,
+                contacts: data.contacts && data.contacts.length > 0 ? {
+                    create: data.contacts.filter(c => c.value?.trim()).map(c => ({
+                        type: c.type,
+                        value: c.value.trim(),
+                        label: c.label || null,
+                        isPrimary: c.isPrimary || false,
+                    }))
+                } : undefined,
                 tags: data.tags as any,
                 currencies: data.currencyIds as any,
                 lastInteraction: new Date(),
@@ -115,8 +122,11 @@ export async function createPerson(data: CreatePersonData) {
         })
         revalidatePath('/dashboard/persons')
         return { success: true, data: person }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to create person:', error)
+        if (error?.code === 'P2002' && error?.meta?.target?.includes('value')) {
+            return { success: false, error: 'رقم الهاتف أو البريد مسجل بالفعل لشخص آخر' }
+        }
         return { success: false, error: 'تعذّر إنشاء الشخص' }
     }
 }
@@ -127,7 +137,7 @@ export interface UpdatePersonData {
     notes?: string | null
     type?: string | null
     source?: string | null
-    contacts?: ContactItem[] | null
+    contacts?: ContactInput[] | null
     tags?: string[] | null
     personTypeId?: string | null
     priceLabelIds?: string[] | null
@@ -145,13 +155,23 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                 type: data.type,
                 personTypeId: data.personTypeId,
                 source: data.source,
-                contacts: data.contacts !== undefined ? data.contacts as any : undefined,
+                ...(data.contacts !== undefined && {
+                    contacts: {
+                        deleteMany: {},
+                        create: (data.contacts || []).filter(c => c.value?.trim()).map(c => ({
+                            type: c.type,
+                            value: c.value.trim(),
+                            label: c.label || null,
+                            isPrimary: c.isPrimary || false,
+                        }))
+                    }
+                }),
                 tags: data.tags !== undefined ? data.tags as any : undefined,
                 currencies: data.currencyIds !== undefined ? data.currencyIds as any : undefined,
                 lastInteraction: new Date(),
                 ...(data.priceLabelIds !== undefined && {
                     priceLabels: {
-                        deleteMany: {}, // Clear existing
+                        deleteMany: {},
                         create: data.priceLabelIds ? data.priceLabelIds.map(pid => ({
                             priceLabel: { connect: { id: pid } }
                         })) : []
@@ -161,8 +181,11 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
         })
         revalidatePath('/dashboard/persons')
         return { success: true, data: person }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to update person:', error)
+        if (error?.code === 'P2002' && error?.meta?.target?.includes('value')) {
+            return { success: false, error: 'رقم الهاتف أو البريد مسجل بالفعل لشخص آخر' }
+        }
         return { success: false, error: 'تعذّر تحديث بيانات الشخص' }
     }
 }

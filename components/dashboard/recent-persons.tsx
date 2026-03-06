@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Phone, Mail } from "lucide-react"
 import Link from "next/link"
-import { ContactItem, getPrimaryContact } from "@/lib/person-types"
+import { ContactRecord } from "@/lib/person-types"
 
 interface Person {
     id: string
@@ -19,7 +19,7 @@ interface RecentPersonsProps {
     persons: Person[]
 }
 
-function getPrimaryPhone(contacts: ContactItem[] | null): string | null {
+function getPrimaryPhone(contacts: ContactRecord[] | null): string | null {
     if (!contacts || !Array.isArray(contacts)) return null
     const primary = contacts.find(c => c.type === 'phone' && c.isPrimary)
     if (primary) return primary.value
@@ -27,7 +27,7 @@ function getPrimaryPhone(contacts: ContactItem[] | null): string | null {
     return first?.value || null
 }
 
-function getPrimaryEmail(contacts: ContactItem[] | null): string | null {
+function getPrimaryEmail(contacts: ContactRecord[] | null): string | null {
     if (!contacts || !Array.isArray(contacts)) return null
     const primary = contacts.find(c => c.type === 'email' && c.isPrimary)
     if (primary) return primary.value

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useState, useEffect } from "react"
 import { Moon, Sun, Laptop } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -13,7 +14,20 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function ModeToggle() {
+    const [mounted, setMounted] = useState(false)
     const { setTheme } = useTheme()
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    if (!mounted) {
+        return (
+            <Button variant="outline" size="icon" className="rounded-xl bg-muted/30 border-border/50 opacity-50">
+                <span className="sr-only">جاري تحميل الوضع</span>
+            </Button>
+        )
+    }
 
     return (
         <DropdownMenu>

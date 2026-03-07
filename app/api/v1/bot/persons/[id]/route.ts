@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
 
 const BOT_API_KEY = process.env.BOT_API_KEY
 
@@ -7,8 +8,30 @@ const PERSON_INCLUDE = {
     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
     personType: { select: { id: true, name: true, color: true, icon: true } },
     priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
-    groups: { select: { id: true, name: true, number: true } },
 }
+
+// Zod Schemas for Validation
+const contactSchema = z.object({
+    type: z.string().min(1, 'نوع التواصل مطلوب'),
+    value: z.string().min(1, 'قيمة التواصل مطلوبة'),
+    label: z.string().nullable().optional(),
+    isPrimary: z.boolean().default(false),
+})
+
+const updatePersonSchema = z.object({
+    name: z.string().min(1, 'الاسم مطلوب').optional(),
+    address: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    personTypeId: z.string().nullable().optional(),
+    source: z.string().nullable().optional(),
+    contacts: z.array(contactSchema).optional(),
+    tags: z.any().optional(),
+    currencyIds: z.array(z.string()).optional(),
+    groupName: z.string().nullable().optional(),
+    groupNumber: z.string().nullable().optional(),
+    priceLabelIds: z.array(z.string()).optional(),
+    isActive: z.boolean().optional(),
+})
 
 // GET /api/v1/bot/persons/[id] — Get single person
 export async function GET(
@@ -50,7 +73,18 @@ export async function PUT(
 
     try {
         const { id } = await params
-        const body = await req.json()
+        const rawBody = await req.json()
+        
+        // Zod Validation
+        const validationResult = updatePersonSchema.safeParse(rawBody)
+        if (!validationResult.success) {
+            return NextResponse.json({ 
+                error: 'البيانات غير صالحة', 
+                details: validationResult.error.format() 
+            }, { status: 400 })
+        }
+        
+        const body = validationResult.data
 
         // Check person exists
         const existing = await prisma.person.findUnique({ where: { id } })
@@ -64,15 +98,15 @@ export async function PUT(
                 ...(body.name !== undefined && { name: body.name }),
                 ...(body.address !== undefined && { address: body.address }),
                 ...(body.notes !== undefined && { notes: body.notes }),
-                ...(body.type !== undefined && { type: body.type }),
                 ...(body.source !== undefined && { source: body.source }),
                 ...(body.personTypeId !== undefined && { personTypeId: body.personTypeId || null }),
+                ...(body.isActive !== undefined && { isActive: body.isActive }),
                 ...(body.contacts !== undefined && {
                     contacts: {
                         deleteMany: {},
-                        create: (body.contacts || [])
-                            .filter((c: any) => c.value?.trim())
-                            .map((c: any) => ({
+                        create: body.contacts
+                            .filter(c => c.value?.trim())
+                            .map(c => ({
                                 type: c.type,
                                 value: c.value.trim(),
                                 label: c.label || null,
@@ -80,8 +114,10 @@ export async function PUT(
                             }))
                     }
                 }),
-                ...(body.tags !== undefined && { tags: body.tags }),
-                ...(body.currencyIds !== undefined && { currencies: body.currencyIds }),
+                ...(body.tags !== undefined && { tags: body.tags ? body.tags : undefined }),
+                ...(body.currencyIds !== undefined && { currencies: body.currencyIds ? body.currencyIds : undefined }),
+                ...(body.groupName !== undefined && { groupName: body.groupName || null }),
+                ...(body.groupNumber !== undefined && { groupNumber: body.groupNumber || null }),
                 ...(body.priceLabelIds !== undefined && {
                     priceLabels: {
                         deleteMany: {},

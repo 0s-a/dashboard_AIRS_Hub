@@ -54,16 +54,16 @@ export async function getPersons() {
                 name: true,
                 address: true,
                 notes: true,
-                type: true,
                 source: true,
                 contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
                 tags: true,
                 currencies: true,
+                groupName: true,
+                groupNumber: true,
                 isActive: true,
                 lastInteraction: true,
                 createdAt: true,
                 updatedAt: true,
-                groups: true,
                 personType: true,
                 priceLabels: {
                     include: {
@@ -83,24 +83,35 @@ export interface CreatePersonData {
     name: string
     address?: string | null
     notes?: string | null
-    type?: string | null
     source?: string | null
     contacts?: ContactInput[] | null
     tags?: string[] | null
     personTypeId?: string | null
     priceLabelIds?: string[] | null
     currencyIds?: string[] | null
+    groupName?: string | null
+    groupNumber?: string | null
 }
 
 export async function createPerson(data: CreatePersonData) {
     try {
+        let finalPersonTypeId = data.personTypeId || null
+
+        if (!finalPersonTypeId) {
+            const defaultType = await prisma.personType.findFirst({
+                where: { isDefault: true }
+            })
+            if (defaultType) {
+                finalPersonTypeId = defaultType.id
+            }
+        }
+
         const person = await prisma.person.create({
             data: {
                 name: data.name,
                 address: data.address,
                 notes: data.notes,
-                type: data.type || 'عادي',
-                personTypeId: data.personTypeId,
+                personTypeId: finalPersonTypeId,
                 source: data.source,
                 contacts: data.contacts && data.contacts.length > 0 ? {
                     create: data.contacts.filter(c => c.value?.trim()).map(c => ({
@@ -112,6 +123,8 @@ export async function createPerson(data: CreatePersonData) {
                 } : undefined,
                 tags: data.tags as any,
                 currencies: data.currencyIds as any,
+                groupName: data.groupName || null,
+                groupNumber: data.groupNumber || null,
                 lastInteraction: new Date(),
                 priceLabels: data.priceLabelIds && data.priceLabelIds.length > 0 ? {
                     create: data.priceLabelIds.map(id => ({
@@ -135,13 +148,14 @@ export interface UpdatePersonData {
     name?: string
     address?: string | null
     notes?: string | null
-    type?: string | null
     source?: string | null
     contacts?: ContactInput[] | null
     tags?: string[] | null
     personTypeId?: string | null
     priceLabelIds?: string[] | null
     currencyIds?: string[] | null
+    groupName?: string | null
+    groupNumber?: string | null
 }
 
 export async function updatePerson(id: string, data: UpdatePersonData) {
@@ -152,8 +166,7 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                 name: data.name,
                 address: data.address,
                 notes: data.notes,
-                type: data.type,
-                personTypeId: data.personTypeId,
+                personTypeId: data.personTypeId !== undefined ? data.personTypeId || null : undefined,
                 source: data.source,
                 ...(data.contacts !== undefined && {
                     contacts: {
@@ -168,6 +181,8 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                 }),
                 tags: data.tags !== undefined ? data.tags as any : undefined,
                 currencies: data.currencyIds !== undefined ? data.currencyIds as any : undefined,
+                groupName: data.groupName !== undefined ? data.groupName || null : undefined,
+                groupNumber: data.groupNumber !== undefined ? data.groupNumber || null : undefined,
                 lastInteraction: new Date(),
                 ...(data.priceLabelIds !== undefined && {
                     priceLabels: {

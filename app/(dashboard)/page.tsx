@@ -14,14 +14,12 @@ const getDashboardData = unstable_cache(
             productCount,
             personCount,
             activePersonCount,
-            groupCount,
             recentProducts,
             recentPersons
         ] = await Promise.all([
             prisma.product.count(),
             prisma.person.count(),
             prisma.person.count({ where: { isActive: true } }),
-            prisma.group.count(),
             // Get recent products (last 5)
             prisma.product.findMany({
                 take: 5,
@@ -60,7 +58,6 @@ const getDashboardData = unstable_cache(
                 productCount,
                 personCount,
                 activePersonCount,
-                groupCount,
                 lowStockCount
             },
             recentProducts: recentProducts.map((p: any) => ({
@@ -158,13 +155,7 @@ export default async function DashboardPage() {
                     description="شخص نشط"
                     colorScheme="green"
                 />
-                <StatCard
-                    title="عدد المجموعات"
-                    value={stats.groupCount}
-                    iconName="layers"
-                    description="مجموعة مسجلة"
-                    colorScheme="purple"
-                />
+
                 <StatCard
                     title="مخزون منخفض"
                     value={stats.lowStockCount}

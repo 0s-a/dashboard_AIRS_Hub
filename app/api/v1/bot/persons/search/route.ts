@@ -7,7 +7,6 @@ const PERSON_INCLUDE = {
     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
     personType: { select: { id: true, name: true, color: true, icon: true } },
     priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
-    groups: { select: { id: true, name: true, number: true, category: true, isActive: true } },
 }
 
 // GET /api/v1/bot/persons/search?q=xxx or ?value=xxx or ?phone=xxx

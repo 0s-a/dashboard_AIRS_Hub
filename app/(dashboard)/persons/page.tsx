@@ -3,8 +3,7 @@ import { columns } from "../../../components/columns"
 import { getPersons } from "@/lib/actions/persons"
 import { getCurrencies } from "@/lib/actions/currencies"
 import { PersonSheet } from "@/components/persons/person-sheet"
-import { Users, UserCheck, UserPlus, Layers } from "lucide-react"
-import { PersonExpandedRow } from "./components/person-expanded-row"
+import { Users, UserCheck, UserPlus } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -25,7 +24,6 @@ export default async function CRMPage() {
     
     const totalPersons = persons.length
     const activePersons = persons.filter(p => p.isActive).length
-    const withGroups = persons.filter(p => p.groups && p.groups.length > 0).length
     
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -53,13 +51,6 @@ export default async function CRMPage() {
             color: "text-violet-600",
             bgColor: "bg-violet-500/10",
         },
-        {
-            label: "مرتبطون بمجموعات",
-            value: withGroups,
-            icon: Layers,
-            color: "text-amber-600",
-            bgColor: "bg-amber-500/10",
-        },
     ]
 
     return (
@@ -78,7 +69,7 @@ export default async function CRMPage() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {stats.map((stat, i) => (
                     <div key={i} className="rounded-2xl border bg-card p-6 shadow-sm flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/20 group">
                         <div className={`p-3 rounded-xl ${stat.bgColor} ${stat.color} group-hover:scale-110 transition-transform`}>
@@ -102,7 +93,6 @@ export default async function CRMPage() {
                         { id: "isActive", label: "الحالة (نشط/غير نشط)" },
                         { id: "source", label: "المصدر" },
                     ]}
-                    renderSubComponent={PersonExpandedRow}
                 />
             </main>
         </div>

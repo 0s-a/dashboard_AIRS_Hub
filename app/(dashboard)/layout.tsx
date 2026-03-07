@@ -56,7 +56,7 @@ export default function DashboardLayout({
             title: "العملاء والشركاء",
             items: [
                 { href: "/persons", label: "الأشخاص", icon: Users },
-                { href: "/groups", label: "المجموعات", icon: UserSquare2 },
+
                 { href: "/person-types", label: "أنواع الأشخاص", icon: UserCog },
             ]
         },

@@ -44,32 +44,19 @@ model Person {
   notes           String?
   personTypeId    String?
   personType      PersonType?        @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
-  type            String?            @default("عادي")
   source          String?
   contacts        Contact[]
   tags            Json? // ["tag1", "tag2"]
   currencies      Json? // ["currency-uuid-1", "currency-uuid-2"]
+  groupName       String?
+  groupNumber     String?
   isActive        Boolean            @default(true)
   lastInteraction DateTime           @default(now())
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
-  groups          Group[]
   priceLabels     PersonPriceLabel[]
 
   @@map("Person")
-}
-
-model Group {
-  id        String   @id @default(uuid())
-  name      String
-  number    String   @unique
-  tags      Json? // ["tag1", "tag2", ...]
-  isActive  Boolean  @default(true)
-  category  String?
-  personId  String?
-  person    Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 // Pure image storage — no product-specific data
@@ -153,6 +140,7 @@ model PersonType {
   color       String?  @default("#64748b")
   icon        String?  @default("User")
   notes       String?
+  isDefault   Boolean  @default(false)
   persons     Person[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

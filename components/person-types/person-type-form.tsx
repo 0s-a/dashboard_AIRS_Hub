@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { createPersonType, updatePersonType } from "@/lib/actions/person-types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -25,6 +26,7 @@ interface PersonType {
     color: string | null
     icon: string | null
     notes: string | null
+    isDefault: boolean
     createdAt: Date
     updatedAt: Date
 }
@@ -35,6 +37,7 @@ const formSchema = z.object({
     color: z.string().nullable().optional(),
     icon: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
+    isDefault: z.boolean().default(false),
 })
 
 interface PersonTypeFormProps {
@@ -53,6 +56,7 @@ export function PersonTypeForm({ personType, onSuccess }: PersonTypeFormProps) {
             color: personType?.color || "#64748b",
             icon: personType?.icon || "User",
             notes: personType?.notes || "",
+            isDefault: personType?.isDefault || false,
         },
     })
 
@@ -163,6 +167,27 @@ export function PersonTypeForm({ personType, onSuccess }: PersonTypeFormProps) {
                                 />
                             </FormControl>
                             <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="isDefault"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <FormLabel className="text-base">النوع الافتراضي</FormLabel>
+                                <div className="text-sm text-muted-foreground">
+                                    جعل هذا النوع هو الافتراضي عند إضافة أشخاص جدد
+                                </div>
+                            </div>
+                            <FormControl>
+                                <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                />
+                            </FormControl>
                         </FormItem>
                     )}
                 />

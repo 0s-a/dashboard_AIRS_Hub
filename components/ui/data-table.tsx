@@ -51,6 +51,16 @@ interface DataTableProps<TData, TValue> {
     globalFilterFn?: (row: any, columnId: string, filterValue: string) => boolean
 }
 
+// Pre-compute row model factories outside the component to avoid
+// re-creating them on every render (which triggers state updates
+// before mount and causes the React warning).
+const coreRowModel = getCoreRowModel()
+const filteredRowModel = getFilteredRowModel()
+const paginationRowModel = getPaginationRowModel()
+const sortedRowModel = getSortedRowModel()
+const groupedRowModel = getGroupedRowModel()
+const expandedRowModel = getExpandedRowModel()
+
 export function DataTable<TData, TValue>({
     columns,
     data,
@@ -91,12 +101,12 @@ export function DataTable<TData, TValue>({
         onSortingChange: setSorting,
         onGroupingChange: setGrouping,
         onExpandedChange: setExpanded,
-        getCoreRowModel: getCoreRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getGroupedRowModel: getGroupedRowModel(),
-        getExpandedRowModel: getExpandedRowModel(),
+        getCoreRowModel: coreRowModel,
+        getFilteredRowModel: filteredRowModel,
+        getPaginationRowModel: paginationRowModel,
+        getSortedRowModel: sortedRowModel,
+        getGroupedRowModel: groupedRowModel,
+        getExpandedRowModel: expandedRowModel,
         getRowCanExpand: () => true,
         globalFilterFn: globalFilterFn,
     })

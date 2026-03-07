@@ -33,8 +33,15 @@ export async function createPersonType(data: {
     color?: string | null
     icon?: string | null
     notes?: string | null
+    isDefault?: boolean
 }) {
     try {
+        if (data.isDefault) {
+            await (prisma as any).personType.updateMany({
+                where: { isDefault: true },
+                data: { isDefault: false }
+            })
+        }
         const type = await (prisma as any).personType.create({
             data: {
                 name: data.name,
@@ -42,6 +49,7 @@ export async function createPersonType(data: {
                 color: data.color,
                 icon: data.icon,
                 notes: data.notes,
+                isDefault: data.isDefault || false,
             }
         })
         revalidatePath('/person-types')
@@ -61,8 +69,15 @@ export async function updatePersonType(id: string, data: {
     color?: string | null
     icon?: string | null
     notes?: string | null
+    isDefault?: boolean
 }) {
     try {
+        if (data.isDefault) {
+            await (prisma as any).personType.updateMany({
+                where: { id: { not: id }, isDefault: true },
+                data: { isDefault: false }
+            })
+        }
         const type = await (prisma as any).personType.update({
             where: { id },
             data: {
@@ -71,6 +86,7 @@ export async function updatePersonType(id: string, data: {
                 color: data.color,
                 icon: data.icon,
                 notes: data.notes,
+                ...(data.isDefault !== undefined && { isDefault: data.isDefault }),
             }
         })
         revalidatePath('/person-types')

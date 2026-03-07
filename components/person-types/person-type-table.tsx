@@ -10,6 +10,7 @@ interface PersonType {
     color: string | null
     icon: string | null
     notes: string | null
+    isDefault: boolean
     createdAt: Date
     updatedAt: Date
 }

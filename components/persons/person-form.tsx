@@ -29,7 +29,7 @@ import { ContactInput } from "@/lib/person-types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Person } from "@prisma/client"
-import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins } from "lucide-react"
+import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins, UsersRound } from "lucide-react"
 import { useState, useEffect } from "react"
 import { MultiSelect, OptionType } from "@/components/ui/multi-select"
 
@@ -45,12 +45,13 @@ const formSchema = z.object({
     address: z.string().optional(),
     notes: z.string().optional(),
     personTypeId: z.string().optional(),
-    type: z.string().optional(), // backward compatibility
     source: z.string().optional(),
     contacts: z.array(contactSchema),
     tags: z.string().optional(),
     priceLabelIds: z.array(z.string()).optional(),
     currencyIds: z.array(z.string()).optional(),
+    groupName: z.string().optional(),
+    groupNumber: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -109,7 +110,6 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
             address: person?.address || "",
             notes: person?.notes || "",
             personTypeId: person?.personTypeId || "",
-            type: person?.type || "عادي",
             source: person?.source || "",
             contacts: existingContacts.length > 0
                 ? existingContacts.map(c => ({ ...c, label: c.label || "" }))
@@ -117,6 +117,8 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
             tags: existingTags.join("، "),
             priceLabelIds: (person as any)?.priceLabels?.map((pl: any) => pl.priceLabelId) || [],
             currencyIds: (person?.currencies as string[] | null) || [],
+            groupName: (person as any)?.groupName || "",
+            groupNumber: (person as any)?.groupNumber || "",
         },
     })
 
@@ -148,12 +150,13 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                 address: values.address || null,
                 notes: values.notes || null,
                 personTypeId: values.personTypeId || null,
-                type: values.type || "عادي",
                 source: values.source || null,
                 contacts: cleanContacts.length > 0 ? cleanContacts : null,
                 tags: parsedTags && parsedTags.length > 0 ? parsedTags : null,
                 priceLabelIds: values.priceLabelIds || null,
                 currencyIds: values.currencyIds && values.currencyIds.length > 0 ? values.currencyIds : null,
+                groupName: values.groupName || null,
+                groupNumber: values.groupNumber || null,
             }
 
             let res;
@@ -218,11 +221,8 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                     <Select onValueChange={(val) => {
                                         if (val === "__none__") {
                                             field.onChange("")
-                                            form.setValue("type", "عادي")
                                         } else {
                                             field.onChange(val)
-                                            const selectedType = personTypes.find(pt => pt.id === val)
-                                            if (selectedType) form.setValue("type", selectedType.name)
                                         }
                                     }} value={field.value || ""}>
                                         <FormControl>
@@ -324,6 +324,40 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                             placeholder="اختر عملة أو أكثر"
                                             emptyMessage="لا توجد عملات مضافة"
                                         />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <FormField
+                            control={form.control}
+                            name="groupName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                                        <UsersRound className="h-3 w-3" />
+                                        اسم المجموعة
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="مثال: كبار الشخصيات" {...field} className="h-9" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="groupNumber"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                                        رقم المجموعة
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="مثال: G-100" {...field} className="h-9 font-mono" dir="ltr" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

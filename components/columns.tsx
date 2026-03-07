@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { Person } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, ChevronRight, Layers, Wallet, Coins } from "lucide-react"
+import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, Wallet, Coins, UsersRound } from "lucide-react"
 import { softDeletePerson, hardDeletePerson, togglePersonActive } from "@/lib/actions/persons"
 import { ContactRecord } from "@/lib/person-types"
 import { toast } from "sonner"
@@ -90,29 +90,6 @@ function copyToClipboard(text: string) {
 
 export const columns: ColumnDef<Person>[] = [
     // ──────────────────────────────────────
-    // Column 0: Expander
-    // ──────────────────────────────────────
-    {
-        id: "expander",
-        header: () => null,
-        cell: ({ row }) => {
-            const groups = (row.original as any).groups || []
-            if (groups.length === 0) return null
-
-            return (
-                <button
-                    onClick={row.getToggleExpandedHandler()}
-                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted text-muted-foreground transition-colors"
-                    title={row.getIsExpanded() ? "طي المجموعات" : "عرض المجموعات"}
-                >
-                    <ChevronRight 
-                        className={`h-4 w-4 transition-transform duration-200 ${row.getIsExpanded() ? "rotate-90 rtl:-rotate-90" : "rtl:rotate-180"}`} 
-                    />
-                </button>
-            )
-        },
-    },
-    // ──────────────────────────────────────
     // Column 1: Person Name + Avatar
     // ──────────────────────────────────────
     {
@@ -120,7 +97,6 @@ export const columns: ColumnDef<Person>[] = [
         header: "الشخص",
         cell: ({ row }) => {
             const name = row.getValue("name") as string
-            const groups = (row.original as any).groups || []
             const tags = (row.original.tags as string[] | null) || []
             const initials = name ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : "??"
 
@@ -144,19 +120,40 @@ export const columns: ColumnDef<Person>[] = [
                     </Avatar>
                     <div className="flex flex-col gap-1 min-w-0">
                         <span className="font-semibold text-sm truncate max-w-[160px]">{name || "بدون اسم"}</span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            {groups.length > 0 && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
-                                    <Layers className="h-3 w-3" />
-                                    {groups.length} مجموعات
-                                </span>
-                            )}
-                            {tags.slice(0, 2).map((tag, i) => (
-                                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/5 text-blue-600 dark:text-blue-400 border border-blue-500/10">
-                                    {tag}
-                                </span>
-                            ))}
-                        </div>
+                        {tags.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                {tags.slice(0, 2).map((tag, i) => (
+                                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/5 text-blue-600 dark:text-blue-400 border border-blue-500/10">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )
+        }
+    },
+
+    // ──────────────────────────────────────
+    // Column 1.5: Group (inline from Person)
+    // ──────────────────────────────────────
+    {
+        id: "group",
+        header: "المجموعة",
+        cell: ({ row }) => {
+            const groupName = (row.original as any).groupName
+            const groupNumber = (row.original as any).groupNumber
+            if (!groupName && !groupNumber) return <span className="text-muted-foreground text-xs text-center block">-</span>
+
+            return (
+                <div className="flex items-center gap-1.5">
+                    <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <UsersRound className="size-3.5 text-primary" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        {groupName && <span className="text-xs font-semibold truncate max-w-[120px]">{groupName}</span>}
+                        {groupNumber && <span className="text-[10px] font-mono text-muted-foreground">{groupNumber}</span>}
                     </div>
                 </div>
             )
@@ -169,7 +166,7 @@ export const columns: ColumnDef<Person>[] = [
         cell: ({ row }) => {
             const person = row.original as any
             const personType = person.personType
-            const typeName = personType?.name || person.type || 'عادي'
+            const typeName = personType?.name || 'عادي'
             const color = personType?.color || "#64748b"
             const iconName = personType?.icon || "User"
             const TypeIcon = getIcon(iconName)

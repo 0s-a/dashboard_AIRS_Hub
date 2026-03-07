@@ -24,6 +24,7 @@ export function ModeToggle() {
     if (!mounted) {
         return (
             <Button variant="outline" size="icon" className="rounded-xl bg-muted/30 border-border/50 opacity-50">
+                <Sun className="h-[1.2rem] w-[1.2rem] text-muted-foreground" />
                 <span className="sr-only">جاري تحميل الوضع</span>
             </Button>
         )

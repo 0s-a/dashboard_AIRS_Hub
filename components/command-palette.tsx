@@ -88,11 +88,11 @@ export function CommandPalette() {
             <Button
                 variant="outline"
                 onClick={() => setOpen(true)}
-                className="relative h-10 w-full max-w-[240px] justify-start gap-2 rounded-xl border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all"
+                className="relative h-9 w-9 lg:w-full lg:max-w-[240px] justify-center lg:justify-start gap-2 rounded-xl border-border/50 bg-muted/30 px-0 lg:px-3 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all shrink-0"
             >
                 <Search className="h-4 w-4 shrink-0" />
                 <span className="hidden lg:inline-flex text-xs">بحث سريع...</span>
-                <kbd className="pointer-events-none mr-auto hidden h-5 select-none items-center gap-1 rounded border border-border/60 bg-muted px-1.5 font-mono text-[10px] font-medium opacity-80 sm:flex">
+                <kbd className="pointer-events-none mr-auto hidden h-5 select-none items-center gap-1 rounded border border-border/60 bg-muted px-1.5 font-mono text-[10px] font-medium opacity-80 lg:flex">
                     <span className="text-xs">⌘</span>K
                 </kbd>
             </Button>

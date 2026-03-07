@@ -4,9 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog, Coins, ArrowRight } from "lucide-react"
-import { ModeToggle } from "@/components/ui/mode-toggle"
-import { Button } from "@/components/ui/button"
-import { CommandPalette } from "@/components/command-palette"
+import { Header } from "@/components/dashboard/header"
+import { navigationGroups } from "@/lib/navigation"
 import {
     Tooltip,
     TooltipContent,
@@ -37,43 +36,6 @@ export default function DashboardLayout({
         setIsCollapsed(newState)
         localStorage.setItem("sidebar-collapsed", String(newState))
     }
-
-    const navigationGroups = [
-        {
-            title: "الرئيسية",
-            items: [
-                { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
-            ]
-        },
-        {
-            title: "إدارة المخزون",
-            items: [
-                { href: "/inventory", label: "المخزون", icon: Package },
-                { href: "/categories", label: "التصنيفات", icon: Layers },
-            ]
-        },
-        {
-            title: "العملاء والشركاء",
-            items: [
-                { href: "/persons", label: "الأشخاص", icon: Users },
-
-                { href: "/person-types", label: "أنواع الأشخاص", icon: UserCog },
-            ]
-        },
-        {
-            title: "النظام والتسعير",
-            items: [
-                { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
-                { href: "/currencies", label: "العملات", icon: Coins },
-            ]
-        },
-        {
-            title: "الوسائط",
-            items: [
-                { href: "/gallery", label: "معرض الصور", icon: Images },
-            ]
-        }
-    ]
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-background relative overflow-hidden">
@@ -179,29 +141,7 @@ export default function DashboardLayout({
                     </div>
                 </aside>
                 <div className={`flex flex-col w-full transition-all duration-300 ${isCollapsed ? 'sm:pr-20' : 'sm:pr-64'}`}>
-                    <header className="sticky z-30 flex h-20 items-center gap-4 px-6 sm:px-10 border-b glass-panel">
-                        <div className="flex-1">
-                                    <span className="text-sm font-semibold text-muted-foreground">التنقل السريع</span>
-                                    <p className="text-[9px] text-muted-foreground/60 uppercase tracking-tighter">نظام إدارة التوزيع الذكي • {new Date().toLocaleDateString('ar-SA')}</p>
-                                </div>
-                        <div className="flex items-center gap-3">
-                            <CommandPalette />
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={toggleSidebar}
-                                className="hidden sm:flex h-10 w-10 rounded-xl hover:bg-primary/5 transition-all group"
-                                title={isCollapsed ? "توسيع القائمة" : "طي القائمة"}
-                            >
-                                {isCollapsed ? (
-                                    <ChevronsLeft className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-transform group-hover:scale-110" />
-                                ) : (
-                                    <ChevronsRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-transform group-hover:scale-110" />
-                                )}
-                            </Button>
-                            <ModeToggle />
-                        </div>
-                    </header>
+                    <Header isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
                     <main className="p-8 sm:px-10 max-w-(--breakpoint-2xl) mx-auto w-full overflow-hidden">
                         {children}
                     </main>

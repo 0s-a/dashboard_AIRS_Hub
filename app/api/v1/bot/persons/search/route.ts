@@ -9,6 +9,28 @@ const PERSON_INCLUDE = {
     priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
 }
 
+// Resolve currency UUIDs (JSON) to full Currency objects
+async function resolveCurrencies(persons: any[]) {
+    const allIds = new Set<string>()
+    for (const p of persons) {
+        if (Array.isArray(p.currencies)) {
+            p.currencies.forEach((id: string) => allIds.add(id))
+        }
+    }
+    if (allIds.size === 0) return persons
+    const currencies = await prisma.currency.findMany({
+        where: { id: { in: Array.from(allIds) } },
+        select: { id: true, name: true, code: true, symbol: true },
+    })
+    const map = new Map(currencies.map(c => [c.id, c]))
+    return persons.map(p => ({
+        ...p,
+        currencies: Array.isArray(p.currencies)
+            ? p.currencies.map((id: string) => map.get(id) || { id }).filter(Boolean)
+            : [],
+    }))
+}
+
 // GET /api/v1/bot/persons/search?q=xxx or ?value=xxx or ?phone=xxx
 export async function GET(req: NextRequest) {
     const apiKey = req.headers.get('x-api-key')
@@ -59,17 +81,23 @@ export async function GET(req: NextRequest) {
             include: PERSON_INCLUDE,
         })
 
-        const firstPerson = persons[0]
-        console.log(`Search for "${q}" found ${persons.length} results`);
+        let enriched = persons
+        try {
+            enriched = await resolveCurrencies(persons)
+        } catch (currError) {
+            console.error('Currency resolution failed (non-fatal):', currError)
+        }
+        const firstPerson = enriched[0]
 
         return NextResponse.json({ 
             success: true, 
             personId: firstPerson?.id || null, 
-            data: persons, 
-            count: persons.length 
+            data: enriched, 
+            count: enriched.length 
         })
-    } catch (error) {
-        console.error('API Error [GET /persons/search]:', error)
+    } catch (error: any) {
+        console.error('API Error [GET /persons/search]:', error?.message || error)
+        console.error('Stack:', error?.stack)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }

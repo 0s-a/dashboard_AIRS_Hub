@@ -10,6 +10,30 @@ const PERSON_INCLUDE = {
     priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
 }
 
+// Resolve currency UUIDs (JSON) to full Currency objects
+async function resolveCurrencies(persons: any[]) {
+    const allIds = new Set<string>()
+    for (const p of persons) {
+        if (Array.isArray(p.currencies)) {
+            p.currencies.forEach((id: string) => allIds.add(id))
+        }
+    }
+    if (allIds.size === 0) return persons
+
+    const currencies = await prisma.currency.findMany({
+        where: { id: { in: Array.from(allIds) } },
+        select: { id: true, name: true, code: true, symbol: true },
+    })
+    const map = new Map(currencies.map(c => [c.id, c]))
+
+    return persons.map(p => ({
+        ...p,
+        currencies: Array.isArray(p.currencies)
+            ? p.currencies.map((id: string) => map.get(id) || { id }).filter(Boolean)
+            : [],
+    }))
+}
+
 // Zod Schemas for Validation
 const contactSchema = z.object({
     type: z.string().min(1, 'نوع التواصل مطلوب'),
@@ -97,9 +121,11 @@ export async function GET(req: NextRequest) {
             })
         ])
 
+        const enriched = await resolveCurrencies(persons)
+
         return NextResponse.json({ 
             success: true, 
-            data: persons, 
+            data: enriched, 
             pagination: {
                 total: totalCount,
                 page,
@@ -176,7 +202,9 @@ export async function POST(req: NextRequest) {
             include: PERSON_INCLUDE,
         })
 
-        return NextResponse.json({ success: true, data: person }, { status: 201 })
+        const [enriched] = await resolveCurrencies([person])
+
+        return NextResponse.json({ success: true, data: enriched }, { status: 201 })
     } catch (error: any) {
         console.error('API Error [POST /persons]:', error)
         if (error?.code === 'P2002' && error?.meta?.target?.includes('value')) {

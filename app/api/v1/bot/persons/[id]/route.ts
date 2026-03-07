@@ -10,6 +10,22 @@ const PERSON_INCLUDE = {
     priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
 }
 
+// Resolve currency UUIDs (JSON) to full Currency objects
+async function resolveCurrencies(person: any) {
+    if (!person || !Array.isArray(person.currencies) || person.currencies.length === 0) {
+        return { ...person, currencies: [] }
+    }
+    const currencies = await prisma.currency.findMany({
+        where: { id: { in: person.currencies } },
+        select: { id: true, name: true, code: true, symbol: true },
+    })
+    const map = new Map(currencies.map(c => [c.id, c]))
+    return {
+        ...person,
+        currencies: person.currencies.map((id: string) => map.get(id) || { id }).filter(Boolean),
+    }
+}
+
 // Zod Schemas for Validation
 const contactSchema = z.object({
     type: z.string().min(1, 'نوع التواصل مطلوب'),
@@ -54,7 +70,8 @@ export async function GET(
             return NextResponse.json({ error: 'الشخص غير موجود' }, { status: 404 })
         }
 
-        return NextResponse.json({ success: true, data: person })
+        const enriched = await resolveCurrencies(person)
+        return NextResponse.json({ success: true, data: enriched })
     } catch (error) {
         console.error('API Error [GET /persons/id]:', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
@@ -131,7 +148,8 @@ export async function PUT(
             include: PERSON_INCLUDE,
         })
 
-        return NextResponse.json({ success: true, data: person })
+        const enriched = await resolveCurrencies(person)
+        return NextResponse.json({ success: true, data: enriched })
     } catch (error: any) {
         console.error('API Error [PUT /persons/id]:', error)
         if (error?.code === 'P2002' && error?.meta?.target?.includes('value')) {

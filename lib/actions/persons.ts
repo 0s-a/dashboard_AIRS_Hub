@@ -64,6 +64,7 @@ export async function getPersons() {
                 lastInteraction: true,
                 createdAt: true,
                 updatedAt: true,
+                personTypeId: true,
                 personType: true,
                 priceLabels: {
                     include: {

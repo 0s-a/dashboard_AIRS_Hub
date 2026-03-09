@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-const BOT_API_KEY = process.env.BOT_API_KEY
+import { validateApiKey } from '@/lib/api-utils'
 
 // PATCH /api/v1/bot/persons/[id]/toggle — Toggle active/inactive
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const { id } = await params

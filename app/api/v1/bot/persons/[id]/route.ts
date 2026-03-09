@@ -1,30 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-
-const BOT_API_KEY = process.env.BOT_API_KEY
-
-const PERSON_INCLUDE = {
-    contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
-    personType: { select: { id: true, name: true, color: true, icon: true } },
-    priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
-}
-
-// Resolve currency UUIDs (JSON) to full Currency objects
-async function resolveCurrencies(person: any) {
-    if (!person || !Array.isArray(person.currencies) || person.currencies.length === 0) {
-        return { ...person, currencies: [] }
-    }
-    const currencies = await prisma.currency.findMany({
-        where: { id: { in: person.currencies } },
-        select: { id: true, name: true, code: true, symbol: true },
-    })
-    const map = new Map(currencies.map(c => [c.id, c]))
-    return {
-        ...person,
-        currencies: person.currencies.map((id: string) => map.get(id) || { id }).filter(Boolean),
-    }
-}
+import { validateApiKey, PERSON_INCLUDE, resolveCurrenciesSingle } from '@/lib/api-utils'
 
 // Zod Schemas for Validation
 const contactSchema = z.object({
@@ -54,10 +31,8 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const { id } = await params
@@ -70,7 +45,7 @@ export async function GET(
             return NextResponse.json({ error: 'الشخص غير موجود' }, { status: 404 })
         }
 
-        const enriched = await resolveCurrencies(person)
+        const enriched = await resolveCurrenciesSingle(person)
         return NextResponse.json({ success: true, data: enriched })
     } catch (error) {
         console.error('API Error [GET /persons/id]:', error)
@@ -83,10 +58,8 @@ export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const { id } = await params
@@ -148,7 +121,7 @@ export async function PUT(
             include: PERSON_INCLUDE,
         })
 
-        const enriched = await resolveCurrencies(person)
+        const enriched = await resolveCurrenciesSingle(person)
         return NextResponse.json({ success: true, data: enriched })
     } catch (error: any) {
         console.error('API Error [PUT /persons/id]:', error)
@@ -164,10 +137,8 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const { id } = await params

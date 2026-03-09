@@ -1,15 +1,10 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-const BOT_API_KEY = process.env.BOT_API_KEY
+import { validateApiKey, normalizePhonePatterns } from '@/lib/api-utils'
 
 export async function POST(req: NextRequest) {
-    // 1. Security Check
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const body = await req.json()
@@ -19,7 +14,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing phoneNumber or productId' }, { status: 400 })
         }
 
-        // 2. Get Product with prices (from ProductPrice table)
+        // Get Product with prices
         const product = await prisma.product.findUnique({
             where: { id: productId },
             include: {
@@ -37,13 +32,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         }
 
-        // 3. Find person by phone number (via Contact relation)
+        // Find person by phone number — using normalized patterns
+        const patterns = normalizePhonePatterns(phoneNumber)
         const person = await prisma.person.findFirst({
             where: {
                 contacts: {
                     some: {
-                        type: 'phone',
-                        value: phoneNumber,
+                        OR: patterns.map(p => ({
+                            value: { contains: p, mode: 'insensitive' }
+                        }))
                     }
                 }
             },
@@ -54,7 +51,7 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        // 4. Filter prices based on person's assigned price labels
+        // Filter prices based on person's assigned price labels
         let filteredPrices = product.productPrices
 
         if (person && person.priceLabels.length > 0) {
@@ -62,7 +59,7 @@ export async function POST(req: NextRequest) {
             filteredPrices = product.productPrices.filter(pp => allowedLabelIds.has(pp.priceLabelId))
         }
 
-        // 5. Format response
+        // Format response
         const prices = filteredPrices.map(pp => ({
             label: pp.priceLabel.name,
             value: pp.value,

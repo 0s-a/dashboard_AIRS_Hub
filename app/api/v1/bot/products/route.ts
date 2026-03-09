@@ -1,8 +1,6 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-const BOT_API_KEY = process.env.BOT_API_KEY
+import { validateApiKey, parsePagination, paginationMeta } from '@/lib/api-utils'
 
 const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true, icon: true } },
@@ -23,18 +21,17 @@ const PRODUCT_INCLUDE = {
     },
 }
 
-// GET /api/v1/bot/products — List products (optional ?search= &available= &category=)
+// GET /api/v1/bot/products — List products (with search, pagination, filters)
 export async function GET(req: NextRequest) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const { searchParams } = new URL(req.url)
-        const search = searchParams.get('search')
+        const search = searchParams.get('search') || searchParams.get('q')
         const available = searchParams.get('available')
         const category = searchParams.get('category')
+        const { page, limit, skip } = parsePagination(searchParams)
 
         const where: any = {}
         if (search) {
@@ -49,11 +46,16 @@ export async function GET(req: NextRequest) {
         if (available === 'false') where.isAvailable = false
         if (category) where.categoryId = category
 
-        const products = await prisma.product.findMany({
-            where,
-            include: PRODUCT_INCLUDE,
-            orderBy: { name: 'asc' },
-        })
+        const [totalCount, products] = await Promise.all([
+            prisma.product.count({ where }),
+            prisma.product.findMany({
+                where,
+                include: PRODUCT_INCLUDE,
+                orderBy: { name: 'asc' },
+                skip,
+                take: limit,
+            })
+        ])
 
         // Flatten for easier bot consumption
         const data = products.map(p => ({
@@ -80,7 +82,12 @@ export async function GET(req: NextRequest) {
             variants: p.variants,
         }))
 
-        return NextResponse.json({ success: true, data, count: data.length })
+        return NextResponse.json({ 
+            success: true, 
+            data, 
+            count: data.length,
+            pagination: paginationMeta(totalCount, page, limit),
+        })
     } catch (error) {
         console.error('API Error [GET /products]:', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

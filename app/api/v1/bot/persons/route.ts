@@ -1,38 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-
-const BOT_API_KEY = process.env.BOT_API_KEY
-
-const PERSON_INCLUDE = {
-    contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
-    personType: { select: { id: true, name: true, color: true, icon: true } },
-    priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
-}
-
-// Resolve currency UUIDs (JSON) to full Currency objects
-async function resolveCurrencies(persons: any[]) {
-    const allIds = new Set<string>()
-    for (const p of persons) {
-        if (Array.isArray(p.currencies)) {
-            p.currencies.forEach((id: string) => allIds.add(id))
-        }
-    }
-    if (allIds.size === 0) return persons
-
-    const currencies = await prisma.currency.findMany({
-        where: { id: { in: Array.from(allIds) } },
-        select: { id: true, name: true, code: true, symbol: true },
-    })
-    const map = new Map(currencies.map(c => [c.id, c]))
-
-    return persons.map(p => ({
-        ...p,
-        currencies: Array.isArray(p.currencies)
-            ? p.currencies.map((id: string) => map.get(id) || { id }).filter(Boolean)
-            : [],
-    }))
-}
+import { 
+    validateApiKey, 
+    PERSON_INCLUDE, 
+    resolveCurrencies, 
+    normalizePhonePatterns,
+    parsePagination,
+    paginationMeta 
+} from '@/lib/api-utils'
 
 // Zod Schemas for Validation
 const contactSchema = z.object({
@@ -49,7 +25,7 @@ const createPersonSchema = z.object({
     personTypeId: z.string().nullable().optional(),
     source: z.string().nullable().optional(),
     contacts: z.array(contactSchema).optional(),
-    tags: z.any().optional(), // Using any due to Prisma Json array structure nuances
+    tags: z.any().optional(),
     currencyIds: z.array(z.string()).optional(),
     groupName: z.string().nullable().optional(),
     groupNumber: z.string().nullable().optional(),
@@ -58,47 +34,25 @@ const createPersonSchema = z.object({
 
 // GET /api/v1/bot/persons — List persons (with search, pagination & active filter)
 export async function GET(req: NextRequest) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const { searchParams } = new URL(req.url)
         const search = searchParams.get('search') || searchParams.get('q')
         const active = searchParams.get('active')
-        
-        // Pagination
-        const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-        const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '50')))
-        const skip = (page - 1) * limit
+        const { page, limit, skip } = parsePagination(searchParams)
 
         const where: any = {}
         
         if (search) {
-            // Smart search parsing (similar to search route)
-            const patterns = new Set<string>([search])
-            const digits = search.replace(/\D/g, '')
-            if (digits.length >= 7) {
-                patterns.add(digits)
-                if (digits.startsWith('05') && digits.length === 10) {
-                    patterns.add(digits.substring(1))
-                    patterns.add('966' + digits.substring(1))
-                } else if (digits.startsWith('9665') && digits.length === 12) {
-                    patterns.add(digits.substring(3))
-                    patterns.add('0' + digits.substring(3))
-                } else if (digits.startsWith('5') && digits.length === 9) {
-                    patterns.add('0' + digits)
-                    patterns.add('966' + digits)
-                }
-            }
-
+            const patterns = normalizePhonePatterns(search)
             where.OR = [
                 { name: { contains: search, mode: 'insensitive' } },
                 {
                     contacts: {
                         some: {
-                            OR: Array.from(patterns).map(p => ({
+                            OR: patterns.map(p => ({
                                 value: { contains: p, mode: 'insensitive' }
                             }))
                         }
@@ -126,12 +80,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ 
             success: true, 
             data: enriched, 
-            pagination: {
-                total: totalCount,
-                page,
-                limit,
-                totalPages: Math.ceil(totalCount / limit)
-            }
+            pagination: paginationMeta(totalCount, page, limit),
         })
     } catch (error) {
         console.error('API Error [GET /persons]:', error)
@@ -139,12 +88,10 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/v1/bot/persons
+// POST /api/v1/bot/persons — Create or Update (Upsert) a person
 export async function POST(req: NextRequest) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const rawBody = await req.json()
@@ -160,8 +107,8 @@ export async function POST(req: NextRequest) {
         
         const body = validationResult.data
 
+        // ── Resolve default person type ──
         let finalPersonTypeId = body.personTypeId || null
-
         if (!finalPersonTypeId) {
             const defaultType = await prisma.personType.findFirst({
                 where: { isDefault: true }
@@ -171,6 +118,81 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // ── Check for existing person (duplicate detection) ──
+        let existingPerson: any = null
+
+        // 1. Search by contact value (phone/email/whatsapp)
+        const contactValues = (body.contacts || [])
+            .map(c => c.value?.trim())
+            .filter(Boolean) as string[]
+
+        if (contactValues.length > 0) {
+            const allPatterns = new Set<string>()
+            for (const val of contactValues) {
+                normalizePhonePatterns(val).forEach(p => allPatterns.add(p))
+            }
+
+            existingPerson = await prisma.person.findFirst({
+                where: {
+                    contacts: {
+                        some: {
+                            value: { in: Array.from(allPatterns) }
+                        }
+                    }
+                },
+                include: PERSON_INCLUDE,
+            })
+        }
+
+        // 2. If not found by contact, search by groupNumber
+        if (!existingPerson && body.groupNumber?.trim()) {
+            existingPerson = await prisma.person.findFirst({
+                where: { groupNumber: body.groupNumber.trim() },
+                include: PERSON_INCLUDE,
+            })
+        }
+
+        // ── UPDATE existing person ──
+        if (existingPerson) {
+            const existingContactValues = new Set(
+                (existingPerson.contacts || []).map((c: any) => c.value)
+            )
+            const newContacts = (body.contacts || [])
+                .filter(c => c.value?.trim() && !existingContactValues.has(c.value.trim()))
+
+            const updatedPerson = await prisma.person.update({
+                where: { id: existingPerson.id },
+                data: {
+                    name: existingPerson.name ? existingPerson.name : (body.name?.trim() || existingPerson.name),
+                    address: body.address || existingPerson.address,
+                    notes: body.notes || existingPerson.notes,
+                    personTypeId: existingPerson.personTypeId || finalPersonTypeId,
+                    source: body.source || existingPerson.source,
+                    groupName: body.groupName || existingPerson.groupName,
+                    groupNumber: body.groupNumber || existingPerson.groupNumber,
+                    lastInteraction: new Date(),
+                    contacts: newContacts.length > 0 ? {
+                        create: newContacts.map(c => ({
+                            type: c.type,
+                            value: c.value.trim(),
+                            label: c.label || null,
+                            isPrimary: c.isPrimary || false,
+                        }))
+                    } : undefined,
+                },
+                include: PERSON_INCLUDE,
+            })
+
+            const [enriched] = await resolveCurrencies([updatedPerson])
+
+            return NextResponse.json({ 
+                success: true, 
+                action: 'updated',
+                data: enriched 
+            }, { status: 200 })
+        }
+
+        // ── CREATE new person ──
         const person = await prisma.person.create({
             data: {
                 name: body.name.trim(),
@@ -204,13 +226,26 @@ export async function POST(req: NextRequest) {
 
         const [enriched] = await resolveCurrencies([person])
 
-        return NextResponse.json({ success: true, data: enriched }, { status: 201 })
+        return NextResponse.json({ 
+            success: true, 
+            action: 'created',
+            data: enriched 
+        }, { status: 201 })
     } catch (error: any) {
         console.error('API Error [POST /persons]:', error)
-        if (error?.code === 'P2002' && error?.meta?.target?.includes('value')) {
-            return NextResponse.json({ error: 'رقم الهاتف أو البريد مسجل بالفعل لشخص آخر' }, { status: 409 })
+        if (error?.code === 'P2002') {
+            const target = error?.meta?.target
+            if (target?.includes('value')) {
+                return NextResponse.json({ 
+                    error: 'رقم الهاتف أو البريد مسجل بالفعل لشخص آخر',
+                    details: `Duplicate contact: ${target}`
+                }, { status: 409 })
+            }
+            return NextResponse.json({ 
+                error: 'بيانات مكررة',
+                details: `Duplicate field: ${target}`
+            }, { status: 409 })
         }
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }
-

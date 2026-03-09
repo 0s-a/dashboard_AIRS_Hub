@@ -1,0 +1,968 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AIRS Hub Bot API",
+    "version": "1.0.0",
+    "description": "API للتعامل مع بيانات الأشخاص والمنتجات والتسعير — مخصصة لبوتات Telegram/WhatsApp",
+    "contact": {
+      "name": "AIRS Hub"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development Server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Persons",
+      "description": "إدارة الأشخاص (عملاء، موردين، إلخ)"
+    },
+    {
+      "name": "Products",
+      "description": "استعراض المنتجات"
+    },
+    {
+      "name": "Pricing",
+      "description": "فحص الأسعار والتسعير"
+    }
+  ],
+  "paths": {
+    "/api/v1/bot/persons": {
+      "get": {
+        "tags": ["Persons"],
+        "summary": "قائمة الأشخاص",
+        "description": "جلب قائمة الأشخاص مع دعم البحث والفلترة والصفحات. البحث يدعم الاسم ورقم الهاتف مع تطبيع أرقام السعودية واليمن.",
+        "operationId": "listPersons",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "بحث بالاسم أو رقم الهاتف (يدعم أيضاً q)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "بديل لـ search",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "description": "فلترة حسب حالة التفعيل",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "رقم الصفحة (افتراضي: 1)",
+            "schema": { "type": "integer", "default": 1, "minimum": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "عدد النتائج في الصفحة (افتراضي: 50، أقصى: 100)",
+            "schema": { "type": "integer", "default": 50, "minimum": 1, "maximum": 100 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة الأشخاص",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Person" }
+                    },
+                    "pagination": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "post": {
+        "tags": ["Persons"],
+        "summary": "إنشاء أو تحديث شخص (Upsert)",
+        "description": "ينشئ شخصاً جديداً أو يحدّث شخصاً موجوداً إذا تطابق رقم الهاتف أو رقم المجموعة (groupNumber). يبحث أولاً عن تكرار بالهاتف ثم بـ groupNumber.",
+        "operationId": "upsertPerson",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreatePersonInput" },
+              "example": {
+                "name": "أحمد محمد",
+                "address": "الرياض، حي النزهة",
+                "notes": "عميل VIP",
+                "personTypeId": null,
+                "source": "whatsapp",
+                "contacts": [
+                  { "type": "phone", "value": "0512345678", "label": "جوال", "isPrimary": true },
+                  { "type": "whatsapp", "value": "0512345678", "label": null, "isPrimary": false }
+                ],
+                "currencyIds": [],
+                "groupName": "مجموعة الرياض",
+                "groupNumber": "G-001",
+                "priceLabelIds": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "تم إنشاء شخص جديد",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "action": { "type": "string", "example": "created" },
+                    "data": { "$ref": "#/components/schemas/Person" }
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "تم تحديث شخص موجود",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "action": { "type": "string", "example": "updated" },
+                    "data": { "$ref": "#/components/schemas/Person" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "بيانات غير صالحة (فشل Zod validation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "البيانات غير صالحة" },
+                    "details": { "type": "object", "description": "تفاصيل أخطاء Zod" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": {
+            "description": "بيانات مكررة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "رقم الهاتف أو البريد مسجل بالفعل لشخص آخر" },
+                    "details": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/persons/search": {
+      "get": {
+        "tags": ["Persons"],
+        "summary": "بحث عن شخص بالهاتف أو البريد",
+        "description": "بحث شامل في جهات اتصال الأشخاص (هاتف، بريد، واتساب) مع تطبيع أرقام الهاتف السعودية واليمنية.",
+        "operationId": "searchPersons",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "قيمة البحث (يدعم أيضاً value, phone, email)",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "value",
+            "in": "query",
+            "description": "بديل لـ q",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "phone",
+            "in": "query",
+            "description": "بديل لـ q — بحث بالهاتف",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "description": "بديل لـ q — بحث بالبريد",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "نتائج البحث",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "personId": { "type": "string", "nullable": true, "description": "ID أول شخص في النتائج" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Person" }
+                    },
+                    "count": { "type": "integer", "example": 3 }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "معلمة البحث مفقودة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "يجب تمرير q أو value كمعلمة بحث" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/persons/{id}": {
+      "get": {
+        "tags": ["Persons"],
+        "summary": "جلب شخص واحد",
+        "description": "جلب بيانات شخص واحد بالـ ID مع جهات الاتصال والعملات وتصنيفات الأسعار.",
+        "operationId": "getPerson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID الشخص",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "بيانات الشخص",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": { "$ref": "#/components/schemas/Person" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "put": {
+        "tags": ["Persons"],
+        "summary": "تعديل شخص",
+        "description": "تعديل بيانات شخص موجود. جميع الحقول اختيارية — يتم تحديث الحقول المرسلة فقط. عند إرسال contacts يتم استبدال جميع جهات الاتصال.",
+        "operationId": "updatePerson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID الشخص",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdatePersonInput" },
+              "example": {
+                "name": "أحمد محمد علي",
+                "address": "جدة، حي الصفا",
+                "isActive": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم التعديل بنجاح",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": { "$ref": "#/components/schemas/Person" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "بيانات غير صالحة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "البيانات غير صالحة" },
+                    "details": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": {
+            "description": "تكرار جهة اتصال",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "رقم الهاتف أو البريد مسجل بالفعل لشخص آخر" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "delete": {
+        "tags": ["Persons"],
+        "summary": "حذف شخص",
+        "description": "حذف شخص نهائياً من قاعدة البيانات.",
+        "operationId": "deletePerson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID الشخص",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "تم الحذف بنجاح",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string", "example": "تم حذف الشخص بنجاح" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/persons/{id}/pricing": {
+      "get": {
+        "tags": ["Pricing"],
+        "summary": "جلب تسعير شخص",
+        "description": "جلب العملات وتصنيفات الأسعار المرتبطة بشخص معين.",
+        "operationId": "getPersonPricing",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID الشخص",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "بيانات التسعير",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "personId": { "type": "string", "format": "uuid" },
+                        "personName": { "type": "string", "example": "أحمد محمد" },
+                        "personType": { "$ref": "#/components/schemas/PersonType" },
+                        "currencies": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/CurrencyFull" }
+                        },
+                        "priceLabels": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/PriceLabelFull" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/persons/{id}/toggle": {
+      "patch": {
+        "tags": ["Persons"],
+        "summary": "تفعيل/إلغاء تفعيل شخص",
+        "description": "تبديل حالة الشخص بين نشط وغير نشط (toggle isActive).",
+        "operationId": "togglePerson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID الشخص",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "تم التبديل بنجاح",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "name": { "type": "string", "example": "أحمد محمد" },
+                        "isActive": { "type": "boolean", "example": true }
+                      }
+                    },
+                    "message": { "type": "string", "example": "تم تفعيل الشخص" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "قائمة المنتجات",
+        "description": "جلب قائمة المنتجات مع دعم البحث (بالاسم، رقم الصنف، الماركة، الوصف)، فلترة التوفر والفئة، والصفحات.",
+        "operationId": "listProducts",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "بحث بالاسم، رقم الصنف، الماركة، أو الوصف (يدعم أيضاً q)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "بديل لـ search",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "available",
+            "in": "query",
+            "description": "فلترة حسب التوفر",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "فلترة حسب UUID الفئة",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "رقم الصفحة (افتراضي: 1)",
+            "schema": { "type": "integer", "default": 1, "minimum": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "عدد النتائج في الصفحة (افتراضي: 50، أقصى: 100)",
+            "schema": { "type": "integer", "default": 50, "minimum": 1, "maximum": 100 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة المنتجات",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Product" }
+                    },
+                    "count": { "type": "integer", "example": 25 },
+                    "pagination": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/check-price": {
+      "post": {
+        "tags": ["Pricing"],
+        "summary": "فحص سعر منتج",
+        "description": "فحص سعر منتج معين بناءً على رقم هاتف العميل. يبحث عن العميل بالهاتف ويُرجع الأسعار المسموحة حسب تصنيف السعر المرتبط بالعميل.",
+        "operationId": "checkPrice",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["phoneNumber", "productId"],
+                "properties": {
+                  "phoneNumber": {
+                    "type": "string",
+                    "description": "رقم هاتف العميل (يدعم صيغ 05/5/966/967)",
+                    "example": "0512345678"
+                  },
+                  "productId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "UUID المنتج"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "بيانات السعر",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "productId": { "type": "string", "format": "uuid" },
+                        "productName": { "type": "string", "example": "جهاز لابتوب" },
+                        "personName": { "type": "string", "nullable": true, "example": "أحمد محمد" },
+                        "prices": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": { "type": "string", "example": "سعر الجملة" },
+                              "value": { "type": "number", "example": 150.0 },
+                              "currency": {
+                                "type": "object",
+                                "properties": {
+                                  "code": { "type": "string", "example": "SAR" },
+                                  "symbol": { "type": "string", "example": "ر.س" },
+                                  "name": { "type": "string", "example": "ريال سعودي" }
+                                }
+                              },
+                              "unit": { "type": "string", "nullable": true, "example": "حبة" },
+                              "quantity": { "type": "integer", "nullable": true, "example": 1 }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "حقول مفقودة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Missing phoneNumber or productId" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "المنتج غير موجود",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Product not found" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "مفتاح API للمصادقة — يُرسل في header باسم x-api-key"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "غير مصرح — مفتاح API مفقود أو غير صحيح",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": { "type": "string", "example": "Unauthorized" }
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "العنصر غير موجود",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": { "type": "string", "example": "الشخص غير موجود" }
+              }
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "خطأ داخلي في الخادم",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": { "type": "string", "example": "Internal Server Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "enum": ["phone", "email", "whatsapp"], "description": "نوع جهة الاتصال" },
+          "value": { "type": "string", "description": "الرقم أو البريد", "example": "0512345678" },
+          "label": { "type": "string", "nullable": true, "description": "تسمية (جوال، عمل، إلخ)", "example": "جوال" },
+          "isPrimary": { "type": "boolean", "default": false }
+        }
+      },
+      "PersonType": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "عميل" },
+          "color": { "type": "string", "example": "#64748b" },
+          "icon": { "type": "string", "example": "User" }
+        }
+      },
+      "Currency": {
+        "type": "object",
+        "description": "عملة مختصرة (كما تظهر في بيانات الشخص)",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "ريال سعودي" },
+          "code": { "type": "string", "example": "SAR" },
+          "symbol": { "type": "string", "example": "ر.س" }
+        }
+      },
+      "CurrencyFull": {
+        "type": "object",
+        "description": "عملة كاملة (كما تظهر في تسعير الشخص)",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "itemNumber": { "type": "string", "example": "0001" },
+          "name": { "type": "string", "example": "ريال سعودي" },
+          "code": { "type": "string", "example": "SAR" },
+          "symbol": { "type": "string", "example": "ر.س" },
+          "isDefault": { "type": "boolean" }
+        }
+      },
+      "PriceLabel": {
+        "type": "object",
+        "description": "تصنيف سعر مختصر",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "سعر الجملة" }
+        }
+      },
+      "PriceLabelFull": {
+        "type": "object",
+        "description": "تصنيف سعر كامل (كما يظهر في تسعير الشخص)",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "itemNumber": { "type": "string", "example": "0001" },
+          "name": { "type": "string", "example": "سعر الجملة" },
+          "notes": { "type": "string", "nullable": true }
+        }
+      },
+      "Person": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "nullable": true, "example": "أحمد محمد" },
+          "address": { "type": "string", "nullable": true },
+          "notes": { "type": "string", "nullable": true },
+          "source": { "type": "string", "nullable": true },
+          "isActive": { "type": "boolean", "default": true },
+          "groupName": { "type": "string", "nullable": true },
+          "groupNumber": { "type": "string", "nullable": true },
+          "lastInteraction": { "type": "string", "format": "date-time" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "contacts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Contact" }
+          },
+          "personType": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/PersonType" }]
+          },
+          "currencies": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Currency" }
+          },
+          "priceLabels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "priceLabel": { "$ref": "#/components/schemas/PriceLabel" }
+              }
+            }
+          }
+        }
+      },
+      "CreatePersonInput": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "description": "اسم الشخص (مطلوب)" },
+          "address": { "type": "string", "nullable": true },
+          "notes": { "type": "string", "nullable": true },
+          "personTypeId": { "type": "string", "format": "uuid", "nullable": true },
+          "source": { "type": "string", "nullable": true },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "value"],
+              "properties": {
+                "type": { "type": "string", "enum": ["phone", "email", "whatsapp"] },
+                "value": { "type": "string", "minLength": 1 },
+                "label": { "type": "string", "nullable": true },
+                "isPrimary": { "type": "boolean", "default": false }
+              }
+            }
+          },
+          "tags": { "description": "أي بيانات إضافية" },
+          "currencyIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "groupName": { "type": "string", "nullable": true },
+          "groupNumber": { "type": "string", "nullable": true },
+          "priceLabelIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        }
+      },
+      "UpdatePersonInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "address": { "type": "string", "nullable": true },
+          "notes": { "type": "string", "nullable": true },
+          "personTypeId": { "type": "string", "format": "uuid", "nullable": true },
+          "source": { "type": "string", "nullable": true },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "value"],
+              "properties": {
+                "type": { "type": "string", "enum": ["phone", "email", "whatsapp"] },
+                "value": { "type": "string", "minLength": 1 },
+                "label": { "type": "string", "nullable": true },
+                "isPrimary": { "type": "boolean", "default": false }
+              }
+            }
+          },
+          "tags": { "description": "أي بيانات إضافية" },
+          "currencyIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "groupName": { "type": "string", "nullable": true },
+          "groupNumber": { "type": "string", "nullable": true },
+          "priceLabelIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "إلكترونيات" },
+          "icon": { "type": "string", "nullable": true, "example": "Laptop" }
+        }
+      },
+      "ProductImage": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "example": "https://example.com/image.jpg" },
+          "alt": { "type": "string", "nullable": true },
+          "isPrimary": { "type": "boolean" }
+        }
+      },
+      "ProductPrice": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "label": { "type": "string", "example": "سعر الجملة" },
+          "value": { "type": "number", "example": 150.0 },
+          "unit": { "type": "string", "nullable": true, "example": "حبة" },
+          "quantity": { "type": "integer", "nullable": true, "example": 1 },
+          "currency": { "$ref": "#/components/schemas/CurrencyFull" }
+        }
+      },
+      "Variant": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "variantNumber": { "type": "string", "example": "001-BF-483-01" },
+          "suffix": { "type": "string", "example": "01" },
+          "name": { "type": "string", "example": "أسود" },
+          "type": { "type": "string", "enum": ["color", "size", "custom"], "example": "color" },
+          "hex": { "type": "string", "nullable": true, "example": "#000000" },
+          "price": { "type": "number", "nullable": true },
+          "isDefault": { "type": "boolean" },
+          "order": { "type": "integer" }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "itemNumber": { "type": "string", "example": "001-BF-483" },
+          "name": { "type": "string", "example": "جهاز لابتوب HP" },
+          "brand": { "type": "string", "nullable": true, "example": "HP" },
+          "description": { "type": "string", "nullable": true },
+          "isAvailable": { "type": "boolean", "default": true },
+          "category": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/Category" }]
+          },
+          "images": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProductImage" }
+          },
+          "prices": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProductPrice" }
+          },
+          "variants": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Variant" }
+          }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer", "example": 150 },
+          "page": { "type": "integer", "example": 1 },
+          "limit": { "type": "integer", "example": 50 },
+          "totalPages": { "type": "integer", "example": 3 }
+        }
+      }
+    }
+  }
+}

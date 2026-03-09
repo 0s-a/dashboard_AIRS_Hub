@@ -23,6 +23,7 @@ model Product {
   productImages    ProductImage[]
   variants         Variant[]
   productPrices    ProductPrice[]
+  orderItems       OrderItem[]
 }
 
 model Category {
@@ -55,6 +56,7 @@ model Person {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   priceLabels     PersonPriceLabel[]
+  orders          Order[]
 
   @@map("Person")
 }
@@ -104,6 +106,7 @@ model Variant {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   variantImages ProductImage[] @relation("VariantToProductImages")
+  orderItems    OrderItem[]
 
   @@unique([productId, suffix])
 }
@@ -116,6 +119,7 @@ model PriceLabel {
   notes         String?
   persons       PersonPriceLabel[]
   productPrices ProductPrice[]
+  orderItems    OrderItem[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 }
@@ -170,6 +174,7 @@ model Currency {
   isDefault     Boolean        @default(false)
   isActive      Boolean        @default(true)
   productPrices ProductPrice[]
+  orderItems    OrderItem[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -190,4 +195,39 @@ model ProductPrice {
   updatedAt    DateTime   @updatedAt
 
   @@unique([productId, priceLabelId, currencyId])
+}
+
+// Represents a customer order
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique // auto-generated e.g. "0001"
+  personId    String?
+  person      Person?     @relation(fields: [personId], references: [id], onDelete: SetNull)
+  status      String      @default("pending")
+  // "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
+  notes       String?
+  totalAmount Float? // pre-computed sum from items
+  items       OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Individual line items inside an order
+model OrderItem {
+  id           String      @id @default(uuid())
+  orderId      String
+  order        Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String?
+  product      Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId    String?
+  variant      Variant?    @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  priceLabelId String?
+  priceLabel   PriceLabel? @relation(fields: [priceLabelId], references: [id], onDelete: SetNull)
+  // Snapshot of price & currency from ProductPrice at order creation time
+  unitPrice    Float
+  currencyId   String?
+  currency     Currency?   @relation(fields: [currencyId], references: [id], onDelete: SetNull)
+  quantity     Int         @default(1)
+  notes        String?
+  createdAt    DateTime    @default(now())
 }

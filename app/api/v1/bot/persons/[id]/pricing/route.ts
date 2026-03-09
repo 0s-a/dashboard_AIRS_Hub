@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-const BOT_API_KEY = process.env.BOT_API_KEY
+import { validateApiKey } from '@/lib/api-utils'
 
 // GET /api/v1/bot/persons/[id]/pricing — Get person's currencies & price labels
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
     try {
         const { id } = await params
@@ -21,7 +18,7 @@ export async function GET(
             select: {
                 id: true,
                 name: true,
-                currencies: true, // JSON array of currency IDs
+                currencies: true,
                 personType: {
                     select: {
                         id: true,

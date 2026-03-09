@@ -443,9 +443,9 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
                 dir="rtl"
             >
                 {/* ─── Header ─── */}
-                <SheetHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-l from-primary/5 to-transparent">
+                <SheetHeader className="px-6 pt-6 pb-4 border-b bg-linear-to-l from-primary/5 to-transparent">
                     <SheetTitle className="text-xl font-bold flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
+                        <div className="size-10 rounded-xl bg-linear-to-br from-primary to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
                             <ShoppingCart className="size-5" />
                         </div>
                         <div className="flex flex-col">
@@ -743,7 +743,7 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
 
                         {/* ─── Grand Total ─── */}
                         {items.length > 0 && (
-                            <div className="rounded-2xl bg-gradient-to-l from-primary/10 to-indigo-500/5 border border-primary/20 p-5">
+                            <div className="rounded-2xl bg-linear-to-l from-primary/10 to-indigo-500/5 border border-primary/20 p-5">
                                 <div className="flex items-center justify-between">
                                     <div className="flex flex-col gap-0.5">
                                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">الإجمالي الكلي</span>

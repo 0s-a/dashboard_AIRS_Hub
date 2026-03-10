@@ -25,6 +25,10 @@
       "description": "إدارة الأشخاص (عملاء، موردين، إلخ)"
     },
     {
+      "name": "Orders",
+      "description": "إدارة الطلبات — إنشاء وجلب الطلبات"
+    },
+    {
       "name": "Products",
       "description": "استعراض المنتجات"
     },
@@ -667,6 +671,187 @@
           "500": { "$ref": "#/components/responses/InternalError" }
         }
       }
+    },
+    "/api/v1/bot/persons/group": {
+      "get": {
+        "tags": ["Persons"],
+        "summary": "بحث عن شخص برقم المجموعة",
+        "description": "بحث عن شخص بناءً على رقم المجموعة (WhatsApp group ID). يُرجع جميع الأشخاص المطابقين.",
+        "operationId": "searchPersonByGroup",
+        "parameters": [
+          {
+            "name": "groupNumber",
+            "in": "query",
+            "description": "رقم المجموعة (يدعم أيضاً group أو g)",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "description": "بديل لـ groupNumber",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "نتائج البحث",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "personId": { "type": "string", "nullable": true, "description": "ID أول شخص في النتائج" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Person" }
+                    },
+                    "count": { "type": "integer", "example": 1 }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "معلمة البحث مفقودة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "يجب تمرير groupNumber كمعلمة بحث" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/orders": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "إنشاء طلب جديد",
+        "description": "إنشاء طلب جديد مع بنود المنتجات. يدعم تحديد العميل بـ personId أو groupNumber (يبحث تلقائياً عن العميل). يتم حساب الأسعار والإجمالي تلقائياً من تسعيرات المنتجات.",
+        "operationId": "createOrder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateOrderInput" },
+              "example": {
+                "groupNumber": "120363xxx@g.us",
+                "notes": "طلب من الواتساب",
+                "items": [
+                  {
+                    "productId": "uuid-product-1",
+                    "priceLabelId": "uuid-price-label",
+                    "variantId": "uuid-variant",
+                    "quantity": 2,
+                    "notes": "ملاحظة على البند"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "تم إنشاء الطلب بنجاح",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": { "$ref": "#/components/schemas/Order" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "بيانات غير صالحة أو تسعيرة مفقودة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "بيانات غير صالحة" },
+                    "details": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "get": {
+        "tags": ["Orders"],
+        "summary": "قائمة الطلبات",
+        "description": "جلب قائمة الطلبات مع دعم التصفية حسب العميل (personId أو groupNumber) والحالة (status) والصفحات.",
+        "operationId": "listOrders",
+        "parameters": [
+          {
+            "name": "personId",
+            "in": "query",
+            "description": "فلترة حسب UUID العميل",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "groupNumber",
+            "in": "query",
+            "description": "فلترة حسب رقم المجموعة (يبحث عن العميل تلقائياً)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "فلترة حسب حالة الطلب",
+            "schema": { "type": "string", "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"] }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "رقم الصفحة (افتراضي: 1)",
+            "schema": { "type": "integer", "default": 1, "minimum": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "عدد النتائج (افتراضي: 20، أقصى: 50)",
+            "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 50 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة الطلبات",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Order" }
+                    },
+                    "count": { "type": "integer", "example": 5 },
+                    "pagination": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
     }
   },
   "components": {
@@ -952,6 +1137,92 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/Variant" }
           }
+        }
+      },
+      "OrderItemInput": {
+        "type": "object",
+        "required": ["productId", "priceLabelId"],
+        "properties": {
+          "productId": { "type": "string", "format": "uuid", "description": "UUID المنتج" },
+          "priceLabelId": { "type": "string", "format": "uuid", "description": "UUID التسعيرة" },
+          "variantId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID المتغير (اختياري)" },
+          "quantity": { "type": "integer", "minimum": 1, "default": 1, "description": "الكمية" },
+          "notes": { "type": "string", "nullable": true, "description": "ملاحظة على البند" }
+        }
+      },
+      "CreateOrderInput": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "personId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID العميل (أو استخدم groupNumber)" },
+          "groupNumber": { "type": "string", "nullable": true, "description": "رقم المجموعة — يبحث عن العميل تلقائياً" },
+          "notes": { "type": "string", "nullable": true, "description": "ملاحظات على الطلب" },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/components/schemas/OrderItemInput" }
+          }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "product": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string", "example": "جهاز لابتوب HP" },
+              "itemNumber": { "type": "string", "example": "001-BF-483" }
+            }
+          },
+          "priceLabel": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string", "example": "سعر الجملة" }
+            }
+          },
+          "variant": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string", "example": "أسود" },
+              "hex": { "type": "string", "nullable": true, "example": "#000000" },
+              "type": { "type": "string", "example": "color" }
+            }
+          },
+          "unitPrice": { "type": "number", "example": 150.0 },
+          "quantity": { "type": "integer", "example": 2 },
+          "currency": { "$ref": "#/components/schemas/Currency" },
+          "notes": { "type": "string", "nullable": true }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "orderNumber": { "type": "string", "example": "0001" },
+          "status": { "type": "string", "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"], "example": "pending" },
+          "notes": { "type": "string", "nullable": true },
+          "totalAmount": { "type": "number", "nullable": true, "example": 300.0 },
+          "person": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string", "example": "أحمد محمد" }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrderItem" }
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
         }
       },
       "PaginationMeta": {

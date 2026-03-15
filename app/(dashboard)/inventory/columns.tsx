@@ -61,22 +61,30 @@ export const customGlobalFilterFn = (row: any, columnId: string, filterValue: st
 
     const product = row.original
 
-    // Search in primary fields
+    // Primary fields
     if (product.name?.toLowerCase().includes(searchValue)) return true
     if (product.itemNumber?.toLowerCase().includes(searchValue)) return true
     if (product.brand?.toLowerCase().includes(searchValue)) return true
+    if (product.description?.toLowerCase().includes(searchValue)) return true
     if (product.category?.name?.toLowerCase().includes(searchValue)) return true
 
-    // Search in alternative names
-    if (product.alternativeNames && Array.isArray(product.alternativeNames)) {
-        const matchedName = product.alternativeNames.find((name: string) =>
-            name.toLowerCase().includes(searchValue)
-        )
-        if (matchedName) {
-            // We use standard row object to check matching, instead of mutating it.
-            // Component should calculate this independently if needed for UI, or use a safe non-mutating context map.
-            return true
-        }
+    // Tags (JSON array)
+    if (Array.isArray(product.tags)) {
+        if (product.tags.some((tag: string) => tag.toLowerCase().includes(searchValue))) return true
+    }
+
+    // Alternative names (JSON array)
+    if (Array.isArray(product.alternativeNames)) {
+        if (product.alternativeNames.some((name: string) => name.toLowerCase().includes(searchValue))) return true
+    }
+
+    // Variant names & numbers
+    if (Array.isArray(product.variants)) {
+        if (product.variants.some((v: any) =>
+            v.name?.toLowerCase().includes(searchValue) ||
+            v.variantNumber?.toLowerCase().includes(searchValue) ||
+            v.suffix?.toLowerCase().includes(searchValue)
+        )) return true
     }
 
     return false

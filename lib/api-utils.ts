@@ -20,15 +20,10 @@ export function validateApiKey(req: NextRequest): NextResponse | null {
 }
 
 // ────────────────────────────────────────────────────────
-// Shared Prisma Include/Select constants
+// Shared Prisma Include/Select constants (re-exported)
 // ────────────────────────────────────────────────────────
 
-/** Standard include for person queries across all endpoints */
-export const PERSON_INCLUDE = {
-    contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
-    personType: { select: { id: true, name: true, color: true, icon: true } },
-    priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
-} as const
+export { PERSON_INCLUDE } from '@/lib/prisma-includes'
 
 // ────────────────────────────────────────────────────────
 // Phone Number Normalization
@@ -136,4 +131,76 @@ export function paginationMeta(total: number, page: number, limit: number) {
         limit,
         totalPages: Math.ceil(total / limit),
     }
+}
+
+// ────────────────────────────────────────────────────────
+// Order Helpers (shared between bot API & server actions)
+// ────────────────────────────────────────────────────────
+
+/**
+ * Generate next 4-digit order number e.g. "0001".
+ */
+export async function generateOrderNumber(): Promise<string> {
+    const last = await prisma.order.findFirst({
+        orderBy: { orderNumber: 'desc' },
+        select: { orderNumber: true },
+    })
+    const next = last ? parseInt(last.orderNumber, 10) + 1 : 1
+    return String(next).padStart(4, '0')
+}
+
+/**
+ * Resolve unit price and currency from ProductPrice.
+ * Returns null if no matching ProductPrice found.
+ */
+export async function resolveProductPrice(productId: string, priceLabelId: string) {
+    return prisma.productPrice.findFirst({
+        where: { productId, priceLabelId },
+        include: { currency: true },
+    })
+}
+
+/**
+ * Resolve a product by UUID or itemNumber.
+ * Returns the product with its prices and person-relevant data, or null.
+ */
+export async function resolveProduct(identifier: { productId?: string; productItemNumber?: string }) {
+    if (identifier.productId) {
+        return prisma.product.findUnique({
+            where: { id: identifier.productId },
+            select: { id: true, name: true, itemNumber: true },
+        })
+    }
+    if (identifier.productItemNumber) {
+        return prisma.product.findUnique({
+            where: { itemNumber: identifier.productItemNumber },
+            select: { id: true, name: true, itemNumber: true },
+        })
+    }
+    return null
+}
+
+/**
+ * Auto-resolve the best priceLabelId for a person and product.
+ * Finds the first ProductPrice matching one of the person's assigned price labels.
+ * Returns { priceLabelId, value, currencyId } or null.
+ */
+export async function autoResolvePriceLabel(productId: string, personId: string) {
+    const person = await prisma.person.findUnique({
+        where: { id: personId },
+        include: { priceLabels: { select: { priceLabelId: true } } },
+    })
+    if (!person || person.priceLabels.length === 0) return null
+
+    const personLabelIds = person.priceLabels.map(pl => pl.priceLabelId)
+
+    const productPrice = await prisma.productPrice.findFirst({
+        where: {
+            productId,
+            priceLabelId: { in: personLabelIds },
+        },
+        include: { currency: true },
+    })
+
+    return productPrice
 }

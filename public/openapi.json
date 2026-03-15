@@ -735,25 +735,48 @@
       "post": {
         "tags": ["Orders"],
         "summary": "إنشاء طلب جديد",
-        "description": "إنشاء طلب جديد مع بنود المنتجات. يدعم تحديد العميل بـ personId أو groupNumber (يبحث تلقائياً عن العميل). يتم حساب الأسعار والإجمالي تلقائياً من تسعيرات المنتجات.",
+        "description": "إنشاء طلب جديد. يدعم 3 طرق مرنة:\n\n**1. مبسّط (منتج واحد):** أرسل `productItemNumber` و `quantity` مباشرة بدون `items`.\n**2. متعدد مع اختيار تلقائي:** أرسل `items` بدون `priceLabelId` — يتم اختيار التسعيرة تلقائياً حسب الشخص.\n**3. كامل (الطريقة الأصلية):** أرسل `items` مع `productId` و `priceLabelId`.\n\nيدعم تحديد المنتج بـ `productId` (UUID) أو `productItemNumber` (رقم الصنف). يدعم تحديد العميل بـ `personId` أو `groupNumber`.",
         "operationId": "createOrder",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": { "$ref": "#/components/schemas/CreateOrderInput" },
-              "example": {
-                "groupNumber": "120363xxx@g.us",
-                "notes": "طلب من الواتساب",
-                "items": [
-                  {
-                    "productId": "uuid-product-1",
-                    "priceLabelId": "uuid-price-label",
-                    "variantId": "uuid-variant",
-                    "quantity": 2,
-                    "notes": "ملاحظة على البند"
+              "examples": {
+                "shorthand": {
+                  "summary": "منتج واحد (مبسّط)",
+                  "value": {
+                    "groupNumber": "120363xxx@g.us",
+                    "productItemNumber": "001",
+                    "quantity": 3
                   }
-                ]
+                },
+                "auto_price": {
+                  "summary": "عدة منتجات (تسعيرة تلقائية)",
+                  "value": {
+                    "groupNumber": "120363xxx@g.us",
+                    "items": [
+                      { "productItemNumber": "001", "quantity": 2 },
+                      { "productItemNumber": "005", "quantity": 1, "notes": "لون أحمر" }
+                    ]
+                  }
+                },
+                "full": {
+                  "summary": "الطريقة الكاملة (UUID)",
+                  "value": {
+                    "personId": "uuid-person",
+                    "notes": "طلب من الواتساب",
+                    "items": [
+                      {
+                        "productId": "uuid-product-1",
+                        "priceLabelId": "uuid-price-label",
+                        "variantId": "uuid-variant",
+                        "quantity": 2,
+                        "notes": "ملاحظة على البند"
+                      }
+                    ]
+                  }
+                }
               }
             }
           }
@@ -1141,10 +1164,11 @@
       },
       "OrderItemInput": {
         "type": "object",
-        "required": ["productId", "priceLabelId"],
+        "description": "بند في الطلب — يجب تحديد productId أو productItemNumber. التسعيرة priceLabelId اختيارية (تُختار تلقائياً حسب الشخص إذا لم تُحدد).",
         "properties": {
-          "productId": { "type": "string", "format": "uuid", "description": "UUID المنتج" },
-          "priceLabelId": { "type": "string", "format": "uuid", "description": "UUID التسعيرة" },
+          "productId": { "type": "string", "format": "uuid", "description": "UUID المنتج (بديل لـ productItemNumber)" },
+          "productItemNumber": { "type": "string", "description": "رقم صنف المنتج (بديل لـ productId) — مثال: '001'", "example": "001" },
+          "priceLabelId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID التسعيرة (اختياري — يتم اختيارها تلقائياً من الشخص إذا لم تُحدد)" },
           "variantId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID المتغير (اختياري)" },
           "quantity": { "type": "integer", "minimum": 1, "default": 1, "description": "الكمية" },
           "notes": { "type": "string", "nullable": true, "description": "ملاحظة على البند" }
@@ -1152,16 +1176,21 @@
       },
       "CreateOrderInput": {
         "type": "object",
-        "required": ["items"],
+        "description": "يدعم 3 طرق: (1) shorthand بدون items — أرسل productItemNumber + quantity مباشرة. (2) items بدون priceLabelId — تسعيرة تلقائية. (3) items كاملة بـ UUIDs.",
         "properties": {
           "personId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID العميل (أو استخدم groupNumber)" },
           "groupNumber": { "type": "string", "nullable": true, "description": "رقم المجموعة — يبحث عن العميل تلقائياً" },
           "notes": { "type": "string", "nullable": true, "description": "ملاحظات على الطلب" },
           "items": {
             "type": "array",
-            "minItems": 1,
+            "description": "بنود الطلب (اختياري إذا استخدمت shorthand)",
             "items": { "$ref": "#/components/schemas/OrderItemInput" }
-          }
+          },
+          "productId": { "type": "string", "format": "uuid", "description": "Shorthand: UUID المنتج (بديل عن items لمنتج واحد)" },
+          "productItemNumber": { "type": "string", "description": "Shorthand: رقم صنف المنتج (بديل عن items لمنتج واحد)", "example": "001" },
+          "priceLabelId": { "type": "string", "format": "uuid", "nullable": true, "description": "Shorthand: UUID التسعيرة (اختياري)" },
+          "variantId": { "type": "string", "format": "uuid", "nullable": true, "description": "Shorthand: UUID المتغير (اختياري)" },
+          "quantity": { "type": "integer", "minimum": 1, "default": 1, "description": "Shorthand: الكمية (افتراضي: 1)" }
         }
       },
       "OrderItem": {

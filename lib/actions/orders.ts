@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { safeAction, safeActionWithRevalidation, generateItemNumber, resolveProductPrice } from '@/lib/action-utils'
+import { ORDER_INCLUDE } from '@/lib/prisma-includes'
 
 // ============================================================
 // Types
@@ -29,29 +31,43 @@ export interface UpdateOrderData {
 }
 
 // ============================================================
-// Helpers
+// Internal: Resolve items with prices
 // ============================================================
 
-/** Generate next 4-digit order number e.g. "0001" */
-async function generateOrderNumber(): Promise<string> {
-    const last = await prisma.order.findFirst({
-        orderBy: { orderNumber: 'desc' },
-        select: { orderNumber: true },
-    })
-    const next = last ? parseInt(last.orderNumber, 10) + 1 : 1
-    return String(next).padStart(4, '0')
+interface ResolvedItem {
+    productId: string
+    priceLabelId: string
+    variantId: string | null
+    unitPrice: number
+    currencyId: string | null
+    quantity: number
+    notes: string | null
 }
 
-/**
- * Resolve unit price and currency from ProductPrice.
- * Returns null if no matching ProductPrice found.
- */
-async function resolveProductPrice(productId: string, priceLabelId: string) {
-    const pp = await prisma.productPrice.findFirst({
-        where: { productId, priceLabelId },
-        include: { currency: true },
-    })
-    return pp
+async function resolveItems(items: OrderItemInput[]): Promise<ResolvedItem[]> {
+    const resolved: ResolvedItem[] = []
+
+    for (const item of items) {
+        const pp = await resolveProductPrice(item.productId, item.priceLabelId)
+        if (!pp) {
+            throw new Error(`لا توجد تسعيرة مرتبطة بالمنتج المختار`)
+        }
+        resolved.push({
+            productId: item.productId,
+            priceLabelId: item.priceLabelId,
+            variantId: item.variantId ?? null,
+            unitPrice: pp.value,
+            currencyId: pp.currencyId,
+            quantity: item.quantity,
+            notes: item.notes ?? null,
+        })
+    }
+
+    return resolved
+}
+
+function calcTotal(items: ResolvedItem[]): number {
+    return items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
 }
 
 // ============================================================
@@ -59,50 +75,27 @@ async function resolveProductPrice(productId: string, priceLabelId: string) {
 // ============================================================
 
 export async function getOrders() {
-    try {
-        const orders = await prisma.order.findMany({
+    return safeAction(
+        () => prisma.order.findMany({
             orderBy: { createdAt: 'desc' },
-            include: {
-                person: { select: { id: true, name: true } },
-                items: {
-                    include: {
-                        product: { select: { id: true, name: true, itemNumber: true } },
-                        priceLabel: { select: { id: true, name: true } },
-                        currency: { select: { id: true, name: true, symbol: true, code: true } },
-                        variant: { select: { id: true, name: true, hex: true, type: true } },
-                    },
-                },
-            },
-        })
-        return { success: true, data: orders }
-    } catch (error) {
-        console.error('Failed to fetch orders:', error)
-        return { success: false, error: 'تعذّر جلب الطلبات', data: [] }
-    }
+            include: ORDER_INCLUDE,
+        }),
+        'تعذّر جلب الطلبات'
+    )
 }
 
 export async function getOrderById(id: string) {
-    try {
-        const order = await prisma.order.findUnique({
-            where: { id },
-            include: {
-                person: { select: { id: true, name: true } },
-                items: {
-                    include: {
-                        product: { select: { id: true, name: true, itemNumber: true } },
-                        priceLabel: { select: { id: true, name: true } },
-                        currency: { select: { id: true, name: true, symbol: true, code: true } },
-                        variant: { select: { id: true, name: true, hex: true, type: true } },
-                    },
-                },
-            },
-        })
-        if (!order) return { success: false, error: 'الطلب غير موجود' }
-        return { success: true, data: order }
-    } catch (error) {
-        console.error('Failed to fetch order:', error)
-        return { success: false, error: 'تعذّر جلب الطلب' }
-    }
+    return safeAction(
+        async () => {
+            const order = await prisma.order.findUnique({
+                where: { id },
+                include: ORDER_INCLUDE,
+            })
+            if (!order) throw Object.assign(new Error('الطلب غير موجود'), { code: 'P2025' })
+            return order
+        },
+        'تعذّر جلب الطلب'
+    )
 }
 
 // ============================================================
@@ -110,61 +103,25 @@ export async function getOrderById(id: string) {
 // ============================================================
 
 export async function createOrder(data: CreateOrderData) {
-    try {
-        const resolvedItems: {
-            productId: string
-            priceLabelId: string
-            variantId: string | null
-            unitPrice: number
-            currencyId: string | null
-            quantity: number
-            notes?: string | null
-        }[] = []
+    return safeActionWithRevalidation(
+        async () => {
+            const resolvedItems = await resolveItems(data.items)
+            const totalAmount = calcTotal(resolvedItems)
+            const orderNumber = await generateItemNumber('order')
 
-        for (const item of data.items) {
-            const pp = await resolveProductPrice(item.productId, item.priceLabelId)
-            if (!pp) {
-                return {
-                    success: false,
-                    error: `لا توجد تسعيرة مرتبطة بالمنتج المختار`,
-                }
-            }
-            resolvedItems.push({
-                productId: item.productId,
-                priceLabelId: item.priceLabelId,
-                variantId: item.variantId ?? null,
-                unitPrice: pp.value,
-                currencyId: pp.currencyId,
-                quantity: item.quantity,
-                notes: item.notes ?? null,
-            })
-        }
-
-        const totalAmount = resolvedItems.reduce(
-            (sum, i) => sum + i.unitPrice * i.quantity,
-            0
-        )
-
-        const orderNumber = await generateOrderNumber()
-
-        const order = await prisma.order.create({
-            data: {
-                orderNumber,
-                personId: data.personId ?? null,
-                notes: data.notes ?? null,
-                totalAmount,
-                items: {
-                    create: resolvedItems,
+            return prisma.order.create({
+                data: {
+                    orderNumber,
+                    personId: data.personId ?? null,
+                    notes: data.notes ?? null,
+                    totalAmount,
+                    items: { create: resolvedItems },
                 },
-            },
-        })
-
-        revalidatePath('/orders')
-        return { success: true, data: order }
-    } catch (error) {
-        console.error('Failed to create order:', error)
-        return { success: false, error: 'تعذّر إنشاء الطلب' }
-    }
+            })
+        },
+        '/orders',
+        'تعذّر إنشاء الطلب'
+    )
 }
 
 // ============================================================
@@ -172,82 +129,42 @@ export async function createOrder(data: CreateOrderData) {
 // ============================================================
 
 export async function updateOrder(id: string, data: UpdateOrderData) {
-    try {
-        let totalAmount: number | undefined
-        let itemsUpdate: any = undefined
+    return safeActionWithRevalidation(
+        async () => {
+            let totalAmount: number | undefined
+            let itemsUpdate: any = undefined
 
-        if (data.items !== undefined) {
-            const resolvedItems: {
-                productId: string
-                priceLabelId: string
-                variantId: string | null
-                unitPrice: number
-                currencyId: string | null
-                quantity: number
-                notes?: string | null
-            }[] = []
-
-            for (const item of data.items) {
-                const pp = await resolveProductPrice(item.productId, item.priceLabelId)
-                if (!pp) {
-                    return {
-                        success: false,
-                        error: `لا توجد تسعيرة مرتبطة بالمنتج المختار`,
-                    }
+            if (data.items !== undefined) {
+                const resolvedItems = await resolveItems(data.items)
+                totalAmount = calcTotal(resolvedItems)
+                itemsUpdate = {
+                    deleteMany: {},
+                    create: resolvedItems,
                 }
-                resolvedItems.push({
-                    productId: item.productId,
-                    priceLabelId: item.priceLabelId,
-                    variantId: item.variantId ?? null,
-                    unitPrice: pp.value,
-                    currencyId: pp.currencyId,
-                    quantity: item.quantity,
-                    notes: item.notes ?? null,
-                })
             }
 
-            totalAmount = resolvedItems.reduce(
-                (sum, i) => sum + i.unitPrice * i.quantity,
-                0
-            )
-
-            itemsUpdate = {
-                deleteMany: {},
-                create: resolvedItems,
-            }
-        }
-
-        const order = await prisma.order.update({
-            where: { id },
-            data: {
-                personId: data.personId !== undefined ? data.personId ?? null : undefined,
-                notes: data.notes !== undefined ? data.notes ?? null : undefined,
-                status: data.status,
-                totalAmount,
-                ...(itemsUpdate && { items: itemsUpdate }),
-            },
-        })
-
-        revalidatePath('/orders')
-        return { success: true, data: order }
-    } catch (error) {
-        console.error('Failed to update order:', error)
-        return { success: false, error: 'تعذّر تعديل الطلب' }
-    }
+            return prisma.order.update({
+                where: { id },
+                data: {
+                    personId: data.personId !== undefined ? data.personId ?? null : undefined,
+                    notes: data.notes !== undefined ? data.notes ?? null : undefined,
+                    status: data.status,
+                    totalAmount,
+                    ...(itemsUpdate && { items: itemsUpdate }),
+                },
+            })
+        },
+        '/orders',
+        'تعذّر تعديل الطلب'
+    )
 }
 
 export async function updateOrderStatus(id: string, status: string) {
-    try {
-        const order = await prisma.order.update({
-            where: { id },
-            data: { status },
-        })
-        revalidatePath('/orders')
-        return { success: true, data: order }
-    } catch (error) {
-        console.error('Failed to update order status:', error)
-        return { success: false, error: 'تعذّر تحديث حالة الطلب' }
-    }
+    return safeActionWithRevalidation(
+        () => prisma.order.update({ where: { id }, data: { status } }),
+        '/orders',
+        'تعذّر تحديث حالة الطلب'
+    )
 }
 
 // ============================================================
@@ -255,43 +172,33 @@ export async function updateOrderStatus(id: string, status: string) {
 // ============================================================
 
 export async function deleteOrder(id: string) {
-    try {
-        await prisma.order.delete({ where: { id } })
-        revalidatePath('/orders')
-        return { success: true }
-    } catch (error) {
-        console.error('Failed to delete order:', error)
-        return { success: false, error: 'تعذّر حذف الطلب' }
-    }
+    return safeActionWithRevalidation(
+        async () => {
+            await prisma.order.delete({ where: { id } })
+            return null
+        },
+        '/orders',
+        'تعذّر حذف الطلب'
+    )
 }
 
 // ============================================================
-// Helper: Get available price labels for a product
+// Helpers: Product price labels & variants (for order form)
 // ============================================================
 
 export async function getProductPriceLabels(productId: string) {
-    try {
-        const prices = await prisma.productPrice.findMany({
+    return safeAction(
+        () => prisma.productPrice.findMany({
             where: { productId },
-            include: {
-                priceLabel: true,
-                currency: true,
-            },
-        })
-        return { success: true, data: prices }
-    } catch (error) {
-        console.error('Failed to fetch product price labels:', error)
-        return { success: false, error: 'تعذّر جلب التسعيرات', data: [] }
-    }
+            include: { priceLabel: true, currency: true },
+        }),
+        'تعذّر جلب التسعيرات'
+    )
 }
 
-// ============================================================
-// Helper: Get variants for a product
-// ============================================================
-
 export async function getProductVariants(productId: string) {
-    try {
-        const variants = await prisma.variant.findMany({
+    return safeAction(
+        () => prisma.variant.findMany({
             where: { productId },
             orderBy: { order: 'asc' },
             select: {
@@ -302,10 +209,7 @@ export async function getProductVariants(productId: string) {
                 suffix: true,
                 isDefault: true,
             },
-        })
-        return { success: true, data: variants }
-    } catch (error) {
-        console.error('Failed to fetch product variants:', error)
-        return { success: false, error: 'تعذّر جلب المتغيرات', data: [] }
-    }
+        }),
+        'تعذّر جلب المتغيرات'
+    )
 }

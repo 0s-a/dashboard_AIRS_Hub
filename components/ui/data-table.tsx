@@ -70,11 +70,14 @@ export function DataTable<TData, TValue>({
     renderSubComponent,
     globalFilterFn,
 }: DataTableProps<TData, TValue>) {
+    const [isMounted, setIsMounted] = React.useState(false)
     const [globalFilter, setGlobalFilter] = React.useState("")
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [grouping, setGrouping] = React.useState<GroupingState>([])
     const [expanded, setExpanded] = React.useState<ExpandedState>({})
     const searchInputRef = React.useRef<HTMLInputElement>(null)
+
+    React.useEffect(() => { setIsMounted(true) }, [])
 
     // Keyboard shortcut for focusing search (/)
     React.useEffect(() => {
@@ -88,6 +91,7 @@ export function DataTable<TData, TValue>({
         return () => window.removeEventListener("keydown", handleKeyDown)
     }, [])
 
+    // useReactTable must be called unconditionally (Rules of Hooks)
     const table = useReactTable({
         data,
         columns,
@@ -110,6 +114,24 @@ export function DataTable<TData, TValue>({
         getRowCanExpand: () => true,
         globalFilterFn: globalFilterFn,
     })
+
+    // Skeleton shown during hydration — after ALL hooks to respect Rules of Hooks
+    if (!isMounted) {
+        return (
+            <div className="space-y-4 animate-pulse">
+                <div className="flex items-center gap-4">
+                    <div className="h-11 flex-1 max-w-md rounded-xl bg-muted/40" />
+                </div>
+                <div className="card-premium overflow-hidden">
+                    <div className="h-10 bg-muted/30" />
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="h-12 border-t border-border/40 bg-muted/10" />
+                    ))}
+                </div>
+                <div className="h-10 rounded-lg bg-muted/20" />
+            </div>
+        )
+    }
 
     return (
         <div className="space-y-4">

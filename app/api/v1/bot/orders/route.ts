@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateApiKey } from '@/lib/api-utils'
+import { resolveProductPrice, generateItemNumber } from '@/lib/action-utils'
+import { ORDER_INCLUDE } from '@/lib/prisma-includes'
 import { z } from 'zod'
 
 // ────────────────────────────────────────────────────────
@@ -17,30 +19,10 @@ const OrderItemSchema = z.object({
 
 const CreateOrderSchema = z.object({
     personId: z.string().uuid().optional().nullable(),
-    groupNumber: z.string().optional().nullable(), // Alternative: find person by group number
+    groupNumber: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
     items: z.array(OrderItemSchema).min(1, 'يجب أن يحتوي الطلب على منتج واحد على الأقل'),
 })
-
-// ────────────────────────────────────────────────────────
-// Helpers
-// ────────────────────────────────────────────────────────
-
-async function generateOrderNumber(): Promise<string> {
-    const last = await prisma.order.findFirst({
-        orderBy: { orderNumber: 'desc' },
-        select: { orderNumber: true },
-    })
-    const next = last ? parseInt(last.orderNumber, 10) + 1 : 1
-    return String(next).padStart(4, '0')
-}
-
-async function resolveProductPrice(productId: string, priceLabelId: string) {
-    return prisma.productPrice.findFirst({
-        where: { productId, priceLabelId },
-        include: { currency: true },
-    })
-}
 
 // ────────────────────────────────────────────────────────
 // POST /api/v1/bot/orders — Create a new order
@@ -106,12 +88,11 @@ export async function POST(req: NextRequest) {
 
         // ── Calculate total ──
         const totalAmount = resolvedItems.reduce(
-            (sum, i) => sum + i.unitPrice * i.quantity,
-            0
+            (sum, i) => sum + i.unitPrice * i.quantity, 0
         )
 
         // ── Create order ──
-        const orderNumber = await generateOrderNumber()
+        const orderNumber = await generateItemNumber('order')
 
         const order = await prisma.order.create({
             data: {
@@ -119,27 +100,12 @@ export async function POST(req: NextRequest) {
                 personId: resolvedPersonId,
                 notes: notes ?? null,
                 totalAmount,
-                items: {
-                    create: resolvedItems,
-                },
+                items: { create: resolvedItems },
             },
-            include: {
-                person: { select: { id: true, name: true } },
-                items: {
-                    include: {
-                        product: { select: { id: true, name: true, itemNumber: true } },
-                        priceLabel: { select: { id: true, name: true } },
-                        currency: { select: { id: true, name: true, symbol: true, code: true } },
-                        variant: { select: { id: true, name: true, hex: true, type: true } },
-                    },
-                },
-            },
+            include: ORDER_INCLUDE,
         })
 
-        return NextResponse.json({
-            success: true,
-            data: order,
-        }, { status: 201 })
+        return NextResponse.json({ success: true, data: order }, { status: 201 })
     } catch (error: any) {
         console.error('API Error [POST /orders]:', error?.message || error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
@@ -177,17 +143,13 @@ export async function GET(req: NextRequest) {
                 where.personId = person.id
             } else {
                 return NextResponse.json({
-                    success: true,
-                    data: [],
-                    count: 0,
+                    success: true, data: [], count: 0,
                     pagination: { total: 0, page, limit, totalPages: 0 },
                 })
             }
         }
 
-        if (status) {
-            where.status = status
-        }
+        if (status) where.status = status
 
         const [orders, total] = await Promise.all([
             prisma.order.findMany({
@@ -195,17 +157,7 @@ export async function GET(req: NextRequest) {
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit,
-                include: {
-                    person: { select: { id: true, name: true } },
-                    items: {
-                        include: {
-                            product: { select: { id: true, name: true, itemNumber: true } },
-                            priceLabel: { select: { id: true, name: true } },
-                            currency: { select: { id: true, name: true, symbol: true, code: true } },
-                            variant: { select: { id: true, name: true, hex: true, type: true } },
-                        },
-                    },
-                },
+                include: ORDER_INCLUDE,
             }),
             prisma.order.count({ where }),
         ])
@@ -215,9 +167,7 @@ export async function GET(req: NextRequest) {
             data: orders,
             count: orders.length,
             pagination: {
-                total,
-                page,
-                limit,
+                total, page, limit,
                 totalPages: Math.ceil(total / limit),
             },
         })

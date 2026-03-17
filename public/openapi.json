@@ -33,8 +33,16 @@
       "description": "استعراض المنتجات"
     },
     {
+      "name": "Search",
+      "description": "بحث متقدم في المنتجات باستخدام PostgreSQL Full-Text Search بالعربية"
+    },
+    {
       "name": "Pricing",
       "description": "فحص الأسعار والتسعير"
+    },
+    {
+      "name": "Notifications",
+      "description": "إشعارات الذكاء الاصطناعي — تنبيهات بحث الزبائن عبر البوت"
     }
   ],
   "paths": {
@@ -875,6 +883,215 @@
           "500": { "$ref": "#/components/responses/InternalError" }
         }
       }
+    },
+    "/api/v1/bot/products/search": {
+      "get": {
+        "tags": ["Search"],
+        "summary": "بحث متقدم في المنتجات (Full-Text Search)",
+        "description": "بحث متقدم يستخدم PostgreSQL Full-Text Search بالعربية مع ترتيب بالصلة (ts_rank). يبحث في: الاسم، الماركة، الوصف، رقم الصنف، الأسماء البديلة، والوسوم. يدعم تصفية الأسعار حسب العميل (personId). إذا لم يعطِ FTS نتائج، يتم الانتقال تلقائياً لبحث ILIKE.",
+        "operationId": "searchProducts",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "كلمة البحث (يدعم أيضاً search)",
+            "schema": { "type": "string" },
+            "example": "آيفون"
+          },
+          {
+            "name": "personId",
+            "in": "query",
+            "description": "UUID العميل — لتصفية الأسعار حسب مسميات تسعيرة المرتبطة بالعميل",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "available",
+            "in": "query",
+            "description": "فلترة حسب التوفر",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "فلترة حسب UUID الفئة",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "brand",
+            "in": "query",
+            "description": "فلترة حسب الماركة (ILIKE)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "رقم الصفحة (افتراضي: 1)",
+            "schema": { "type": "integer", "default": 1, "minimum": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "عدد النتائج (افتراضي: 20، أقصى: 50)",
+            "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 50 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "نتائج البحث مرتبة حسب الصلة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/SearchProduct" }
+                    },
+                    "count": { "type": "integer", "example": 5 },
+                    "searchMode": { "type": "string", "enum": ["fulltext", "ilike_fallback"], "description": "وضع البحث المُستخدم" },
+                    "pagination": { "$ref": "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "معلمة البحث مفقودة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Missing required parameter: q" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/v1/bot/notifications": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "إنشاء إشعار",
+        "description": "إنشاء إشعار ذكاء اصطناعي جديد. يُستدعى من البوت عندما يبحث الزبون عن منتج غير متوفر أو غير موجود.",
+        "operationId": "createNotification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateNotificationInput" },
+              "examples": {
+                "not_found": {
+                  "summary": "منتج غير موجود",
+                  "value": {
+                    "type": "not_found",
+                    "searchQuery": "سامسونج S25",
+                    "phoneNumber": "0512345678",
+                    "personId": null
+                  }
+                },
+                "out_of_stock": {
+                  "summary": "منتج غير متوفر",
+                  "value": {
+                    "type": "out_of_stock",
+                    "searchQuery": "آيفون 15",
+                    "productId": "uuid-product",
+                    "productName": "آيفون 15 برو ماكس",
+                    "personId": "uuid-person",
+                    "phoneNumber": "0512345678"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "تم إنشاء الإشعار",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": { "$ref": "#/components/schemas/AiNotification" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "بيانات غير صالحة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string", "example": "Missing required fields: type, searchQuery" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "قائمة الإشعارات",
+        "description": "جلب قائمة إشعارات الذكاء الاصطناعي مع فلاتر اختيارية وعدد غير المقروء.",
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "فلترة حسب نوع الإشعار",
+            "schema": { "type": "string", "enum": ["out_of_stock", "not_found"] }
+          },
+          {
+            "name": "isRead",
+            "in": "query",
+            "description": "فلترة حسب حالة القراءة",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "عدد النتائج (افتراضي: 50، أقصى: 100)",
+            "schema": { "type": "integer", "default": 50, "minimum": 1, "maximum": 100 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة الإشعارات",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AiNotification" }
+                    },
+                    "unreadCount": { "type": "integer", "example": 3 },
+                    "count": { "type": "integer", "example": 10 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
     }
   },
   "components": {
@@ -1261,6 +1478,88 @@
           "page": { "type": "integer", "example": 1 },
           "limit": { "type": "integer", "example": 50 },
           "totalPages": { "type": "integer", "example": 3 }
+        }
+      },
+      "SearchProduct": {
+        "type": "object",
+        "description": "نتيجة بحث منتج من Full-Text Search — تتضمن rank للترتيب بالصلة",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "آيفون 15 برو ماكس" },
+          "brand": { "type": "string", "nullable": true, "example": "Apple" },
+          "itemNumber": { "type": "string", "example": "001-BF-483" },
+          "description": { "type": "string", "nullable": true },
+          "isAvailable": { "type": "boolean" },
+          "tags": { "type": "array", "nullable": true, "items": { "type": "string" } },
+          "alternativeNames": { "nullable": true },
+          "rank": { "type": "number", "description": "درجة الصلة بالبحث (أعلى = أكثر صلة)", "example": 0.6383 },
+          "category": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/Category" }]
+          },
+          "prices": {
+            "type": "array",
+            "description": "الأسعار — مُصفّاة حسب العميل إذا أُرسل personId",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "value": { "type": "number", "example": 150.0 },
+                "unit": { "type": "string", "nullable": true },
+                "quantity": { "type": "integer", "nullable": true },
+                "priceLabelId": { "type": "string", "format": "uuid" },
+                "priceLabelName": { "type": "string", "example": "سعر الجملة" },
+                "currencyCode": { "type": "string", "example": "SAR" },
+                "currencySymbol": { "type": "string", "example": "ر.س" },
+                "currencyName": { "type": "string", "example": "ريال سعودي" }
+              }
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Variant" }
+          },
+          "images": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProductImage" }
+          }
+        }
+      },
+      "AiNotification": {
+        "type": "object",
+        "description": "إشعار ذكاء اصطناعي من بحث الزبائن",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "enum": ["out_of_stock", "not_found"], "description": "نوع الإشعار: غير متوفر أو غير موجود" },
+          "searchQuery": { "type": "string", "example": "سامسونج S25", "description": "كلمة البحث التي أدخلها الزبون" },
+          "productId": { "type": "string", "format": "uuid", "nullable": true },
+          "productName": { "type": "string", "nullable": true, "example": "آيفون 15 برو ماكس" },
+          "personId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID العميل المرتبط" },
+          "person": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string", "example": "أحمد محمد" }
+            }
+          },
+          "source": { "type": "string", "nullable": true, "example": "bot", "description": "مصدر الإشعار" },
+          "phoneNumber": { "type": "string", "nullable": true, "example": "0512345678" },
+          "isRead": { "type": "boolean", "default": false },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateNotificationInput": {
+        "type": "object",
+        "required": ["type", "searchQuery"],
+        "properties": {
+          "type": { "type": "string", "enum": ["out_of_stock", "not_found"], "description": "نوع الإشعار" },
+          "searchQuery": { "type": "string", "description": "كلمة البحث" },
+          "productId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID المنتج (لإشعارات out_of_stock)" },
+          "productName": { "type": "string", "nullable": true, "description": "اسم المنتج" },
+          "personId": { "type": "string", "format": "uuid", "nullable": true, "description": "UUID العميل" },
+          "phoneNumber": { "type": "string", "nullable": true, "description": "رقم هاتف الزبون" },
+          "source": { "type": "string", "nullable": true, "default": "bot", "description": "المصدر (افتراضي: bot)" }
         }
       }
     }

@@ -7,7 +7,8 @@ import {
     Tag, 
     UserCog, 
     Coins,
-    ShoppingCart
+    ShoppingCart,
+    Bell
 } from "lucide-react"
 
 export const navigationGroups = [
@@ -42,6 +43,12 @@ export const navigationGroups = [
         items: [
             { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
             { href: "/currencies", label: "العملات", icon: Coins },
+        ]
+    },
+    {
+        title: "الذكاء الاصطناعي",
+        items: [
+            { href: "/notifications", label: "الإشعارات", icon: Bell },
         ]
     },
     {

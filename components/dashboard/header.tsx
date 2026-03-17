@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { 
@@ -14,11 +15,17 @@ import {
     Menu,
     Wand2,
     PanelRightClose,
-    PanelRightOpen
+    PanelRightOpen,
+    PackageX,
+    SearchX,
+    CheckCheck,
+    ExternalLink,
+    Clock,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { CommandPalette } from "@/components/command-palette"
+import { Badge } from "@/components/ui/badge"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -34,6 +41,8 @@ import {
     SheetContent,
     SheetTrigger,
 } from "@/components/ui/sheet"
+import { getNotifications, getUnreadCount, markAllAsRead } from "@/lib/actions/notifications"
+import { cn } from "@/lib/utils"
 
 interface HeaderProps {
     isCollapsed: boolean
@@ -49,10 +58,45 @@ const routeMap: Record<string, string> = {
     "/price-labels": "مسميات التسعيرات",
     "/currencies": "العملات",
     "/gallery": "معرض الصور",
+    "/orders": "الطلبات",
+    "/notifications": "الإشعارات",
+}
+
+function timeAgo(date: Date | string) {
+    const now = new Date()
+    const d = new Date(date)
+    const diff = Math.floor((now.getTime() - d.getTime()) / 1000)
+    if (diff < 60) return "الآن"
+    if (diff < 3600) return `منذ ${Math.floor(diff / 60)} د`
+    if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} س`
+    return `منذ ${Math.floor(diff / 86400)} ي`
 }
 
 export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
     const pathname = usePathname()
+    const [unreadCount, setUnreadCount] = useState(0)
+    const [recentNotifs, setRecentNotifs] = useState<any[]>([])
+
+    const loadNotifications = useCallback(async () => {
+        const [countRes, notifsRes] = await Promise.all([
+            getUnreadCount(),
+            getNotifications({ limit: 5 }),
+        ])
+        if (countRes.success && countRes.data !== undefined) setUnreadCount(countRes.data as number)
+        if (notifsRes.success && notifsRes.data) setRecentNotifs(notifsRes.data)
+    }, [])
+
+    useEffect(() => {
+        loadNotifications()
+        // Poll every 30 seconds
+        const interval = setInterval(loadNotifications, 30000)
+        return () => clearInterval(interval)
+    }, [loadNotifications])
+
+    const handleMarkAllRead = async () => {
+        await markAllAsRead()
+        loadNotifications()
+    }
     
     // Build breadcrumbs from the URL pathname
     const segments = pathname.split("/").filter(Boolean)
@@ -72,7 +116,7 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                 
                 {/* ======== RIGHT SIDE: Mobile menu + Page title ======== */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        {/* Sidebar Toggle - desktop only */}
+                                    {/* Sidebar Toggle - desktop only */}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -169,11 +213,102 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                     {/* Search */}
                     <CommandPalette />
 
-                    {/* Notifications */}
-                    <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl hover:bg-primary/5 transition-colors group">
-                        <Bell className="size-[18px] text-muted-foreground group-hover:text-primary transition-colors" />
-                        <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-background" />
-                    </Button>
+                    {/* Notification Bell with Dropdown */}
+                    <DropdownMenu onOpenChange={(open) => { if (open) loadNotifications() }}>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl hover:bg-primary/5 transition-colors group">
+                                <Bell className="size-[18px] text-muted-foreground group-hover:text-primary transition-colors" />
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 size-4 bg-red-500 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white">
+                                        {unreadCount > 9 ? "9+" : unreadCount}
+                                    </span>
+                                )}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-80 rounded-xl p-0 overflow-hidden">
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b">
+                                <span className="text-sm font-bold">الإشعارات</span>
+                                <div className="flex items-center gap-2">
+                                    {unreadCount > 0 && (
+                                        <Badge variant="destructive" className="text-[10px] h-5 px-1.5">
+                                            {unreadCount} جديد
+                                        </Badge>
+                                    )}
+                                    {unreadCount > 0 && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 text-[10px] px-2 text-primary hover:text-primary"
+                                            onClick={handleMarkAllRead}
+                                        >
+                                            <CheckCheck className="h-3 w-3 ml-1" />
+                                            قراءة الكل
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Notifications list */}
+                            <div className="max-h-80 overflow-y-auto">
+                                {recentNotifs.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                                        <Bell className="size-8 text-muted-foreground/30 mb-2" />
+                                        <span className="text-xs text-muted-foreground">لا توجد إشعارات</span>
+                                    </div>
+                                ) : (
+                                    recentNotifs.map((notif) => (
+                                        <div
+                                            key={notif.id}
+                                            className={cn(
+                                                "flex items-start gap-3 px-4 py-3 border-b border-border/30 last:border-0 transition-colors hover:bg-muted/30",
+                                                !notif.isRead && "bg-primary/3"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "size-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
+                                                notif.type === "out_of_stock" ? "bg-amber-500/10" : "bg-red-500/10"
+                                            )}>
+                                                {notif.type === "out_of_stock" ? (
+                                                    <PackageX className="size-4 text-amber-600" />
+                                                ) : (
+                                                    <SearchX className="size-4 text-red-600" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-medium truncate">
+                                                    بحث: <span className="text-primary font-bold">"{notif.searchQuery}"</span>
+                                                </p>
+                                                {notif.productName && (
+                                                    <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                                                        المنتج: {notif.productName}
+                                                    </p>
+                                                )}
+                                                <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                                                    <Clock className="h-2.5 w-2.5" />
+                                                    {timeAgo(notif.createdAt)}
+                                                </p>
+                                            </div>
+                                            {!notif.isRead && (
+                                                <div className="size-2 rounded-full bg-primary shrink-0 mt-2" />
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="border-t px-4 py-2 bg-muted/20">
+                                <Link
+                                    href="/notifications"
+                                    className="text-xs text-primary hover:underline font-semibold flex items-center justify-center gap-1"
+                                >
+                                    عرض كل الإشعارات
+                                    <ExternalLink className="h-3 w-3" />
+                                </Link>
+                            </div>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
 
 

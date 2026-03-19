@@ -8,7 +8,8 @@ import {
     UserCog, 
     Coins,
     ShoppingCart,
-    Bell
+    Bell,
+    UsersRound
 } from "lucide-react"
 
 export const navigationGroups = [
@@ -43,6 +44,7 @@ export const navigationGroups = [
         items: [
             { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
             { href: "/currencies", label: "العملات", icon: Coins },
+            { href: "/users", label: "المستخدمين", icon: UsersRound },
         ]
     },
     {

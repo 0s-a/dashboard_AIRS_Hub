@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog, Coins, ArrowRight } from "lucide-react"
 import { Header } from "@/components/dashboard/header"
+import { Footer } from "@/components/dashboard/footer"
 import { navigationGroups } from "@/lib/navigation"
 import {
     Tooltip,
@@ -145,6 +146,7 @@ export default function DashboardLayout({
                     <main className="p-8 sm:px-10 max-w-(--breakpoint-2xl) mx-auto w-full overflow-hidden">
                         {children}
                     </main>
+                    <Footer />
                 </div>
             </div>
         </div>

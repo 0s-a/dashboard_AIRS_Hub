@@ -10,8 +10,6 @@ import {
     User, 
     Settings, 
     LogOut,
-    ChevronsLeft,
-    ChevronsRight,
     Menu,
     Wand2,
     PanelRightClose,
@@ -42,6 +40,7 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet"
 import { getNotifications, getUnreadCount, markAllAsRead } from "@/lib/actions/notifications"
+import { getCurrentUser, logout } from "@/lib/actions/auth"
 import { cn } from "@/lib/utils"
 
 interface HeaderProps {
@@ -60,6 +59,7 @@ const routeMap: Record<string, string> = {
     "/gallery": "معرض الصور",
     "/orders": "الطلبات",
     "/notifications": "الإشعارات",
+    "/users": "المستخدمين",
 }
 
 function timeAgo(date: Date | string) {
@@ -76,6 +76,7 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
     const pathname = usePathname()
     const [unreadCount, setUnreadCount] = useState(0)
     const [recentNotifs, setRecentNotifs] = useState<any[]>([])
+    const [userName, setUserName] = useState("")
 
     const loadNotifications = useCallback(async () => {
         const [countRes, notifsRes] = await Promise.all([
@@ -88,6 +89,10 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
 
     useEffect(() => {
         loadNotifications()
+        // Load current user
+        getCurrentUser().then(res => {
+            if (res.success && res.data) setUserName(res.data.name)
+        })
         // Poll every 30 seconds
         const interval = setInterval(loadNotifications, 30000)
         return () => clearInterval(interval)
@@ -96,6 +101,11 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
     const handleMarkAllRead = async () => {
         await markAllAsRead()
         loadNotifications()
+    }
+
+    const handleLogout = async () => {
+        await logout()
+        window.location.href = '/login'
     }
     
     // Build breadcrumbs from the URL pathname
@@ -207,7 +217,7 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                         </h1>
                     </div>
                 </div>
-                            <ModeToggle />
+
                 {/* ======== LEFT SIDE: Actions ======== */}
                 <div className="flex items-center gap-2 shrink-0">
                     {/* Search */}
@@ -217,9 +227,9 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                     <DropdownMenu onOpenChange={(open) => { if (open) loadNotifications() }}>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl hover:bg-primary/5 transition-colors group">
-                                <Bell className="size-[18px] text-muted-foreground group-hover:text-primary transition-colors" />
+                                <Bell className="size-[18px] text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all duration-300" />
                                 {unreadCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 size-4 bg-red-500 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white">
+                                    <span className="absolute -top-0.5 -right-0.5 size-4 bg-red-500 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white animate-pulse">
                                         {unreadCount > 9 ? "9+" : unreadCount}
                                     </span>
                                 )}
@@ -310,14 +320,49 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-
-
                     {/* Theme Toggle */}
-                    
+                    <ModeToggle />
 
                     {/* Divider */}
                     <div className="hidden sm:block h-6 w-px bg-border/50 mx-1" />
 
+                    {/* User Profile */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="relative h-9 w-9 rounded-xl p-0 hover:bg-primary/5 transition-all duration-300 group">
+                                <Avatar className="h-8 w-8 border-2 border-transparent group-hover:border-primary/30 transition-all duration-300">
+                                    <AvatarFallback className="bg-linear-to-br from-primary/80 to-indigo-500/80 text-white text-xs font-bold">
+                                        {userName ? userName[0] : "?"}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-bold leading-none">{userName || "جاري التحميل..."}</p>
+                                    <p className="text-xs leading-none text-muted-foreground">مدير النظام</p>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="gap-2 cursor-pointer font-medium">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                الملف الشخصي
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2 cursor-pointer font-medium">
+                                <Settings className="h-4 w-4 text-muted-foreground" />
+                                الإعدادات
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className="gap-2 cursor-pointer font-medium text-destructive focus:text-destructive"
+                                onClick={handleLogout}
+                            >
+                                <LogOut className="h-4 w-4" />
+                                تسجيل الخروج
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
         </header>

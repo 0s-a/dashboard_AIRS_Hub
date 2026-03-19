@@ -254,3 +254,15 @@ model AiNotification {
   @@index([createdAt])
   @@index([personId])
 }
+
+// User accounts for dashboard authentication
+model User {
+  id        String    @id @default(uuid())
+  name      String
+  username  String    @unique
+  password  String // bcrypt hashed
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}

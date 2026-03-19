@@ -1,9 +1,24 @@
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
 async function main() {
     console.log('🌱 Start seeding ...')
+
+    // 0. إنشاء حساب Admin افتراضي
+    const adminPassword = await bcrypt.hash('admin123', 12)
+    await prisma.user.upsert({
+        where: { username: 'admin' },
+        update: {},
+        create: {
+            name: 'حسام',
+            username: 'admin',
+            password: adminPassword,
+            isActive: true,
+        },
+    })
+    console.log('👤 Admin user created/verified (username: admin, password: admin123)')
 
     // 1. تعريف المنتجات مع الحقول الجديدة (رقم الصنف، الوحدة، المستوى، العبوة)
     const products = [

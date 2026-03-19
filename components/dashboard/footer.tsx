@@ -16,7 +16,7 @@ export function Footer() {
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>© {currentYear}</span>
                         <span className="font-bold bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent">
-                            HUSAM-AI
+                            نواة
                         </span>
                         <span className="hidden sm:inline">—</span>
                         <span className="hidden sm:inline">جميع الحقوق محفوظة</span>

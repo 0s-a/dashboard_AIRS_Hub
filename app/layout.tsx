@@ -11,8 +11,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "لوحة التحكم الذكية", // Smart Dashboard in Arabic
-  description: "نظام إدارة المخزون والعلامة التجارية",
+  title: "نواة — نظام الإدارة الذكي",
+  description: "منصة نواة لإدارة المخزون والمبيعات بكفاءة عالية",
 };
 
 export default function RootLayout({

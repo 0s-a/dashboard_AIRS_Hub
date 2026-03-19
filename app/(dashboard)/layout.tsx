@@ -51,11 +51,11 @@ export default function DashboardLayout({
                     <div className="p-6">
                         <div className={`flex items-center gap-3 px-2 ${isCollapsed ? 'justify-center' : ''}`}>
                             <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0 group hover:rotate-12 transition-transform duration-500">
-                                <Wand2 className="size-6 text-white" />
+                                <span className="text-white font-black text-xl leading-none" style={{fontFamily: 'serif'}}>ن</span>
                             </div>
                             <div className={`flex flex-col transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
-                                <span className="font-bold text-lg tracking-tight whitespace-nowrap bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent italic">HUSAM-AI</span>
-                                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest -mt-1 whitespace-nowrap">إدارة المتاجر الذكية</span>
+                                <span className="font-black text-lg tracking-tight whitespace-nowrap bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent">نواة</span>
+                                <span className="text-[9px] text-muted-foreground font-bold tracking-[0.2em] -mt-0.5 whitespace-nowrap uppercase">Nawaat</span>
                             </div>
                         </div>
                     </div>

@@ -151,11 +151,11 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                             <div className="p-6 border-b border-border/40">
                                 <div className="flex items-center gap-3">
                                     <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0">
-                                        <Wand2 className="size-6 text-white" />
+                                        <span className="text-white font-black text-xl leading-none" style={{fontFamily: 'serif'}}>ن</span>
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="font-bold text-lg tracking-tight bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent italic">HUSAM-AI</span>
-                                        <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">إدارة المتاجر الذكية</span>
+                                        <span className="font-black text-lg tracking-tight bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent">نواة</span>
+                                        <span className="text-[9px] text-muted-foreground font-bold tracking-[0.2em] uppercase">Nawaat</span>
                                     </div>
                                 </div>
                             </div>

@@ -2,7 +2,7 @@ import { getGalleryImages, getGalleryStats } from "@/lib/actions/gallery"
 import { GalleryClient } from "./gallery-client"
 
 export const metadata = {
-    title: "معرض الصور | HUSAM-AI",
+    title: "معرض الصور | نواة",
     description: "معرض الصور المركزي — رفع وإدارة وربط الصور بالمنتجات",
 }
 

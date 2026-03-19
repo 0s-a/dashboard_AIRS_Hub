@@ -2,7 +2,7 @@
 
 export const AUTH_CONFIG = {
     tokenName: 'auth-token',
-    jwtSecret: process.env.JWT_SECRET || 'husam-ai-dashboard-secret-key-2026',
+    jwtSecret: process.env.JWT_SECRET || 'nawaat-dashboard-secret-key-2026',
     tokenMaxAge: 60 * 60 * 24 * 7, // 7 days
     tokenExpiry: '7d',
 } as const

@@ -11,5 +11,7 @@ export interface JwtPayload {
     userId: string
     username: string
     name: string
+    role: string     // "admin" | "user"
+    color: string    // avatar color hex
     [key: string]: unknown
 }

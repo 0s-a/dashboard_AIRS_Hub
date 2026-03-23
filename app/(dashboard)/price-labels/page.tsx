@@ -80,7 +80,7 @@ export default function PriceLabelsPage() {
 
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
-                <PriceLabelTable data={labels} />
+                <PriceLabelTable data={labels} onRefresh={loadLabels} />
             </div>
 
             {/* Sheet */}

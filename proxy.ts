@@ -9,7 +9,7 @@ const secret = new TextEncoder().encode(AUTH_CONFIG.jwtSecret)
 const PUBLIC_PATHS = ['/login']
 const PUBLIC_PREFIXES = ['/api/v1/', '/_next/', '/favicon.ico']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl
 
     // Allow public paths

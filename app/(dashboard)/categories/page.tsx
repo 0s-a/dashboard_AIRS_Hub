@@ -96,7 +96,7 @@ export default function CategoriesPage() {
 
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
-                <CategoryTable data={categories} />
+                <CategoryTable data={categories} onRefresh={loadCategories} />
             </div>
 
             {/* Sheet */}

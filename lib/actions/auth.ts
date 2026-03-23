@@ -42,7 +42,13 @@ export async function login(username: string, password: string): Promise<ActionR
         })
 
         // Create JWT with jose (consistent with middleware)
-        const token = await new SignJWT({ userId: user.id, username: user.username, name: user.name } as JwtPayload)
+        const token = await new SignJWT({
+            userId: user.id,
+            username: user.username,
+            name: user.name,
+            role: user.role,
+            color: user.color,
+        } as JwtPayload)
             .setProtectedHeader({ alg: 'HS256' })
             .setExpirationTime(AUTH_CONFIG.tokenExpiry)
             .setIssuedAt()
@@ -93,9 +99,11 @@ export async function getCurrentUser(): Promise<ActionResult<JwtPayload | null>>
         return {
             success: true,
             data: {
-                userId: payload.userId as string,
+                userId:   payload.userId   as string,
                 username: payload.username as string,
-                name: payload.name as string,
+                name:     payload.name     as string,
+                role:     (payload.role     as string) || 'user',
+                color:    (payload.color    as string) || '#6366f1',
             },
         }
     } catch {

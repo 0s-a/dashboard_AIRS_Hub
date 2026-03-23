@@ -6,8 +6,9 @@ import { PriceLabel } from "@prisma/client"
 
 interface PriceLabelTableProps {
     data: PriceLabel[]
+    onRefresh?: () => void | Promise<void>
 }
 
-export function PriceLabelTable({ data }: PriceLabelTableProps) {
-    return <DataTable columns={columns} data={data} />
+export function PriceLabelTable({ data, onRefresh }: PriceLabelTableProps) {
+    return <DataTable columns={columns} data={data} onRefresh={onRefresh} />
 }

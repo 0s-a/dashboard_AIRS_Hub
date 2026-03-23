@@ -18,9 +18,10 @@ import { cn } from "@/lib/utils"
 
 interface InventoryTableProps {
     products: any[]
+    onRefresh?: () => void | Promise<void>
 }
 
-export function InventoryTable({ products }: InventoryTableProps) {
+export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
     const [isMounted, setIsMounted] = useState(false)
 
     // ── Filter state ──────────────────────────────────
@@ -259,6 +260,7 @@ export function InventoryTable({ products }: InventoryTableProps) {
                     return <VariantsList variants={variantsWithDefaults} />
                 }}
                 globalFilterFn={customGlobalFilterFn}
+                onRefresh={onRefresh}
             />
         </div>
     )

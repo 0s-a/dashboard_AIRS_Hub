@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
     ColumnDef,
     flexRender,
@@ -15,7 +16,7 @@ import {
     GroupingState,
     ExpandedState,
 } from "@tanstack/react-table"
-import { Search, X, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, ChevronLeft, ChevronFirst, ChevronLast, Layers, LayoutGrid } from "lucide-react"
+import { Search, X, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, ChevronLeft, ChevronFirst, ChevronLast, Layers, LayoutGrid, RefreshCcw } from "lucide-react"
 
 import {
     Table,
@@ -49,6 +50,7 @@ interface DataTableProps<TData, TValue> {
     groupingOptions?: GroupingOption[]
     renderSubComponent?: (props: { row: any }) => React.ReactElement
     globalFilterFn?: (row: any, columnId: string, filterValue: string) => boolean
+    onRefresh?: () => void | Promise<void>
 }
 
 // Pre-compute row model factories outside the component to avoid
@@ -69,13 +71,31 @@ export function DataTable<TData, TValue>({
     groupingOptions = [],
     renderSubComponent,
     globalFilterFn,
+    onRefresh,
 }: DataTableProps<TData, TValue>) {
     const [isMounted, setIsMounted] = React.useState(false)
     const [globalFilter, setGlobalFilter] = React.useState("")
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [grouping, setGrouping] = React.useState<GroupingState>([])
     const [expanded, setExpanded] = React.useState<ExpandedState>({})
+    const [isRefreshing, setIsRefreshing] = React.useState(false)
     const searchInputRef = React.useRef<HTMLInputElement>(null)
+    const router = useRouter()
+
+    const handleRefresh = React.useCallback(async () => {
+        if (isRefreshing) return
+        setIsRefreshing(true)
+        try {
+            if (onRefresh) {
+                await onRefresh()
+            } else {
+                router.refresh()
+            }
+        } finally {
+            // Small delay so the animation feels smooth
+            setTimeout(() => setIsRefreshing(false), 600)
+        }
+    }, [onRefresh, isRefreshing, router])
 
     React.useEffect(() => { setIsMounted(true) }, [])
 
@@ -190,6 +210,17 @@ export function DataTable<TData, TValue>({
                 </div>
 
                 <div className="flex items-center justify-between md:justify-end gap-4">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        title="تحديث البيانات"
+                        className="group relative h-9 w-9 flex items-center justify-center rounded-xl border border-border/50 bg-background hover:bg-primary/5 hover:border-primary/30 hover:shadow-sm active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <RefreshCcw className={cn(
+                            "h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors",
+                            isRefreshing && "animate-spin"
+                        )} />
+                    </button>
                     <div className="text-xs text-muted-foreground font-medium bg-muted/30 px-3 py-1.5 rounded-lg border border-border/40 whitespace-nowrap">
                         العدد الإجمالي: <span className="text-foreground font-bold">{data.length}</span>
                     </div>

@@ -17,8 +17,9 @@ interface PersonType {
 
 interface PersonTypeTableProps {
     data: PersonType[]
+    onRefresh?: () => void | Promise<void>
 }
 
-export function PersonTypeTable({ data }: PersonTypeTableProps) {
-    return <DataTable columns={columns} data={data} />
+export function PersonTypeTable({ data, onRefresh }: PersonTypeTableProps) {
+    return <DataTable columns={columns} data={data} onRefresh={onRefresh} />
 }

@@ -9,14 +9,17 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Pencil, Trash2, UserCheck, UserX } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, UserCheck, UserX, ShieldCheck, User } from "lucide-react"
 import { toggleUserActive, deleteUser } from "@/lib/actions/users"
 import { toast } from "sonner"
+import { UserAvatar } from "./user-avatar"
 
 export type UserRow = {
     id: string
     name: string
     username: string
+    role: string
+    color: string
     isActive: boolean
     lastLogin: Date | string | null
     createdAt: Date | string
@@ -37,12 +40,37 @@ function formatDate(date: Date | string | null) {
 export const userColumns: ColumnDef<UserRow>[] = [
     {
         accessorKey: "name",
-        header: "الاسم",
+        header: "المستخدم",
         cell: ({ row }) => (
-            <div className="flex flex-col">
-                <span className="font-bold text-sm">{row.original.name}</span>
-                <span className="text-[11px] text-muted-foreground font-mono">@{row.original.username}</span>
+            <div className="flex items-center gap-3">
+                <UserAvatar name={row.original.name} color={row.original.color} size="sm" />
+                <div className="flex flex-col">
+                    <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-sm">{row.original.name}</span>
+                        {row.original.role === "admin" && (
+                            <ShieldCheck className="size-3.5 text-primary" />
+                        )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground font-mono">@{row.original.username}</span>
+                </div>
             </div>
+        ),
+    },
+    {
+        accessorKey: "role",
+        header: "الدور",
+        cell: ({ row }) => (
+            row.original.role === "admin" ? (
+                <Badge className="bg-primary/10 text-primary border-0 gap-1 font-semibold">
+                    <ShieldCheck className="size-3" />
+                    مدير
+                </Badge>
+            ) : (
+                <Badge className="bg-muted text-muted-foreground border-0 gap-1 font-semibold">
+                    <User className="size-3" />
+                    مستخدم
+                </Badge>
+            )
         ),
     },
     {
@@ -50,7 +78,6 @@ export const userColumns: ColumnDef<UserRow>[] = [
         header: "الحالة",
         cell: ({ row }) => (
             <Badge
-                variant={row.original.isActive ? "default" : "secondary"}
                 className={row.original.isActive
                     ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-0"
                     : "bg-muted text-muted-foreground border-0"

@@ -112,7 +112,7 @@ export default function UsersPage() {
 
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
-                <UserTable data={users} />
+                <UserTable data={users} onRefresh={loadUsers} />
             </div>
 
             {/* Sheet */}

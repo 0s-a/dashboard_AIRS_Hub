@@ -51,7 +51,7 @@ model Person {
   tags            Json? // ["tag1", "tag2"]
   currencies      Json? // ["currency-uuid-1", "currency-uuid-2"]
   groupName       String?
-  groupNumber     String?
+  groupNumber     String?            @unique
   isActive        Boolean            @default(true)
   lastInteraction DateTime           @default(now())
   createdAt       DateTime           @default(now())
@@ -261,6 +261,8 @@ model User {
   name      String
   username  String    @unique
   password  String // bcrypt hashed
+  role      String    @default("user") // "admin" | "user"
+  color     String    @default("#6366f1") // avatar color
   isActive  Boolean   @default(true)
   lastLogin DateTime?
   createdAt DateTime  @default(now())

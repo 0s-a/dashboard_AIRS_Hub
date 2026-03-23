@@ -33,6 +33,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/users/user-avatar"
 import { navigationGroups } from "@/lib/navigation"
 import {
     Sheet,
@@ -60,6 +61,7 @@ const routeMap: Record<string, string> = {
     "/orders": "الطلبات",
     "/notifications": "الإشعارات",
     "/users": "المستخدمين",
+    "/profile": "الملف الشخصي",
 }
 
 function timeAgo(date: Date | string) {
@@ -77,6 +79,8 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
     const [unreadCount, setUnreadCount] = useState(0)
     const [recentNotifs, setRecentNotifs] = useState<any[]>([])
     const [userName, setUserName] = useState("")
+    const [userColor, setUserColor] = useState("#6366f1")
+    const [userRole, setUserRole] = useState("user")
 
     const loadNotifications = useCallback(async () => {
         const [countRes, notifsRes] = await Promise.all([
@@ -91,7 +95,11 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
         loadNotifications()
         // Load current user
         getCurrentUser().then(res => {
-            if (res.success && res.data) setUserName(res.data.name)
+            if (res.success && res.data) {
+                setUserName(res.data.name)
+                setUserColor(res.data.color  || '#6366f1')
+                setUserRole(res.data.role    || 'user')
+            }
         })
         // Poll every 30 seconds
         const interval = setInterval(loadNotifications, 30000)
@@ -125,7 +133,7 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
             <div className="flex h-16 items-center justify-between gap-5 px-6 sm:px-8">
                 
                 {/* ======== RIGHT SIDE: Mobile menu + Page title ======== */}
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex items-center gap-3   ">
                                     {/* Sidebar Toggle - desktop only */}
                     <Button
                         variant="ghost"
@@ -219,7 +227,7 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                 </div>
 
                 {/* ======== LEFT SIDE: Actions ======== */}
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center mx-18  gap-2   w-max">
                     {/* Search */}
                     <CommandPalette />
 
@@ -330,24 +338,27 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-9 w-9 rounded-xl p-0 hover:bg-primary/5 transition-all duration-300 group">
-                                <Avatar className="h-8 w-8 border-2 border-transparent group-hover:border-primary/30 transition-all duration-300">
-                                    <AvatarFallback className="bg-linear-to-br from-primary/80 to-indigo-500/80 text-white text-xs font-bold">
-                                        {userName ? userName[0] : "?"}
-                                    </AvatarFallback>
-                                </Avatar>
+                                <UserAvatar name={userName || '?'} color={userColor} size="sm" className="transition-all duration-300" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56 rounded-xl">
                             <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                    <p className="text-sm font-bold leading-none">{userName || "جاري التحميل..."}</p>
-                                    <p className="text-xs leading-none text-muted-foreground">مدير النظام</p>
+                                <div className="flex items-center gap-3">
+                                    <UserAvatar name={userName || '?'} color={userColor} size="sm" />
+                                    <div className="flex flex-col space-y-0.5">
+                                        <p className="text-sm font-bold leading-none">{userName || "جاري التحميل..."}</p>
+                                        <p className="text-xs leading-none text-muted-foreground">
+                                            {userRole === 'admin' ? 'مدير النظام' : 'مستخدم'}
+                                        </p>
+                                    </div>
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="gap-2 cursor-pointer font-medium">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                الملف الشخصي
+                            <DropdownMenuItem className="gap-2 cursor-pointer font-medium" asChild>
+                                <a href="/profile">
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                    الملف الشخصي
+                                </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2 cursor-pointer font-medium">
                                 <Settings className="h-4 w-4 text-muted-foreground" />

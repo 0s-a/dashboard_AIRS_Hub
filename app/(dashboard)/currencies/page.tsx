@@ -101,7 +101,7 @@ export default function CurrenciesPage() {
 
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
-                <CurrencyTable data={currencies} />
+                <CurrencyTable data={currencies} onRefresh={loadCurrencies} />
             </div>
 
             {/* Sheet */}

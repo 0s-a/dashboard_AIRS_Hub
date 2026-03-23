@@ -91,7 +91,7 @@ export default function PersonTypesPage() {
 
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
-                <PersonTypeTable data={types} />
+                <PersonTypeTable data={types} onRefresh={loadTypes} />
             </div>
 
             {/* Sheet */}

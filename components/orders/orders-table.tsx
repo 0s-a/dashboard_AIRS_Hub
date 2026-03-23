@@ -7,9 +7,10 @@ interface Props {
     orders: any[]
     persons: any[]
     products: any[]
+    onRefresh?: () => void | Promise<void>
 }
 
-export function OrdersTable({ orders, persons, products }: Props) {
+export function OrdersTable({ orders, persons, products, onRefresh }: Props) {
     const columns = getOrderColumns(persons, products)
 
     return (
@@ -20,6 +21,7 @@ export function OrdersTable({ orders, persons, products }: Props) {
             groupingOptions={[
                 { id: "status", label: "الحالة" },
             ]}
+            onRefresh={onRefresh}
         />
     )
 }

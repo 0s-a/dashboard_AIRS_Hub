@@ -7,6 +7,7 @@ import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsR
 import { Header } from "@/components/dashboard/header"
 import { Footer } from "@/components/dashboard/footer"
 import { navigationGroups } from "@/lib/navigation"
+import { useNotificationAlert } from "@/hooks/use-notification-alert"
 import {
     Tooltip,
     TooltipContent,
@@ -20,6 +21,7 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const [isCollapsed, setIsCollapsed] = useState(false)
+    const { unreadCount } = useNotificationAlert()
 
     // Load sidebar state from localStorage
     useEffect(() => {
@@ -101,6 +103,17 @@ export default function DashboardLayout({
                                                             }`}>
                                                                 {item.label}
                                                             </span>
+
+                                                            {/* Notification unread badge */}
+                                                            {item.href === "/notifications" && unreadCount > 0 && (
+                                                                <span className={`flex items-center justify-center text-[10px] font-bold text-white bg-red-500 shadow-lg shadow-red-500/30 animate-pulse ${
+                                                                    isCollapsed
+                                                                        ? 'absolute -top-1 -left-1 size-5 rounded-full'
+                                                                        : 'mr-auto min-w-[20px] h-5 px-1.5 rounded-full'
+                                                                }`}>
+                                                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                                                </span>
+                                                            )}
                                                         </Link>
                                                     </TooltipTrigger>
                                                     {isCollapsed && (

@@ -236,20 +236,24 @@ model OrderItem {
 
 // AI-driven notifications from bot product searches
 model AiNotification {
-  id          String   @id @default(uuid())
-  type        String // "out_of_stock" | "not_found"
-  searchQuery String
-  productId   String?
-  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productName String?
-  personId    String?
-  person      Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
-  source      String?  @default("bot") // "bot" | "api"
-  phoneNumber String?
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id            String    @id @default(uuid())
+  type          String // "out_of_stock" | "not_found"
+  searchQuery   String
+  productId     String?
+  product       Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName   String?
+  personId      String?
+  person        Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  source        String?   @default("bot") // "bot" | "api"
+  phoneNumber   String?
+  isRead        Boolean   @default(false)
+  isArchived    Boolean   @default(false)
+  archivedAt    DateTime?
+  archiveReason String?
+  createdAt     DateTime  @default(now())
 
   @@index([isRead])
+  @@index([isArchived])
   @@index([type])
   @@index([createdAt])
   @@index([personId])

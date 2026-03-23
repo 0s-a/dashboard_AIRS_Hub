@@ -10,12 +10,14 @@ const PATHS = '/notifications'
 export async function getNotifications(filters?: {
     type?: 'out_of_stock' | 'not_found'
     isRead?: boolean
+    isArchived?: boolean
     limit?: number
     offset?: number
 }) {
     return safeAction(
         () => prisma.aiNotification.findMany({
             where: {
+                isArchived: filters?.isArchived ?? false,
                 ...(filters?.type ? { type: filters.type } : {}),
                 ...(filters?.isRead !== undefined ? { isRead: filters.isRead } : {}),
             },
@@ -37,7 +39,7 @@ export async function getNotifications(filters?: {
 
 export async function getUnreadCount() {
     return safeAction(
-        () => prisma.aiNotification.count({ where: { isRead: false } }),
+        () => prisma.aiNotification.count({ where: { isRead: false, isArchived: false } }),
         'تعذّر عدّ الإشعارات'
     )
 }
@@ -45,13 +47,14 @@ export async function getUnreadCount() {
 export async function getNotificationStats() {
     return safeAction(
         async () => {
-            const [total, unread, outOfStock, notFound] = await Promise.all([
-                prisma.aiNotification.count(),
-                prisma.aiNotification.count({ where: { isRead: false } }),
-                prisma.aiNotification.count({ where: { type: 'out_of_stock' } }),
-                prisma.aiNotification.count({ where: { type: 'not_found' } }),
+            const [total, unread, outOfStock, notFound, archived] = await Promise.all([
+                prisma.aiNotification.count({ where: { isArchived: false } }),
+                prisma.aiNotification.count({ where: { isRead: false, isArchived: false } }),
+                prisma.aiNotification.count({ where: { type: 'out_of_stock', isArchived: false } }),
+                prisma.aiNotification.count({ where: { type: 'not_found', isArchived: false } }),
+                prisma.aiNotification.count({ where: { isArchived: true } }),
             ])
-            return { total, unread, outOfStock, notFound }
+            return { total, unread, outOfStock, notFound, archived }
         },
         'تعذّر جلب الإحصائيات'
     )
@@ -104,6 +107,52 @@ export async function clearOldNotifications(daysOld: number = 30) {
         },
         PATHS,
         'تعذّر مسح الإشعارات القديمة'
+    )
+}
+
+export async function archiveNotification(id: string, reason: string) {
+    return safeActionWithRevalidation(
+        () => prisma.aiNotification.update({
+            where: { id },
+            data: {
+                isArchived: true,
+                isRead: true,
+                archivedAt: new Date(),
+                archiveReason: reason,
+            },
+        }),
+        PATHS,
+        'تعذّر أرشفة الإشعار'
+    )
+}
+
+export async function archiveAllRead() {
+    return safeActionWithRevalidation(
+        () => prisma.aiNotification.updateMany({
+            where: { isRead: true, isArchived: false },
+            data: {
+                isArchived: true,
+                archivedAt: new Date(),
+                archiveReason: 'تم القراءة',
+            },
+        }),
+        PATHS,
+        'تعذّر أرشفة الكل'
+    )
+}
+
+export async function unarchiveNotification(id: string) {
+    return safeActionWithRevalidation(
+        () => prisma.aiNotification.update({
+            where: { id },
+            data: {
+                isArchived: false,
+                archivedAt: null,
+                archiveReason: null,
+            },
+        }),
+        PATHS,
+        'تعذّر إلغاء الأرشفة'
     )
 }
 

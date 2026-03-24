@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Bell, PackageX, SearchX, CheckCheck, Trash2, Clock, Phone, Package, ExternalLink, X, SlidersHorizontal, User, CheckCircle2, Link2, Archive, ArchiveRestore } from "lucide-react"
+import { Bell, PackageX, SearchX, CheckCheck, Trash2, Clock, Phone, Package, ExternalLink, X, SlidersHorizontal, User, CheckCircle2, Link2, Archive, ArchiveRestore, Search, Check, RotateCcw, Trash } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -45,6 +45,35 @@ function timeAgo(date: Date | string) {
     return `منذ ${Math.floor(diff / 86400)} ي`
 }
 
+function groupNotificationsByDate(notifications: any[]) {
+    const groups: { [key: string]: any[] } = {
+        "اليوم": [],
+        "الأمس": [],
+        "سابقاً": []
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    notifications.forEach(n => {
+        const d = new Date(n.createdAt)
+        d.setHours(0, 0, 0, 0)
+
+        if (d.getTime() === today.getTime()) {
+            groups["اليوم"].push(n)
+        } else if (d.getTime() === yesterday.getTime()) {
+            groups["الأمس"].push(n)
+        } else {
+            groups["سابقاً"].push(n)
+        }
+    })
+
+    return groups
+}
+
 export default function NotificationsPage() {
     const [notifications, setNotifications] = useState<any[]>([])
     const [stats, setStats] = useState({ total: 0, unread: 0, outOfStock: 0, notFound: 0, archived: 0 })
@@ -54,6 +83,11 @@ export default function NotificationsPage() {
     const [togglingId, setTogglingId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<"inbox" | "archive">("inbox")
     const [archivedNotifications, setArchivedNotifications] = useState<any[]>([])
+    
+    // UI states
+    const [searchQuery, setSearchQuery] = useState("")
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [isSelectionMode, setIsSelectionMode] = useState(false)
 
     // Link-product dialog state
     const [linkDialog, setLinkDialog] = useState<{ open: boolean; notifId: string; searchQuery: string } | null>(null)
@@ -76,6 +110,8 @@ export default function NotificationsPage() {
         if (archivedRes.success) setArchivedNotifications(archivedRes.data ?? [])
         if (statsRes.success && statsRes.data) setStats(statsRes.data)
         setLoading(false)
+        setSelectedIds(new Set())
+        setIsSelectionMode(false)
     }, [filterType, filterRead])
 
     useEffect(() => { loadData() }, [loadData])
@@ -120,6 +156,78 @@ export default function NotificationsPage() {
             loadData()
         }
     }
+
+    const toggleSelection = (id: string) => {
+        const next = new Set(selectedIds)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        setSelectedIds(next)
+        setIsSelectionMode(next.size > 0)
+    }
+
+    const selectAll = () => {
+        const ids = processedNotifications.map(n => n.id)
+        setSelectedIds(new Set(ids))
+        setIsSelectionMode(true)
+    }
+
+    const deselectAll = () => {
+        setSelectedIds(new Set())
+        setIsSelectionMode(false)
+    }
+
+    const handleBulkArchive = async () => {
+        if (selectedIds.size === 0) return
+        const ids = Array.from(selectedIds)
+        setLoading(true)
+        try {
+            await Promise.all(ids.map(id => archiveNotification(id, "إجراء جماعي")))
+            toast.success(`تم أرشفة ${ids.length} إشعارات`)
+            loadData()
+        } catch (error) {
+            toast.error("فشل أرشفة بعض الإشعارات")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return
+        const ids = Array.from(selectedIds)
+        if (!confirm(`هل أنت متأكد من حذف ${ids.length} إشعارات؟`)) return
+        setLoading(true)
+        try {
+            await Promise.all(ids.map(id => deleteNotification(id)))
+            toast.success(`تم حذف ${ids.length} إشعارات`)
+            loadData()
+        } catch (error) {
+            toast.error("فشل حذف بعض الإشعارات")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // ── Data Processing ──
+    const processedNotifications = useMemo(() => {
+        let items = activeTab === "inbox" ? notifications : archivedNotifications
+        
+        // Apply search
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase()
+            items = items.filter(n => 
+                n.searchQuery?.toLowerCase().includes(q) ||
+                n.productName?.toLowerCase().includes(q) ||
+                n.person?.name?.toLowerCase().includes(q) ||
+                n.phoneNumber?.includes(q)
+            )
+        }
+        
+        return items
+    }, [notifications, archivedNotifications, activeTab, searchQuery])
+
+    const groupedNotifications = useMemo(() => {
+        return groupNotificationsByDate(processedNotifications)
+    }, [processedNotifications])
 
     // ── Quick Action: Toggle product availability ──
     const handleToggleAvailability = async (notif: any) => {
@@ -192,6 +300,25 @@ export default function NotificationsPage() {
                         تنبيهات تلقائية من بحث الزبائن عبر البوت
                     </p>
                 </div>
+                
+                <div className="flex flex-1 max-w-md items-center relative group">
+                    <Search className="absolute right-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                        placeholder="بحث في الإشعارات، المنتجات، أو العملاء..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pr-10 rounded-xl bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20 transition-all"
+                    />
+                    {searchQuery && (
+                        <button 
+                            onClick={() => setSearchQuery("")}
+                            className="absolute left-3 text-muted-foreground hover:text-foreground"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+
                 <div className="flex items-center gap-2">
                     {stats.unread > 0 && (
                         <Button variant="outline" size="sm" onClick={handleMarkAllRead} className="gap-2 rounded-xl">
@@ -288,6 +415,56 @@ export default function NotificationsPage() {
                 </button>
             </div>
 
+            {/* Selection Bar */}
+            {isSelectionMode && (
+                <div className="sticky top-4 z-50 flex items-center justify-between p-3 px-6 rounded-2xl bg-primary text-primary-foreground shadow-2xl animate-in slide-in-from-top-8 duration-300">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Check className="h-5 w-5" />
+                            <span className="font-bold">{selectedIds.size} محدد</span>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={selectAll}
+                            className="text-primary-foreground hover:bg-white/10 rounded-lg text-xs"
+                        >
+                            تحديد الكل
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={deselectAll}
+                            className="text-primary-foreground hover:bg-white/10 rounded-lg text-xs"
+                        >
+                            إلغاء التحديد
+                        </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {activeTab === "inbox" && (
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                onClick={handleBulkArchive}
+                                className="rounded-xl gap-2 h-9 font-bold bg-white text-primary hover:bg-white/90"
+                            >
+                                <Archive className="h-4 w-4" />
+                                أرشفة المحدّد
+                            </Button>
+                        )}
+                        <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={handleBulkDelete}
+                            className="rounded-xl gap-2 h-9 font-bold shadow-lg"
+                        >
+                            <Trash className="h-4 w-4" />
+                            حذف المحدّد
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* Filters — only on inbox tab */}
             {activeTab === "inbox" && (
             <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-border/50 bg-muted/20 backdrop-blur-sm">
@@ -322,274 +499,282 @@ export default function NotificationsPage() {
                     </SelectContent>
                 </Select>
                 <span className="text-[11px] text-muted-foreground mr-auto">
-                    عرض <span className="font-bold text-foreground">{notifications.length}</span> إشعار
+                    عرض <span className="font-bold text-foreground">{processedNotifications.length}</span> إشعار
                 </span>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={loadData} 
+                    className="h-8 w-8 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all rotate-0 active:rotate-180"
+                    disabled={loading}
+                >
+                    <RotateCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+                </Button>
             </div>
             )}
 
-            {/* Notifications List — inbox tab */}
-            {activeTab === "inbox" && (
-            <div className="space-y-2">
-                {loading ? (
-                    <div className="space-y-2 animate-pulse">
+            {/* Notifications List — grouped by date */}
+            {(activeTab === "inbox" || activeTab === "archive") && (
+            <div className="space-y-8 pb-20">
+                {loading && !processedNotifications.length ? (
+                    <div className="space-y-4 animate-pulse">
                         {Array.from({ length: 5 }).map((_, i) => (
-                            <div key={i} className="h-20 rounded-xl bg-muted/30 border border-border/30" />
+                            <div key={i} className="h-24 rounded-2xl bg-muted/30 border border-border/30" />
                         ))}
                     </div>
-                ) : notifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="size-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
-                            <Bell className="size-10 text-muted-foreground/30" />
+                ) : processedNotifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-center glass-panel rounded-3xl border border-dashed border-border/50">
+                        <div className="size-24 rounded-full bg-primary/5 flex items-center justify-center mb-6">
+                            <Bell className="size-12 text-primary/20" />
                         </div>
-                        <h3 className="text-lg font-semibold text-foreground">لا توجد إشعارات</h3>
-                        <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-                            ستظهر هنا تنبيهات عندما يبحث الزبائن عن منتجات غير متوفرة أو غير موجودة
+                        <h3 className="text-xl font-bold text-foreground">لا توجد نتائج</h3>
+                        <p className="text-sm text-muted-foreground mt-2 max-w-xs px-4">
+                            جرب تغيير الفلاتر أو البحث لتجد ما تبحث عنه
                         </p>
                     </div>
                 ) : (
-                    notifications.map((notif) => (
-                        <div
-                            key={notif.id}
-                            className={cn(
-                                "group relative flex items-start gap-4 p-4 rounded-xl border transition-all duration-200",
-                                notif.isRead
-                                    ? "bg-background/50 border-border/30 opacity-70 hover:opacity-100"
-                                    : "bg-background border-border/50 shadow-sm hover:shadow-md"
-                            )}
-                        >
-                            {/* Unread indicator */}
-                            {!notif.isRead && (
-                                <div className="absolute top-4 left-4 size-2 rounded-full bg-primary animate-pulse" />
-                            )}
-
-                            {/* Type icon */}
-                            <div className={cn(
-                                "size-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
-                                notif.type === "out_of_stock"
-                                    ? "bg-amber-500/10"
-                                    : "bg-red-500/10"
-                            )}>
-                                {notif.type === "out_of_stock" ? (
-                                    <PackageX className="size-5 text-amber-600" />
-                                ) : (
-                                    <SearchX className="size-5 text-red-600" />
-                                )}
-                            </div>
-
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <Badge
-                                        variant="secondary"
-                                        className={cn(
-                                            "text-[10px] font-bold",
-                                            notif.type === "out_of_stock"
-                                                ? "bg-amber-500/10 text-amber-700 border-amber-200"
-                                                : "bg-red-500/10 text-red-700 border-red-200"
-                                        )}
-                                    >
-                                        {notif.type === "out_of_stock" ? "غير متوفر" : "غير موجود"}
+                    Object.entries(groupedNotifications).map(([groupName, groupItems]) => (
+                        groupItems.length > 0 && (
+                            <div key={groupName} className="space-y-4">
+                                <div className="flex items-center gap-3 px-2">
+                                    <h2 className="text-sm font-bold text-muted-foreground/80 tracking-wider uppercase">{groupName}</h2>
+                                    <div className="h-px flex-1 bg-linear-to-l from-border/50 to-transparent" />
+                                    <Badge variant="outline" className="text-[10px] font-bold rounded-full border-border/40 bg-muted/30">
+                                        {groupItems.length}
                                     </Badge>
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {timeAgo(notif.createdAt)}
-                                    </span>
                                 </div>
-
-                                <p className="text-sm font-semibold mt-1.5">
-                                    بحث عن: <span className="text-primary font-bold">"{notif.searchQuery}"</span>
-                                </p>
-
-                                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                    {notif.person && (
-                                        <Link
-                                            href={`/persons`}
-                                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                                        >
-                                            <User className="h-3 w-3" />
-                                            {notif.person.name || 'عميل غير مسمّى'}
-                                        </Link>
-                                    )}
-                                    {notif.productName && (
-                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Package className="h-3 w-3" />
-                                            {notif.productName}
-                                            {notif.product && (
-                                                <Link
-                                                    href={`/inventory/${notif.product.id}`}
-                                                    className="text-primary hover:underline mr-1"
-                                                >
-                                                    <ExternalLink className="h-3 w-3 inline" />
-                                                </Link>
-                                            )}
-                                        </span>
-                                    )}
-                                    {notif.phoneNumber && (
-                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Phone className="h-3 w-3" />
-                                            <span className="font-mono" dir="ltr">{notif.phoneNumber}</span>
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* ── Quick Action Buttons ── */}
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    {notif.type === "out_of_stock" && notif.product && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
+                                
+                                <div className="grid gap-3">
+                                    {groupItems.map((notif) => (
+                                        <div
+                                            key={notif.id}
+                                            onClick={() => isSelectionMode && toggleSelection(notif.id)}
                                             className={cn(
-                                                "h-7 text-[11px] rounded-lg gap-1.5 font-bold transition-all",
-                                                notif.product.isAvailable
-                                                    ? "border-amber-300 text-amber-700 hover:bg-amber-50"
-                                                    : "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                                "group relative flex items-start gap-4 p-4 rounded-2xl border transition-all duration-300",
+                                                isSelectionMode && "cursor-pointer",
+                                                selectedIds.has(notif.id) 
+                                                    ? "bg-primary/5 border-primary/40 ring-1 ring-primary/20 translate-x-1 shadow-lg" 
+                                                    : notif.isRead
+                                                        ? "bg-background/40 border-border/30 opacity-80 hover:opacity-100 hover:bg-background/60"
+                                                        : "bg-background border-border/60 shadow-sm hover:shadow-md hover:border-primary/30"
                                             )}
-                                            disabled={togglingId === notif.id}
-                                            onClick={() => handleToggleAvailability(notif)}
                                         >
-                                            <CheckCircle2 className="h-3 w-3" />
-                                            {notif.product.isAvailable ? "إيقاف المنتج" : "تفعيل المنتج"}
-                                        </Button>
-                                    )}
-                                    {notif.type === "not_found" && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-7 text-[11px] rounded-lg gap-1.5 font-bold border-blue-300 text-blue-700 hover:bg-blue-50 transition-all"
-                                            onClick={() => handleOpenLinkDialog(notif)}
-                                        >
-                                            <Link2 className="h-3 w-3" />
-                                            ربط بمنتج
-                                        </Button>
-                                    )}
+                                            {/* Selection Checkbox */}
+                                            <div 
+                                                className={cn(
+                                                    "absolute -right-3 top-1/2 -translate-y-1/2 z-10 transition-all duration-300",
+                                                    isSelectionMode || selectedIds.has(notif.id) ? "opacity-100 scale-100" : "opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100"
+                                                )}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    toggleSelection(notif.id)
+                                                }}
+                                            >
+                                                <div className={cn(
+                                                    "size-6 rounded-full border-2 flex items-center justify-center shadow-lg transition-colors",
+                                                    selectedIds.has(notif.id) 
+                                                        ? "bg-primary border-primary text-primary-foreground" 
+                                                        : "bg-background border-border text-transparent"
+                                                )}>
+                                                    <Check className="h-3.5 w-3.5 stroke-4" />
+                                                </div>
+                                            </div>
+
+                                            {/* Unread indicator */}
+                                            {!notif.isRead && !notif.isArchived && (
+                                                <div className="absolute top-4 left-4 size-2.5 rounded-full bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)] animate-pulse" />
+                                            )}
+
+                                            {/* Type icon */}
+                                            <div className={cn(
+                                                "size-12 rounded-2xl flex items-center justify-center shrink-0 mt-0.5 transition-transform group-hover:scale-110 duration-500",
+                                                notif.type === "out_of_stock" ? "bg-amber-500/10" : "bg-red-500/10",
+                                                notif.isArchived && "opacity-60"
+                                            )}>
+                                                {notif.type === "out_of_stock" ? (
+                                                    <PackageX className="size-6 text-amber-600" />
+                                                ) : (
+                                                    <SearchX className="size-6 text-red-600" />
+                                                )}
+                                            </div>
+
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap mb-2">
+                                                    {notif.isArchived ? (
+                                                        <>
+                                                            <Badge variant="secondary" className="text-[10px] font-bold bg-slate-500/10 text-slate-600 border-slate-200">
+                                                                <Archive className="h-3 w-3 ml-1" />
+                                                                مؤرشف
+                                                            </Badge>
+                                                            {notif.archiveReason && (
+                                                                <Badge variant="outline" className="text-[10px] font-bold border-emerald-300 text-emerald-700 bg-emerald-50">
+                                                                    <CheckCircle2 className="h-3 w-3 ml-1" />
+                                                                    {notif.archiveReason}
+                                                                </Badge>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className={cn(
+                                                                "text-[10px] font-bold px-2 py-0.5 rounded-lg",
+                                                                notif.type === "out_of_stock"
+                                                                    ? "bg-amber-500/10 text-amber-700 border-amber-200/50"
+                                                                    : "bg-red-500/10 text-red-700 border-red-200/50"
+                                                            )}
+                                                        >
+                                                            {notif.type === "out_of_stock" ? "غير متوفر" : "غير موجود"}
+                                                        </Badge>
+                                                    )}
+                                                    <span className="text-[11px] text-muted-foreground/70 flex items-center gap-1.5 font-medium">
+                                                        <Clock className="h-3 w-3" />
+                                                        {timeAgo(notif.createdAt)}
+                                                    </span>
+                                                </div>
+
+                                                <p className={cn(
+                                                    "text-[15px] font-bold mt-1 leading-tight transition-colors",
+                                                    notif.isArchived ? "text-muted-foreground" : "text-foreground"
+                                                )}>
+                                                    بحث عن: <span className={cn("inline-block px-1.5 py-0.5 rounded bg-primary/5", !notif.isArchived && "text-primary")}>"{notif.searchQuery}"</span>
+                                                </p>
+
+                                                <div className="flex items-center gap-4 mt-3 flex-wrap">
+                                                    {notif.person && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="size-5 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                                                <User className="h-3 w-3 text-blue-600" />
+                                                            </div>
+                                                            <span className="text-xs font-semibold text-blue-700/80">
+                                                                {notif.person.name || 'عميل غير مسمّى'}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {notif.productName && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="size-5 rounded-md bg-primary/5 flex items-center justify-center">
+                                                                <Package className="h-3 w-3 text-primary/70" />
+                                                            </div>
+                                                            <span className="text-xs font-semibold text-muted-foreground">
+                                                                {notif.productName}
+                                                                {notif.product && (
+                                                                    <Link
+                                                                        href={`/inventory/${notif.product.id}`}
+                                                                        className="text-primary hover:underline mr-1.5"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <ExternalLink className="h-3 w-3 inline" />
+                                                                    </Link>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {notif.phoneNumber && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="size-5 rounded-full bg-slate-500/10 flex items-center justify-center">
+                                                                <Phone className="h-3 w-3 text-slate-600" />
+                                                            </div>
+                                                            <span className="text-xs font-mono text-muted-foreground/80" dir="ltr">{notif.phoneNumber}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* ── Quick Action Buttons (Inbox only) ── */}
+                                                {!notif.isArchived && (
+                                                    <div className="flex items-center gap-2 mt-4 flex-wrap">
+                                                        {notif.type === "out_of_stock" && notif.product && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className={cn(
+                                                                    "h-8 text-[11px] rounded-xl gap-2 font-bold transition-all shadow-xs border-dashed",
+                                                                    notif.product.isAvailable
+                                                                        ? "border-amber-300 text-amber-700 hover:bg-amber-50"
+                                                                        : "border-emerald-300 text-emerald-700 hover:bg-emerald-50 active:scale-95"
+                                                                )}
+                                                                disabled={togglingId === notif.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleToggleAvailability(notif)
+                                                                }}
+                                                            >
+                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                {notif.product.isAvailable ? "إيقاف المنتج" : "تفعيل المنتج"}
+                                                            </Button>
+                                                        )}
+                                                        {notif.type === "not_found" && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 text-[11px] rounded-xl gap-2 font-bold border-dashed border-blue-300 text-blue-700 hover:bg-blue-50 transition-all active:scale-95 shadow-xs"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleOpenLinkDialog(notif)
+                                                                }}
+                                                            >
+                                                                <Link2 className="h-3.5 w-3.5" />
+                                                                ربط بمنتج
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 shrink-0 self-center">
+                                                {!notif.isArchived && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="size-9 rounded-full text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 shadow-xs"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleArchive(notif.id, "تم القراءة")
+                                                        }}
+                                                        title="أرشفة (تم القراءة)"
+                                                    >
+                                                        <Archive className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                {notif.isArchived && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="size-9 rounded-full text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleUnarchive(notif.id)
+                                                        }}
+                                                        title="إلغاء الأرشفة"
+                                                    >
+                                                        <ArchiveRestore className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="size-9 rounded-full text-red-500 hover:bg-red-50 hover:text-red-600"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleDelete(notif.id)
+                                                    }}
+                                                    title="حذف"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                {!notif.isRead && (
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 rounded-full text-primary hover:bg-primary/10"
-                                        onClick={() => handleArchive(notif.id, "تم القراءة")}
-                                        title="أرشفة (تم القراءة)"
-                                    >
-                                        <Archive className="h-3.5 w-3.5" />
-                                    </Button>
-                                )}
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 rounded-full text-destructive hover:bg-destructive/10"
-                                    onClick={() => handleDelete(notif.id)}
-                                    title="حذف"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </Button>
-                            </div>
-                        </div>
+                        )
                     ))
                 )}
             </div>
             )}
 
-            {/* Archive Tab */}
-            {activeTab === "archive" && (
-            <div className="space-y-2">
-                {archivedNotifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="size-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
-                            <Archive className="size-10 text-muted-foreground/30" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground">الأرشيف فارغ</h3>
-                        <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-                            ستظهر هنا الإشعارات التي تم التعامل معها وأرشفتها
-                        </p>
-                    </div>
-                ) : (
-                    archivedNotifications.map((notif) => (
-                        <div
-                            key={notif.id}
-                            className="group relative flex items-start gap-4 p-4 rounded-xl border border-border/30 bg-muted/20 opacity-80 hover:opacity-100 transition-all duration-200"
-                        >
-                            {/* Type icon */}
-                            <div className={cn(
-                                "size-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 opacity-60",
-                                notif.type === "out_of_stock" ? "bg-amber-500/10" : "bg-red-500/10"
-                            )}>
-                                {notif.type === "out_of_stock" ? (
-                                    <PackageX className="size-5 text-amber-600" />
-                                ) : (
-                                    <SearchX className="size-5 text-red-600" />
-                                )}
-                            </div>
 
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <Badge variant="secondary" className="text-[10px] font-bold bg-slate-500/10 text-slate-600 border-slate-200">
-                                        <Archive className="h-2.5 w-2.5 ml-1" />
-                                        مؤرشف
-                                    </Badge>
-                                    {notif.archiveReason && (
-                                        <Badge variant="outline" className="text-[10px] font-medium border-emerald-300 text-emerald-700 bg-emerald-50">
-                                            <CheckCircle2 className="h-2.5 w-2.5 ml-1" />
-                                            {notif.archiveReason}
-                                        </Badge>
-                                    )}
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {timeAgo(notif.createdAt)}
-                                    </span>
-                                </div>
-
-                                <p className="text-sm font-semibold mt-1.5 text-muted-foreground">
-                                    بحث عن: <span className="font-bold">"{notif.searchQuery}"</span>
-                                </p>
-
-                                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                    {notif.person && (
-                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <User className="h-3 w-3" />
-                                            {notif.person.name || 'عميل غير مسمّى'}
-                                        </span>
-                                    )}
-                                    {notif.productName && (
-                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Package className="h-3 w-3" />
-                                            {notif.productName}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Unarchive + Delete */}
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 rounded-full text-primary hover:bg-primary/10"
-                                    onClick={() => handleUnarchive(notif.id)}
-                                    title="إلغاء الأرشفة"
-                                >
-                                    <ArchiveRestore className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 rounded-full text-destructive hover:bg-destructive/10"
-                                    onClick={() => handleDelete(notif.id)}
-                                    title="حذف"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </Button>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-            )}
 
             {/* ── Link Product Dialog ── */}
             <Dialog open={!!linkDialog?.open} onOpenChange={(open) => !open && setLinkDialog(null)}>

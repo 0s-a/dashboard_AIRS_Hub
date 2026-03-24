@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog, Coins, ArrowRight } from "lucide-react"
 import { Header } from "@/components/dashboard/header"
 import { Footer } from "@/components/dashboard/footer"
 import { navigationGroups } from "@/lib/navigation"
 import { useNotificationAlert } from "@/hooks/use-notification-alert"
+import { getStoreSettings } from "@/lib/actions/store-settings"
 import {
     Tooltip,
     TooltipContent,
@@ -22,6 +24,7 @@ export default function DashboardLayout({
 }) {
     const [isCollapsed, setIsCollapsed] = useState(false)
     const { unreadCount } = useNotificationAlert()
+    const [storeInfo, setStoreInfo] = useState<{ name: string; logo: string | null }>({ name: "المتجر الرئيسي", logo: null })
 
     // Load sidebar state from localStorage
     useEffect(() => {
@@ -29,6 +32,12 @@ export default function DashboardLayout({
         if (saved !== null) {
             setIsCollapsed(saved === "true")
         }
+        // Fetch store settings
+        getStoreSettings().then(res => {
+            if (res.success && res.data) {
+                setStoreInfo({ name: res.data.name, logo: res.data.logo })
+            }
+        })
     }, [])
 
     const pathname = usePathname()
@@ -139,15 +148,28 @@ export default function DashboardLayout({
                             {isCollapsed ? (
                                 <div className="size-2 rounded-full bg-white animate-pulse" />
                             ) : (
-                                <div className="relative z-10 flex flex-col gap-1">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest italic">المتجر الحالي</span>
-                                        <div className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] animate-pulse" />
-                                    </div>
-                                    <span className="text-sm font-bold text-white truncate drop-shadow-sm">المتجر الرئيسي</span>
-                                    <div className="flex items-center justify-between mt-1">
-                                        <span className="text-[9px] font-medium text-white/60 bg-white/10 px-1.5 py-0.5 rounded-md uppercase">خطة بريميوم</span>
-                                        <ArrowRight className="size-3 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300 rtl:rotate-180" />
+                                <div className="relative z-10 flex items-center gap-3">
+                                    {storeInfo.logo ? (
+                                        <div className="relative size-10 rounded-xl overflow-hidden ring-2 ring-white/20 shrink-0">
+                                            <Image
+                                                src={storeInfo.logo}
+                                                alt="شعار المتجر"
+                                                fill
+                                                className="object-contain"
+                                                unoptimized
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="size-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                                            <span className="text-white font-black text-lg" style={{fontFamily: 'serif'}}>{storeInfo.name.charAt(0)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest italic">المتجر الحالي</span>
+                                            <div className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] animate-pulse" />
+                                        </div>
+                                        <span className="text-sm font-bold text-white truncate drop-shadow-sm">{storeInfo.name}</span>
                                     </div>
                                 </div>
                             )}

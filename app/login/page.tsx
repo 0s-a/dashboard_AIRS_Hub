@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, LogIn, Loader2, ShieldCheck, Zap, BarChart3 } from "lucide-react"
+import Image from "next/image"
+import { Eye, EyeOff, LogIn, Loader2, ShieldCheck, Zap, BarChart3, Store } from "lucide-react"
 import { login } from "@/lib/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { getStoreSettings } from "@/lib/actions/store-settings"
 
 const FEATURES = [
     { icon: ShieldCheck, label: "آمن وموثوق", desc: "حماية كاملة لبياناتك" },
@@ -21,6 +23,23 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState("")
     const [isLoading, setIsLoading] = useState(false)
+    const [storeInfo, setStoreInfo] = useState<{ name: string; logo: string | null; description: string | null }>({
+        name: "نواة",
+        logo: null,
+        description: null
+    })
+
+    useEffect(() => {
+        getStoreSettings().then(res => {
+            if (res.success && res.data) {
+                setStoreInfo({
+                    name: res.data.name || "نواة",
+                    logo: res.data.logo || null,
+                    description: res.data.description || null
+                })
+            }
+        })
+    }, [])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -68,35 +87,62 @@ export default function LoginPage() {
                 <div className="absolute top-[8%]  right-[-12%] w-96 h-96 rounded-full border border-white/5" />
                 <div className="absolute bottom-[5%] left-[-8%]  w-80 h-80 rounded-full border border-white/8" />
 
-                {/* ── Top logo ── */}
-                <div className="relative z-10 flex items-center gap-3">
-                    <div className="size-11 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-xl">
-                        <span className="text-white font-black text-2xl leading-none" style={{ fontFamily: 'Georgia, serif' }}>ن</span>
+                {/* ── Top System Logo ── */}
+                <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="size-11 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-xl">
+                            <span className="text-white font-black text-2xl leading-none" style={{ fontFamily: 'Georgia, serif' }}>ن</span>
+                        </div>
+                        <div>
+                            <p className="text-white font-black text-xl leading-none">نواة</p>
+                            <p className="text-white/50 text-[10px] font-semibold tracking-[0.3em] uppercase mt-0.5">Nawaat</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-white font-black text-xl leading-none">نواة</p>
-                        <p className="text-white/50 text-[10px] font-semibold tracking-[0.3em] uppercase mt-0.5">Nawaat</p>
+                    <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 hidden sm:flex">
+                        <span className="text-white/70 text-xs font-medium tracking-wide">نظام إدارة المتاجر المتقدم</span>
                     </div>
                 </div>
 
-                {/* ── Center hero text ── */}
+                {/* ── Center hero text (Store Branding) ── */}
                 <div className="relative z-10 space-y-8">
-                    <div className="space-y-4">
-                        {/* Big Arabic "ن" watermark */}
+                    <div className="space-y-6">
+                        {/* Big watermark character */}
                         <div
-                            className="absolute -top-20 -right-8 text-[18rem] font-black text-white/[0.03] leading-none select-none pointer-events-none"
+                            className="absolute -top-24 -right-12 text-[20rem] font-black text-white/4 leading-none select-none pointer-events-none"
                             style={{ fontFamily: 'Georgia, serif' }}
                         >
-                            ن
+                            {storeInfo.name.charAt(0)}
                         </div>
 
-                        <p className="text-white/60 text-sm font-semibold tracking-widest uppercase">منصة الأعمال الذكية</p>
-                        <h2 className="text-4xl xl:text-5xl font-black text-white leading-[1.15]">
-                            أدِر أعمالك<br />
-                            <span className="text-white/50">بذكاء واقتدار</span>
-                        </h2>
+                        <div className="flex flex-col gap-4">
+                            <p className="text-white/60 text-sm font-semibold tracking-widest uppercase">مرحباً بك في</p>
+                            <div className="flex items-center gap-4">
+                                {storeInfo.logo ? (
+                                    <div className="size-16 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-2 shadow-2xl flex items-center justify-center relative overflow-hidden shrink-0">
+                                        <Image
+                                            src={storeInfo.logo}
+                                            alt="شعار المتجر"
+                                            fill
+                                            className="object-contain p-1"
+                                            unoptimized
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="size-16 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-xl shrink-0">
+                                        <span className="text-white font-black text-3xl leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+                                            {storeInfo.name.charAt(0)}
+                                        </span>
+                                    </div>
+                                )}
+                                <div>
+                                    <h2 className="text-3xl xl:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-sm line-clamp-2">
+                                        {storeInfo.name}
+                                    </h2>
+                                </div>
+                            </div>
+                        </div>
                         <p className="text-white/60 text-base leading-relaxed max-w-sm">
-                            منصة نواة المتكاملة لإدارة المخزون والمبيعات وتحليل البيانات — كل ما تحتاجه في مكان واحد.
+                            {storeInfo.description || "منصة متكاملة لإدارة المخزون والمبيعات وتحليل البيانات — كل ما تحتاجه في مكان واحد."}
                         </p>
                     </div>
 
@@ -104,7 +150,7 @@ export default function LoginPage() {
                     <div className="space-y-4">
                         {FEATURES.map(({ icon: Icon, label, desc }) => (
                             <div key={label} className="flex items-center gap-4 group">
-                                <div className="size-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center justify-center flex-shrink-0 group-hover:bg-white/20 transition-colors duration-300">
+                                <div className="size-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center justify-center shrink-0 group-hover:bg-white/20 transition-colors duration-300">
                                     <Icon className="size-5 text-white/80" />
                                 </div>
                                 <div>
@@ -116,10 +162,10 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                {/* ── Bottom quote ── */}
+                {/* ── Bottom Copyright ── */}
                 <div className="relative z-10">
-                    <p className="text-white/30 text-xs">
-                        © {new Date().getFullYear()} نواة (Nawaat) — جميع الحقوق محفوظة
+                    <p className="text-white/30 text-[10px] font-medium tracking-wide">
+                        © {new Date().getFullYear()} {storeInfo.name} — مدعوم بواسطة نواة (Nawaat)
                     </p>
                 </div>
             </div>
@@ -135,14 +181,39 @@ export default function LoginPage() {
 
                 <div className="relative z-10 w-full max-w-[400px] space-y-8">
 
-                    {/* Mobile logo (visible only on small screens) */}
-                    <div className="flex lg:hidden items-center gap-3 mb-2">
-                        <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-                            <span className="text-white font-black text-xl leading-none" style={{ fontFamily: 'Georgia, serif' }}>ن</span>
+                    {/* Mobile Header (visible only on small screens) */}
+                    <div className="flex lg:hidden items-center justify-between mb-8 w-full">
+                        <div className="flex items-center gap-3">
+                            {storeInfo.logo ? (
+                                <div className="relative size-12 rounded-xl bg-muted/40 p-1 flex items-center justify-center shrink-0 border border-border/50">
+                                    <Image
+                                        src={storeInfo.logo}
+                                        alt="شعار المتجر"
+                                        fill
+                                        className="object-contain p-1"
+                                        unoptimized
+                                    />
+                                </div>
+                            ) : (
+                                <div className="size-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0">
+                                    <span className="text-white font-black text-2xl leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+                                        {storeInfo.name.charAt(0)}
+                                    </span>
+                                </div>
+                            )}
+                            <div>
+                                <h2 className="font-black text-lg text-foreground leading-tight line-clamp-1">{storeInfo.name}</h2>
+                            </div>
                         </div>
-                        <div>
-                            <p className="font-black text-lg bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent">نواة</p>
-                            <p className="text-[9px] text-muted-foreground font-bold tracking-[0.25em] uppercase">Nawaat</p>
+
+                        {/* Tiny Nawaat branding on the right */}
+                        <div className="flex items-center gap-2 opacity-50 pl-1 shrink-0">
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] font-bold tracking-[0.2em] uppercase leading-none">Nawaat</span>
+                            </div>
+                            <div className="size-6 rounded-md bg-foreground/10 flex items-center justify-center">
+                                <span className="text-foreground font-black text-xs leading-none" style={{ fontFamily: 'Georgia, serif' }}>ن</span>
+                            </div>
                         </div>
                     </div>
 

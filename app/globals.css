@@ -74,29 +74,29 @@
 
 /* Dark Mode Overrides — Refined for reduced eye strain */
 .dark {
-  --background: hsl(222 47% 8%);
+  --background: hsl(224 50% 6%);
   --foreground: hsl(210 40% 96%);
-  --card: hsl(222 44% 10%);
+  --card: hsl(224 47% 9%);
   --card-foreground: hsl(210 40% 96%);
-  --popover: hsl(222 44% 10%);
+  --popover: hsl(224 47% 9%);
   --popover-foreground: hsl(210 40% 96%);
-  --primary: hsl(142.1 70% 40%);
+  --primary: hsl(243 75% 59%);
   --primary-foreground: hsl(355.7 100% 97.3%);
-  --secondary: hsl(220 30% 15%);
+  --secondary: hsl(220 30% 13%);
   --secondary-foreground: hsl(210 40% 96%);
-  --muted: hsl(220 26% 14%);
-  --muted-foreground: hsl(215 20% 68%);
-  --accent: hsl(220 30% 15%);
+  --muted: hsl(220 26% 12%);
+  --muted-foreground: hsl(215 20% 60%);
+  --accent: hsl(220 30% 13%);
   --accent-foreground: hsl(210 40% 96%);
-  --destructive: hsl(0 62.8% 35%);
+  --destructive: hsl(0 62.8% 40%);
   --destructive-foreground: hsl(210 40% 96%);
-  --border: hsl(220 20% 18%);
-  --input: hsl(220 20% 18%);
-  --ring: hsl(142.4 65% 34%);
+  --border: hsl(220 20% 16%);
+  --input: hsl(220 20% 16%);
+  --ring: hsl(243 75% 59%);
 
-  /* Glass Variables Dark — warmer, softer */
-  --glass-bg: rgba(10, 15, 30, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  /* Glass Variables Dark */
+  --glass-bg: rgba(8, 12, 28, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.06);
 }
 
 @layer base {
@@ -118,13 +118,13 @@
 .glass-panel {
   background-color: var(--glass-bg);
   border-color: var(--glass-border);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
   box-shadow: var(--shadow-glass);
 }
 
 .card-premium {
-  @apply bg-card rounded-xl border border-border/50 shadow-premium hover:shadow-lg transition-all duration-300;
+  @apply bg-card/80 backdrop-blur-sm rounded-2xl border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300;
 }
 
 .nav-item-active {

@@ -1,63 +1,80 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Package, Users, TrendingUp } from "lucide-react"
+import { Package, Users, TrendingUp, CalendarDays } from "lucide-react"
 import Link from "next/link"
+import { getCurrentUser } from "@/lib/actions/auth"
 
 export function WelcomeSection() {
-    const currentHour = new Date().getHours()
+    const [userName, setUserName] = useState("")
 
+    useEffect(() => {
+        getCurrentUser().then(res => {
+            if (res.success && res.data) {
+                setUserName(res.data.name)
+            }
+        })
+    }, [])
+
+    const currentHour = new Date().getHours()
     let greeting = "مساء الخير"
+    let emoji = "🌙"
     if (currentHour < 12) {
         greeting = "صباح الخير"
+        emoji = "☀️"
     } else if (currentHour < 18) {
-        greeting = "مساء الخير"
-    } else {
-        greeting = "مساء الخير"
+        greeting = "مساء النور"
+        emoji = "🌤️"
     }
 
-    return (
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
-            <div className="space-y-2">
-                <h1 className="text-4xl md:text-5xl font-black tracking-tight">
-                    <span className="bg-clip-text text-transparent bg-linear-to-l from-primary via-indigo-600 to-purple-600">
-                        {greeting}
-                    </span>
-                    <span className="inline-block animate-wave ml-2">👋</span>
-                </h1>
-                <p className="text-muted-foreground text-base max-w-2xl">
-                    مرحباً بك في لوحة التحكم. إليك نظرة سريعة على أداء عملك اليوم
-                </p>
-            </div>
+    const today = new Date()
+    const formattedDate = today.toLocaleDateString('ar-EG', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    })
 
-            <div className="flex flex-wrap items-center gap-3">
-                <Link href="/inventory">
-                    <Button
-                        className="group shadow-lg hover:shadow-xl transition-all duration-300"
-                        size="lg"
-                    >
-                        <Package className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
-                        إضافة منتج
+    return (
+        <div className="relative rounded-2xl border border-border/50 dark:border-white/6 bg-card/50 dark:bg-white/2 p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                {/* Text content */}
+                <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                        <CalendarDays className="size-3.5" />
+                        <span>{formattedDate}</span>
+                    </div>
+
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+                        {greeting}{userName && `، ${userName}`}
+                        <span className="mr-2 inline-block">{emoji}</span>
+                    </h1>
+
+                    <p className="text-sm text-muted-foreground max-w-md">
+                        إليك نظرة سريعة على أداء متجرك اليوم
+                    </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                    <Link href="/inventory">
+                        <Button size="sm" className="rounded-lg font-semibold gap-1.5">
+                            <Package className="size-4" />
+                            إضافة منتج
+                        </Button>
+                    </Link>
+                    <Link href="/persons">
+                        <Button variant="outline" size="sm" className="rounded-lg font-semibold gap-1.5">
+                            <Users className="size-4" />
+                            إضافة شخص
+                        </Button>
+                    </Link>
+                    <Button variant="ghost" size="sm" className="rounded-lg font-semibold gap-1.5 text-muted-foreground">
+                        <TrendingUp className="size-4" />
+                        التقارير
                     </Button>
-                </Link>
-                <Link href="/persons">
-                    <Button
-                        variant="outline"
-                        className="group shadow-md hover:shadow-lg transition-all duration-300"
-                        size="lg"
-                    >
-                        <Users className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
-                        إضافة شخص
-                    </Button>
-                </Link>
-                <Button
-                    variant="ghost"
-                    className="group"
-                    size="lg"
-                >
-                    <TrendingUp className="h-4 w-4 mr-2 group-hover:translate-y-[-2px] transition-transform" />
-                    التقارير
-                </Button>
+                </div>
             </div>
         </div>
     )

@@ -294,9 +294,12 @@ export function DataTable<TData, TValue>({
                                                         )}
                                                     >
                                                         {cell.getIsGrouped() ? (
-                                                            <button
+                                                            <div
                                                                 onClick={row.getToggleExpandedHandler()}
                                                                 className="flex items-center gap-2 cursor-pointer w-full justify-start text-primary"
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.getToggleExpandedHandler()() } }}
                                                                 style={{ paddingRight: `${row.depth * 2}rem` }}
                                                             >
                                                                 {row.getIsExpanded() ? (
@@ -311,7 +314,7 @@ export function DataTable<TData, TValue>({
                                                                         ({row.subRows.length})
                                                                     </span>
                                                                 </span>
-                                                            </button>
+                                                            </div>
                                                         ) : cell.getIsAggregated() ? (
                                                             flexRender(
                                                                 cell.column.columnDef.aggregatedCell ??

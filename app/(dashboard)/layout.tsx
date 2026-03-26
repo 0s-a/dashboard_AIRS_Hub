@@ -53,20 +53,21 @@ export default function DashboardLayout({
         <div className="flex min-h-screen w-full flex-col bg-background relative overflow-hidden">
             {/* Background decorative elements */}
             <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
-                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/5 dark:bg-primary/20 rounded-full blur-[120px]" />
-                <div className="absolute top-[20%] -right-[5%] w-[30%] h-[30%] bg-indigo-500/5 dark:bg-indigo-500/20 rounded-full blur-[100px]" />
+                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/3 dark:bg-primary/8 rounded-full blur-[120px]" />
+                <div className="absolute top-[40%] -right-[5%] w-[30%] h-[30%] bg-indigo-500/3 dark:bg-indigo-500/8 rounded-full blur-[100px]" />
+                <div className="absolute bottom-[10%] left-[20%] w-[25%] h-[25%] bg-purple-500/3 dark:bg-purple-500/6 rounded-full blur-[80px]" />
             </div>
 
             <div className="relative z-10 flex min-h-screen w-full flex-col">
-                <aside className={`fixed inset-y-0 right-0 z-20 hidden flex-col border-l glass-panel sm:flex transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+                <aside className={`fixed inset-y-0 right-0 z-20 hidden flex-col border-l border-border/40 glass-panel sm:flex transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
                     <div className="p-6">
                         <div className={`flex items-center gap-3 px-2 ${isCollapsed ? 'justify-center' : ''}`}>
-                            <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0 group hover:rotate-12 transition-transform duration-500">
+                            <div className="size-10 rounded-2xl bg-linear-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg shadow-primary/25 shrink-0 group hover:rotate-6 hover:scale-105 transition-all duration-500">
                                 <span className="text-white font-black text-xl leading-none" style={{fontFamily: 'serif'}}>ن</span>
                             </div>
                             <div className={`flex flex-col transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
                                 <span className="font-black text-lg tracking-tight whitespace-nowrap bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent">نواة</span>
-                                <span className="text-[9px] text-muted-foreground font-bold tracking-[0.2em] -mt-0.5 whitespace-nowrap uppercase">Nawaat</span>
+                                <span className="text-[9px] text-muted-foreground/60 font-bold tracking-[0.25em] -mt-0.5 whitespace-nowrap uppercase">Nawaat Platform</span>
                             </div>
                         </div>
                     </div>
@@ -94,17 +95,17 @@ export default function DashboardLayout({
                                                             href={item.href}
                                                             className={`relative flex items-center gap-3 rounded-xl px-4 py-2.5 transition-all duration-300 group ${
                                                                 isActive 
-                                                                    ? 'bg-primary/10 text-primary shadow-sm shadow-primary/5' 
+                                                                    ? 'bg-primary/10 text-primary shadow-sm shadow-primary/5 font-bold' 
                                                                     : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'
                                                             } ${isCollapsed ? 'justify-center' : ''}`}
                                                         >
                                                             {/* Active Indicator Bar */}
                                                             {isActive && (
-                                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-l-full bg-primary" />
+                                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-7 w-[3px] rounded-l-full bg-linear-to-b from-primary to-indigo-500 shadow-[0_0_8px] shadow-primary/40" />
                                                             )}
                                                             
                                                             <Icon className={`h-5 w-5 transition-all duration-300 ${
-                                                                isActive ? 'scale-110 rotate-3' : 'group-hover:scale-110 group-hover:-rotate-3'
+                                                                isActive ? 'scale-110' : 'group-hover:scale-110'
                                                             } shrink-0`} />
                                                             
                                                             <span className={`text-[13px] font-semibold transition-all duration-300 ${
@@ -140,17 +141,13 @@ export default function DashboardLayout({
                     </div>
 
                     <div className="p-4 mt-auto">
-                        <div className={`relative overflow-hidden rounded-2xl p-4 transition-all duration-500 bg-linear-to-br from-primary/95 to-indigo-600 group shadow-lg shadow-primary/20 ${isCollapsed ? 'h-12 w-12 p-0 flex items-center justify-center' : ''}`}>
-                            {/* Decorative bubbles for footer card */}
-                            <div className="absolute -top-4 -right-4 size-16 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
-                            <div className="absolute -bottom-4 -left-4 size-16 bg-indigo-400/20 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
-                            
+                        <div className={`rounded-xl border border-border/50 dark:border-white/6 bg-muted/30 dark:bg-white/3 p-3 transition-all duration-300 ${isCollapsed ? 'flex items-center justify-center p-2' : ''}`}>
                             {isCollapsed ? (
-                                <div className="size-2 rounded-full bg-white animate-pulse" />
+                                <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                             ) : (
-                                <div className="relative z-10 flex items-center gap-3">
+                                <div className="flex items-center gap-3">
                                     {storeInfo.logo ? (
-                                        <div className="relative size-10 rounded-xl overflow-hidden ring-2 ring-white/20 shrink-0">
+                                        <div className="relative size-9 rounded-lg overflow-hidden border border-border/50 shrink-0">
                                             <Image
                                                 src={storeInfo.logo}
                                                 alt="شعار المتجر"
@@ -160,17 +157,15 @@ export default function DashboardLayout({
                                             />
                                         </div>
                                     ) : (
-                                        <div className="size-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-                                            <span className="text-white font-black text-lg" style={{fontFamily: 'serif'}}>{storeInfo.name.charAt(0)}</span>
+                                        <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                            <span className="text-primary font-bold text-sm">{storeInfo.name.charAt(0)}</span>
                                         </div>
                                     )}
                                     <div className="flex flex-col flex-1 min-w-0">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest italic">المتجر الحالي</span>
-                                            <div className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] animate-pulse" />
-                                        </div>
-                                        <span className="text-sm font-bold text-white truncate drop-shadow-sm">{storeInfo.name}</span>
+                                        <span className="text-[10px] font-medium text-muted-foreground">المتجر الحالي</span>
+                                        <span className="text-sm font-semibold text-foreground truncate">{storeInfo.name}</span>
                                     </div>
+                                    <div className="size-2 rounded-full bg-emerald-500 shrink-0" />
                                 </div>
                             )}
                         </div>

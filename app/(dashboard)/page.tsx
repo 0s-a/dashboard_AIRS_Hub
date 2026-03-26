@@ -14,12 +14,14 @@ const getDashboardData = unstable_cache(
             productCount,
             personCount,
             activePersonCount,
+            unavailableProductCount,
             recentProducts,
             recentPersons
         ] = await Promise.all([
             prisma.product.count(),
             prisma.person.count(),
             prisma.person.count({ where: { isActive: true } }),
+            prisma.product.count({ where: { isAvailable: false } }),
             // Get recent products (last 5)
             prisma.product.findMany({
                 take: 5,
@@ -47,8 +49,6 @@ const getDashboardData = unstable_cache(
             })
         ])
 
-        const lowStockCount = 0
-
 
         // Generate activity data for last 7 days (optimized)
         const activityData = await generateActivityData()
@@ -58,7 +58,7 @@ const getDashboardData = unstable_cache(
                 productCount,
                 personCount,
                 activePersonCount,
-                lowStockCount
+                unavailableProductCount
             },
             recentProducts: recentProducts.map((p: any) => ({
                 ...p,
@@ -133,49 +133,60 @@ export default async function DashboardPage() {
             <WelcomeSection />
 
             {/* Stats Cards */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard
-                    title="عدد المنتجات"
-                    value={stats.productCount}
-                    iconName="package"
-                    description="منتج متوفر في المخزون"
-                    colorScheme="indigo"
-                />
-                <StatCard
-                    title="إجمالي الأشخاص"
-                    value={stats.personCount}
-                    iconName="users"
-                    description="شخص مسجل حالياً"
-                    colorScheme="blue"
-                />
-                <StatCard
-                    title="الأشخاص النشطون"
-                    value={stats.activePersonCount}
-                    iconName="trending-up"
-                    description="شخص نشط"
-                    colorScheme="green"
-                />
-
-                <StatCard
-                    title="مخزون منخفض"
-                    value={stats.lowStockCount}
-                    iconName="alert-circle"
-                    description="منتج يحتاج تعبئة"
-                    colorScheme="orange"
-                />
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '0ms', animationFillMode: 'both' }}>
+                    <StatCard
+                        title="عدد المنتجات"
+                        value={stats.productCount}
+                        iconName="package"
+                        description="منتج متوفر في المخزون"
+                        colorScheme="indigo"
+                    />
+                </div>
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
+                    <StatCard
+                        title="إجمالي الأشخاص"
+                        value={stats.personCount}
+                        iconName="users"
+                        description="شخص مسجل حالياً"
+                        colorScheme="blue"
+                    />
+                </div>
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
+                    <StatCard
+                        title="الأشخاص النشطون"
+                        value={stats.activePersonCount}
+                        iconName="trending-up"
+                        description="شخص نشط"
+                        colorScheme="green"
+                    />
+                </div>
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '300ms', animationFillMode: 'both' }}>
+                    <StatCard
+                        title="منتجات غير متوفرة"
+                        value={stats.unavailableProductCount}
+                        iconName="alert-circle"
+                        description="منتج غير متاح حالياً"
+                        colorScheme="orange"
+                    />
+                </div>
             </div>
 
             {/* Charts */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-                <div className="lg:col-span-7">
-                    <ActivityChart data={activityData} />
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '400ms', animationFillMode: 'both' }}>
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-7">
+                    <div className="lg:col-span-7">
+                        <ActivityChart data={activityData} />
+                    </div>
                 </div>
             </div>
 
             {/* Recent Items */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-6">
-                <RecentProducts products={recentProducts as any} />
-                <RecentPersons persons={recentPersons as any} />
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '500ms', animationFillMode: 'both' }}>
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-6">
+                    <RecentProducts products={recentProducts as any} />
+                    <RecentPersons persons={recentPersons as any} />
+                </div>
             </div>
         </div>
     )

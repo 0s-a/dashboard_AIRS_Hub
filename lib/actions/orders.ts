@@ -56,7 +56,7 @@ async function resolveItems(items: OrderItemInput[]): Promise<ResolvedItem[]> {
             productId: item.productId,
             priceLabelId: item.priceLabelId,
             variantId: item.variantId ?? null,
-            unitPrice: pp.value,
+            unitPrice: Number(pp.value),
             currencyId: pp.currencyId,
             quantity: item.quantity,
             notes: item.notes ?? null,

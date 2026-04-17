@@ -23,8 +23,10 @@ model Product {
   productImages    ProductImage[]
   variants         Variant[]
   productPrices    ProductPrice[]
+  productUnits     ProductUnit[]
   orderItems       OrderItem[]
   notifications    AiNotification[]
+  search_vector    Unsupported("tsvector")?
 }
 
 model Category {
@@ -100,7 +102,7 @@ model Variant {
   name          String // display name
   type          String         @default("color") // "color" | "size" | "custom"
   hex           String? // CSS hex color (for type=color only)
-  price         Float? // Variant-specific price override
+  price         Decimal? @db.Decimal(12, 2) // Variant-specific price override
   order         Int            @default(0)
   isDefault     Boolean        @default(false)
   productId     String
@@ -183,20 +185,51 @@ model Currency {
 
 // Product prices — normalized pricing with multi-currency support
 model ProductPrice {
-  id           String     @id @default(uuid())
-  productId    String
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  priceLabelId String
-  priceLabel   PriceLabel @relation(fields: [priceLabelId], references: [id], onDelete: Cascade)
-  currencyId   String
-  currency     Currency   @relation(fields: [currencyId], references: [id], onDelete: Restrict)
-  value        Float
-  unit         String? // e.g. "حبة", "كرتون"
-  quantity     Int? // number of units
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id               String     @id @default(uuid())
+  productId        String
+  product          Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceLabelId     String
+  priceLabel       PriceLabel @relation(fields: [priceLabelId], references: [id], onDelete: Cascade)
+  currencyId       String
+  currency         Currency   @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  unitId           String
+  unit             Unit       @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  value            Decimal    @db.Decimal(12, 2)
+  isAutoCalculated Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
-  @@unique([productId, priceLabelId, currencyId])
+  @@unique([productId, priceLabelId, currencyId, unitId])
+}
+
+// Links available units to a product
+model ProductUnit {
+  id               String  @id @default(uuid())
+  productId        String
+  product          Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  unitId           String
+  unit             Unit    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  isBase           Boolean @default(false)
+  conversionFactor Int     @default(1) // how many base units in this specific product's unit (e.g. this product's carton has 24 pieces)
+  barcode          String? @unique // barcode specifically for this product's unit size
+  order            Int     @default(0)
+
+  @@unique([productId, unitId])
+}
+
+// Unit model for pricing units (e.g., Piece, Dozen, Box)
+model Unit {
+  id             String         @id @default(uuid())
+  itemNumber     String         @unique
+  name           String         @unique
+  pluralName     String?
+  notes          String?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  productPrices ProductPrice[]
+  productUnits  ProductUnit[]
 }
 
 // Represents a customer order
@@ -208,7 +241,7 @@ model Order {
   status      String      @default("pending")
   // "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
   notes       String?
-  totalAmount Float? // pre-computed sum from items
+  totalAmount Decimal? @db.Decimal(12, 2) // pre-computed sum from items
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -226,7 +259,7 @@ model OrderItem {
   priceLabelId String?
   priceLabel   PriceLabel? @relation(fields: [priceLabelId], references: [id], onDelete: SetNull)
   // Snapshot of price & currency from ProductPrice at order creation time
-  unitPrice    Float
+  unitPrice    Decimal  @db.Decimal(12, 2)
   currencyId   String?
   currency     Currency?   @relation(fields: [currencyId], references: [id], onDelete: SetNull)
   quantity     Int         @default(1)
@@ -291,4 +324,25 @@ model StoreSettings {
   socialLinks  Json?    // { "facebook": "...", "instagram": "...", ... }
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// Announcements system for mass messaging
+model Announcement {
+  id                   String     @id @default(uuid())
+  title                String
+  description          String?
+  status               String     @default("pending") // pending | running | paused | sent | cancelled | failed
+  scheduledAt          DateTime
+  sentAt               DateTime?
+  personIds            String[]   // Manual specific recipients
+  productIds           String[]   // Manual specific products
+  personFilters        Json       // Filters used to define the audience
+  productFilters       Json       // Filters used to define the attached products
+  batchSize            Int        @default(50)
+  batchIntervalMinutes Int        @default(15)
+  batchProgress        Json       @default("{}") // Progress tracking state
+  sentCount            Int        @default(0)
+  createdBy            String?    // User ID
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 }

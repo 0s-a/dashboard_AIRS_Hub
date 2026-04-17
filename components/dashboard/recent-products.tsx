@@ -131,7 +131,7 @@ export function RecentProducts({ products }: RecentProductsProps) {
                                 {product.productPrices && product.productPrices.length > 0 ? (
                                     <div className="flex flex-col items-end">
                                         <p className="font-mono font-black text-sm text-primary tabular-nums">
-                                            {product.productPrices[0].value.toFixed(2)} {product.productPrices[0].currencySymbol}
+                                            {Number(product.productPrices[0].value).toFixed(2)} {product.productPrices[0].currencySymbol}
                                         </p>
                                         <p className="text-[9px] text-muted-foreground/50 font-bold">{product.productPrices[0].priceLabelName || 'سعر'}</p>
                                     </div>

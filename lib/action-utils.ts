@@ -119,11 +119,11 @@ export async function generateItemNumber(
 
 /**
  * Resolve unit price and currency for a product + price label combo.
- * Shared between server actions and API routes.
+ * Optionally filter by unitId for unit-specific pricing.
  */
-export async function resolveProductPrice(productId: string, priceLabelId: string) {
+export async function resolveProductPrice(productId: string, priceLabelId: string, unitId?: string) {
     return prisma.productPrice.findFirst({
-        where: { productId, priceLabelId },
-        include: { currency: true },
+        where: { productId, priceLabelId, ...(unitId ? { unitId } : {}) },
+        include: { currency: true, unit: true },
     })
 }

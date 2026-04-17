@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
                     include: {
                         priceLabel: true,
                         currency: true,
+                        unit: { select: { name: true } },
                     },
                     orderBy: { createdAt: 'asc' },
                 },
@@ -68,8 +69,7 @@ export async function POST(req: NextRequest) {
                 symbol: pp.currency.symbol,
                 name: pp.currency.name,
             },
-            unit: pp.unit,
-            quantity: pp.quantity,
+            unit: (pp as any).unit?.name ?? null,
         }))
 
         return NextResponse.json({

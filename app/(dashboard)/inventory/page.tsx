@@ -1,10 +1,13 @@
 import { InventoryTable } from "./inventory-table"
-import { getProducts } from "@/lib/actions/inventory"
+import { getProductsPaginated, getProductFilterOptions } from "@/lib/actions/inventory"
 import { ProductSheet } from "@/components/inventory/product-sheet"
 
 export default async function InventoryPage() {
-    const result = await getProducts()
-    const products = result.data || []
+    // Run both queries in parallel
+    const [result, filterOpts] = await Promise.all([
+        getProductsPaginated({ page: 1, limit: 50, sortBy: 'createdAt', sortDir: 'desc' }),
+        getProductFilterOptions(),
+    ])
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -15,7 +18,12 @@ export default async function InventoryPage() {
                 </div>
                 <ProductSheet />
             </div>
-            <InventoryTable products={products} />
+            <InventoryTable
+                initialProducts={result.data || []}
+                initialPagination={result.pagination}
+                filterCategories={filterOpts.categories}
+                filterBrands={filterOpts.brands}
+            />
         </div>
     )
 }

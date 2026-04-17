@@ -10,7 +10,9 @@ import {
     ShoppingCart,
     Bell,
     UsersRound,
-    Store
+    Store,
+    Megaphone,
+    Ruler
 } from "lucide-react"
 
 export const navigationGroups = [
@@ -44,6 +46,7 @@ export const navigationGroups = [
         title: "النظام والتسعير",
         items: [
             { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
+            { href: "/units", label: "وحدات القياس", icon: Ruler },
             { href: "/currencies", label: "العملات", icon: Coins },
             { href: "/users", label: "المستخدمين", icon: UsersRound },
             { href: "/settings", label: "إعدادات المتجر", icon: Store },
@@ -52,6 +55,7 @@ export const navigationGroups = [
     {
         title: "الذكاء الاصطناعي",
         items: [
+            { href: "/announcements", label: "الإعلانات", icon: Megaphone },
             { href: "/notifications", label: "الإشعارات", icon: Bell },
         ]
     },

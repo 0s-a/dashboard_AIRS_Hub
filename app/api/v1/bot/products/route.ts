@@ -12,6 +12,7 @@ const PRODUCT_INCLUDE = {
         include: {
             priceLabel: { select: { id: true, name: true } },
             currency: { select: { id: true, code: true, symbol: true, name: true } },
+            unit: { select: { name: true } },
         },
         orderBy: { createdAt: 'asc' as const },
     },
@@ -75,8 +76,7 @@ export async function GET(req: NextRequest) {
                 id: pp.id,
                 label: pp.priceLabel.name,
                 value: pp.value,
-                unit: pp.unit,
-                quantity: pp.quantity,
+                unit: (pp as any).unit?.name ?? null,
                 currency: pp.currency,
             })),
             variants: p.variants,

@@ -188,60 +188,281 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                 </div>
             </div>
 
-            {/* Hero Section */}
-            <div className="grid gap-6 lg:grid-cols-2">
-                {/* Product Gallery */}
-                <div className="glass-panel rounded-2xl p-4 border border-border/50 space-y-3">
-                    {/* Hero Image */}
-                    <div
-                        className="aspect-square relative rounded-xl overflow-hidden bg-muted/30 group cursor-pointer"
-                        onClick={() => galleryImages.length > 0 && openLightbox(0)}
-                    >
-                        {galleryImages.length > 0 ? (
-                            <Image
-                                src={galleryImages[0].url}
-                                alt={galleryImages[0].alt || product.name}
-                                fill
-                                className="object-cover transition-all duration-500 group-hover:scale-105 group-hover:brightness-105"
-                                priority
-                            />
-                        ) : (
-                            <div className="flex items-center justify-center h-full bg-linear-to-br from-muted/50 to-muted/20">
-                                <Package className="h-24 w-24 text-muted-foreground/30" />
+            {/* Top Overview Section */}
+            <div className="grid gap-6 lg:grid-cols-12 flex-col-reverse lg:flex-row">
+                
+                {/* Product Info (Main Content - Right side in RTL) */}
+                <div className="lg:col-span-7 space-y-6 flex flex-col order-2 lg:order-1">
+                    <div className="glass-panel rounded-2xl p-6 border border-border/50 space-y-6 hover:border-primary/20 transition-all duration-300 flex-1">
+                        {/* Title & Badge */}
+                        <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-4">
+                                <h1 className="text-3xl font-bold tracking-tight bg-linear-to-l from-foreground to-foreground/80 bg-clip-text">
+                                    {product.name}
+                                </h1>
+                                <AvailabilityToggle
+                                    id={product.id}
+                                    isAvailable={product.isAvailable}
+                                />
                             </div>
-                        )}
-                        {galleryImages.length > 0 && (
-                            <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-3">
-                                <span className="text-white text-xs bg-black/50 px-2 py-1 rounded-full">
-                                    اضغط للتكبير
-                                </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Badge
+                                    variant="outline"
+                                    className="gap-1.5 hover:bg-primary/5 transition-colors cursor-pointer select-none"
+                                    onClick={copyItemNumber}
+                                    title="انقر لنسخ رقم الصنف"
+                                >
+                                    <Tag className="h-3 w-3" />
+                                    <span className="font-mono">{product.itemNumber}</span>
+                                    {copiedItemNumber ? (
+                                        <Check className="h-3 w-3 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3 w-3 text-muted-foreground/50" />
+                                    )}
+                                </Badge>
+                                {product.brand && (
+                                    <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15">
+                                        {product.brand}
+                                    </Badge>
+                                )}
                             </div>
-                        )}
-                        {/* Image count badge */}
-                        {galleryImages.length > 1 && (
-                            <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                                {galleryImages.length} صور
-                            </div>
-                        )}
-                    </div>
+                        </div>
 
-                    {/* Interactive Image Manager */}
-                    <div className="pt-2">
-                        <ImageGalleryUpload
-                            images={galleryImages}
-                            productId={product.id}
-                            productItemNumber={product.itemNumber}
-                            variants={product.variants || []}
-                            maxImages={10}
-                            onImagesChange={handleImagesChange}
-                        />
+                        {/* Basic Details Grid */}
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors border border-border/30">
+                                <p className="text-xs text-muted-foreground">الوحدة الأساسية</p>
+                                <p className="font-semibold text-sm">{product.unit}</p>
+                            </div>
+                            <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors border border-border/30">
+                                <p className="text-xs text-muted-foreground">التعبئة</p>
+                                <p className="font-semibold text-sm">{product.packaging || "غير محدد"}</p>
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        {product.description && (
+                            <div className="space-y-2 pt-2">
+                                <h3 className="text-sm font-semibold text-muted-foreground">الوصف</h3>
+                                <p className="text-sm leading-relaxed text-foreground/90 p-4 rounded-xl bg-muted/10 border border-border/30">
+                                    {product.description}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Alternative Names Display */}
+                        <div className="space-y-3 pt-4 border-t border-border/50">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-amber-600" />
+                                    <h3 className="text-sm font-semibold text-muted-foreground">الأسماء البديلة</h3>
+                                </div>
+                                <QuickAddAlternativeName
+                                    productId={product.id}
+                                    productName={product.name}
+                                    currentAlternativeNames={product.alternativeNames}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 px-3 text-xs bg-linear-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-300 text-amber-700 hover:text-amber-800 transition-all"
+                                        >
+                                            <Plus className="h-3.5 w-3.5 ml-1" />
+                                            إضافة
+                                        </Button>
+                                    }
+                                />
+                            </div>
+                            {product.alternativeNames && product.alternativeNames.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {product.alternativeNames.map((altName, idx) => (
+                                        <Badge
+                                            key={idx}
+                                            variant="outline"
+                                            className="px-3 py-1.5 text-sm bg-linear-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200 hover:from-amber-100 hover:to-orange-100 hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all duration-300 cursor-default hover:-translate-y-0.5"
+                                        >
+                                            {altName}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">لا توجد أسماء بديلة لهذا المنتج</p>
+                            )}
+                        </div>
+
+                        {/* Tags Display */}
+                        <div className="space-y-3 pt-4 border-t border-border/50">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Hash className="h-4 w-4 text-violet-600" />
+                                    <h3 className="text-sm font-semibold text-muted-foreground">الوسوم</h3>
+                                </div>
+                                <QuickAddTag
+                                    productId={product.id}
+                                    productName={product.name}
+                                    currentTags={product.tags}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 px-3 text-xs bg-linear-to-r from-violet-500/10 to-purple-500/10 hover:from-violet-500/20 hover:to-purple-500/20 border-violet-300 text-violet-700 hover:text-violet-800 transition-all"
+                                        >
+                                            <Plus className="h-3.5 w-3.5 ml-1" />
+                                            إضافة
+                                        </Button>
+                                    }
+                                />
+                            </div>
+                            {product.tags && product.tags.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {product.tags.map((tag) => (
+                                        <Badge
+                                            key={tag}
+                                            variant="outline"
+                                            className="px-3 py-1.5 text-sm hover:shadow-md transition-all duration-300 cursor-default hover:-translate-y-0.5 gap-1.5 text-violet-700 border-violet-300 bg-violet-500/5"
+                                        >
+                                            <Hash className="h-3 w-3 text-violet-500" />
+                                            {tag}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">لا توجد وسوم لهذا المنتج.</p>
+                            )}
+                        </div>
+
+                        {/* Section Divider */}
+                        <div className="border-t border-border/20 my-6" />
+
+                        {/* Integrated Stats */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-muted/10 border border-border/30 group hover:bg-muted/20 transition-colors">
+                                <div>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">تاريخ الإنشاء</p>
+                                    <h3 className="text-xs font-semibold mt-1 group-hover:text-indigo-500 transition-colors">{formatDate(product.createdAt)}</h3>
+                                </div>
+                                <Calendar className="size-4 text-muted-foreground/30 group-hover:text-indigo-500/50" />
+                            </div>
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-muted/10 border border-border/30 group hover:bg-muted/20 transition-colors">
+                                <div>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">آخر تحديث</p>
+                                    <h3 className="text-xs font-semibold mt-1 group-hover:text-green-500 transition-colors">{formatDate(product.updatedAt)}</h3>
+                                </div>
+                                <Calendar className="size-4 text-muted-foreground/30 group-hover:text-green-500/50" />
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-6 border-t border-border/50">
+                            <ProductSheet
+                                product={product as any}
+                                trigger={
+                                    <Button className="flex-1 gap-2 bg-linear-to-l from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 h-12 shadow-md shadow-primary/20 rounded-xl font-bold" size="lg">
+                                        <Edit className="h-4 w-4" />
+                                        تعديل بيانات المنتج
+                                    </Button>
+                                }
+                            />
+
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 h-12 rounded-xl"
+                                        size="lg"
+                                        disabled={isDeleting}
+                                    >
+                                        {isDeleting ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                        )}
+                                        حذف
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="rounded-3xl border-border/40 backdrop-blur-xl">
+                                    <AlertDialogHeader>
+                                        <div className="size-12 rounded-2xl bg-destructive/10 flex items-center justify-center text-destructive mb-4">
+                                            <Trash2 className="h-6 w-6" />
+                                        </div>
+                                        <AlertDialogTitle className="text-xl font-bold">هل أنت متأكد من حذف هذا المنتج؟</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-base">
+                                            سيؤدي هذا الإجراء إلى حذف المنتج &quot;<span className="font-bold text-foreground">{product.name}</span>&quot; نهائياً وجميع الأشكال المرتبطة به والتسعيرات. لا يمكن التراجع عن هذا الإجراء.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter className="mt-6 gap-3">
+                                        <AlertDialogCancel className="rounded-xl border-border/40 hover:bg-muted/50 h-11 flex-1 m-0">إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={handleDelete}
+                                            className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 h-11 flex-1 shadow-lg shadow-destructive/20 border-none m-0"
+                                        >
+                                            نعم، تأكيد الحذف
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Product Gallery (Left side in RTL) */}
+                <div className="lg:col-span-5 h-fit order-1 lg:order-2">
+                    <div className="glass-panel rounded-2xl p-4 border border-border/50 hover:border-primary/20 transition-all duration-300">
+                        {/* Hero Image */}
+                        <div
+                            className="aspect-square relative rounded-xl overflow-hidden bg-muted/20 group cursor-pointer border border-border/30"
+                            onClick={() => galleryImages.length > 0 && openLightbox(0)}
+                        >
+                            {galleryImages.length > 0 ? (
+                                <Image
+                                    src={galleryImages[0].url}
+                                    alt={galleryImages[0].alt || product.name}
+                                    fill
+                                    className="object-cover transition-all duration-700 group-hover:scale-105"
+                                    priority
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground/30">
+                                    <div className="size-24 rounded-full bg-muted/40 flex items-center justify-center">
+                                        <Package className="h-10 w-10" />
+                                    </div>
+                                    <span className="text-sm font-medium">لا توجد صور للمنتج</span>
+                                </div>
+                            )}
+                            {galleryImages.length > 0 && (
+                                <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
+                                    <span className="text-white text-xs font-medium px-4 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
+                                        تكبير الصورة
+                                    </span>
+                                </div>
+                            )}
+                            {/* Image count badge */}
+                            {galleryImages.length > 1 && (
+                                <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-md text-foreground text-[10px] font-bold px-2 py-1 rounded-md border border-border/50 shadow-sm flex items-center gap-1.5">
+                                    <div className="size-1.5 rounded-full bg-primary" />
+                                    {galleryImages.length} صور
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Interactive Image Manager */}
+                        <div className="pt-4 border-t border-border/30 mt-4">
+                            <ImageGalleryUpload
+                                images={galleryImages}
+                                productId={product.id}
+                                productItemNumber={product.itemNumber}
+                                variants={product.variants || []}
+                                maxImages={10}
+                                onImagesChange={handleImagesChange}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* Lightbox */}
                 {lightboxOpen && galleryImages.length > 0 && (
                     <div
-                        className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+                        className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center backdrop-blur-md"
                         onClick={() => setLightboxOpen(false)}
                     >
                         {/* Close */}
@@ -253,7 +474,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         </button>
 
                         {/* Counter */}
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-mono font-bold px-3 py-1 rounded-full bg-white/10">
                             {lightboxIndex + 1} / {galleryImages.length}
                         </div>
 
@@ -298,7 +519,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                     <button
                                         key={img.id}
                                         onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx) }}
-                                        className={`h-12 w-12 rounded-lg overflow-hidden border-2 transition-all ${idx === lightboxIndex ? 'border-white scale-110' : 'border-white/30 opacity-60 hover:opacity-100'
+                                        className={`h-12 w-12 rounded-lg overflow-hidden border-2 transition-all ${idx === lightboxIndex ? 'border-primary ring-2 ring-primary/50 scale-110 shadow-lg' : 'border-white/20 opacity-50 hover:opacity-100 hover:border-white/50'
                                             }`}
                                     >
                                         <div className="relative h-full w-full">
@@ -310,271 +531,22 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         )}
                     </div>
                 )}
-
-                {/* Product Info */}
-                <div className="space-y-6">
-                    <div className="glass-panel rounded-2xl p-6 border border-border/50 space-y-4 hover:border-primary/20 transition-all duration-300">
-                        {/* Title & Badge */}
-                        <div className="space-y-3">
-                            <div className="flex items-start justify-between gap-4">
-                                <h1 className="text-3xl font-bold tracking-tight bg-linear-to-l from-foreground to-foreground/80 bg-clip-text">
-                                    {product.name}
-                                </h1>
-                                <AvailabilityToggle
-                                    id={product.id}
-                                    isAvailable={product.isAvailable}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <Badge
-                                    variant="outline"
-                                    className="gap-1.5 hover:bg-primary/5 transition-colors cursor-pointer select-none"
-                                    onClick={copyItemNumber}
-                                    title="انقر لنسخ رقم الصنف"
-                                >
-                                    <Tag className="h-3 w-3" />
-                                    <span className="font-mono">{product.itemNumber}</span>
-                                    {copiedItemNumber ? (
-                                        <Check className="h-3 w-3 text-green-500" />
-                                    ) : (
-                                        <Copy className="h-3 w-3 text-muted-foreground/50" />
-                                    )}
-                                </Badge>
-
-                            </div>
-                        </div>
-
-                        {/* Brand */}
-                        {product.brand && (
-                            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border/30">
-                                <span className="text-sm text-muted-foreground">العلامة التجارية:</span>
-                                <span className="font-semibold text-primary">{product.brand}</span>
-                            </div>
-                        )}
-
-                        {/* Description */}
-                        {product.description && (
-                            <div className="space-y-2">
-                                <h3 className="text-sm font-semibold text-muted-foreground">الوصف</h3>
-                                <p className="text-sm leading-relaxed text-foreground/90 p-3 rounded-lg bg-muted/20 border border-border/20">
-                                    {product.description}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Alternative Names Display */}
-                        {product.alternativeNames && product.alternativeNames.length > 0 && (
-                            <div className="space-y-3 pt-4 border-t border-border/50">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-amber-600" />
-                                        <h3 className="text-sm font-semibold text-muted-foreground">الأسماء البديلة</h3>
-                                    </div>
-                                    <QuickAddAlternativeName
-                                        productId={product.id}
-                                        productName={product.name}
-                                        currentAlternativeNames={product.alternativeNames}
-                                        trigger={
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8 px-3 text-xs bg-linear-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-300 text-amber-700 hover:text-amber-800 transition-all"
-                                            >
-                                                <Plus className="h-3.5 w-3.5 ml-1" />
-                                                إضافة
-                                            </Button>
-                                        }
-                                    />
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {product.alternativeNames.map((altName, idx) => (
-                                        <Badge
-                                            key={idx}
-                                            variant="outline"
-                                            className="px-3 py-1.5 text-sm bg-linear-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200 hover:from-amber-100 hover:to-orange-100 hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all duration-300 cursor-default hover:-translate-y-0.5"
-                                        >
-                                            {altName}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {/* Alternative Names - Empty State with Quick Add */}
-                        {(!product.alternativeNames || product.alternativeNames.length === 0) && (
-                            <div className="space-y-3 pt-4 border-t border-border/50">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-amber-600" />
-                                        <h3 className="text-sm font-semibold text-muted-foreground">الأسماء البديلة</h3>
-                                    </div>
-                                    <QuickAddAlternativeName
-                                        productId={product.id}
-                                        productName={product.name}
-                                        currentAlternativeNames={null}
-                                        trigger={
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8 px-3 text-xs bg-linear-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border-amber-300 text-amber-700 hover:text-amber-800 transition-all"
-                                            >
-                                                <Plus className="h-3.5 w-3.5 ml-1" />
-                                                إضافة اسم بديل
-                                            </Button>
-                                        }
-                                    />
-                                </div>
-                                <p className="text-sm text-muted-foreground italic">لا توجد أسماء بديلة لهذا المنتج</p>
-                            </div>
-                        )}
-
-                        {/* Tags Display */}
-                        <div className="space-y-3 pt-4 border-t border-border/50">
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                    <Hash className="h-4 w-4 text-violet-600" />
-                                    <h3 className="text-sm font-semibold text-muted-foreground">الوسوم</h3>
-                                </div>
-                                <QuickAddTag
-                                    productId={product.id}
-                                    productName={product.name}
-                                    currentTags={product.tags}
-                                    trigger={
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 px-3 text-xs bg-linear-to-r from-violet-500/10 to-purple-500/10 hover:from-violet-500/20 hover:to-purple-500/20 border-violet-300 text-violet-700 hover:text-violet-800 transition-all"
-                                        >
-                                            <Plus className="h-3.5 w-3.5 ml-1" />
-                                            إضافة
-                                        </Button>
-                                    }
-                                />
-                            </div>
-                            {product.tags && product.tags.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                    {product.tags.map((tag) => (
-                                        <Badge
-                                            key={tag}
-                                            variant="outline"
-                                            className="px-3 py-1.5 text-sm hover:shadow-md transition-all duration-300 cursor-default hover:-translate-y-0.5 gap-1.5 text-violet-700 border-violet-300 bg-violet-500/5"
-                                        >
-                                            <Hash className="h-3 w-3 text-violet-500" />
-                                            {tag}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground italic">لا توجد وسوم لهذا المنتج.</p>
-                            )}
-                        </div>
-
-                        {/* Variants Display */}
-                        <div className="pt-4 border-t border-border/50">
-                            <VariantManagement
-                                productId={product.id}
-                                itemNumber={product.itemNumber}
-                                variants={product.variants || []}
-                            />
-                        </div>
-
-                        {/* Section Divider */}
-                        <div className="border-t border-border/20 my-6" />
-
-                        {/* Prices */}
-                        <div className="pt-4 border-t border-border/50">
-                            <PricingSection product={product as any} />
-                        </div>
-
-                        {/* Product Details */}
-                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
-                            <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors">
-                                <p className="text-xs text-muted-foreground">الوحدة</p>
-                                <p className="font-semibold">{product.unit}</p>
-                            </div>
-                            {product.packaging && (
-                                <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors col-span-2">
-                                    <p className="text-xs text-muted-foreground">التعبئة</p>
-                                    <p className="font-semibold">{product.packaging}</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-3 pt-4">
-                            <ProductSheet
-                                product={product as any}
-                                trigger={
-                                    <Button className="flex-1 gap-2 bg-linear-to-l from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80" size="lg">
-                                        <Edit className="h-4 w-4" />
-                                        تعديل
-                                    </Button>
-                                }
-                            />
-
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className="gap-2 border-destructive/50 text-destructive hover:bg-destructive/10"
-                                        size="lg"
-                                        disabled={isDeleting}
-                                    >
-                                        {isDeleting ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Trash2 className="h-4 w-4" />
-                                        )}
-                                        حذف
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>هل أنت متأكد من حذف هذا المنتج؟</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            سيؤدي هذا الإجراء إلى حذف المنتج &quot;{product.name}&quot; نهائياً من قاعدة البيانات وجميع الأشكال المرتبطة به. لا يمكن التراجع عن هذا الإجراء.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter className="gap-2 sm:gap-0">
-                                        <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={handleDelete}
-                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
-                                        >
-                                            تأكيد الحذف
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2">
-                <div className="glass-panel rounded-xl p-6 border border-border/50 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5 transition-all duration-300 group">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">تاريخ الإنشاء</p>
-                            <h3 className="text-sm font-bold mt-2 group-hover:text-indigo-500 transition-colors">{formatDate(product.createdAt)}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-linear-to-br from-indigo-500/20 to-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Calendar className="size-6 text-indigo-500" />
-                        </div>
-                    </div>
-                </div>
+            {/* Full-width Data Sections (Below Overview) */}
+            
+            {/* Variants Display - Full Width */}
+            <div className="glass-panel rounded-2xl p-6 border border-border/50 hover:border-primary/20 transition-all duration-300">
+                <VariantManagement
+                    productId={product.id}
+                    itemNumber={product.itemNumber}
+                    variants={product.variants || []}
+                />
+            </div>
 
-                <div className="glass-panel rounded-xl p-6 border border-border/50 hover:border-green-500/30 hover:shadow-lg hover:shadow-green-500/5 transition-all duration-300 group">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">آخر تحديث</p>
-                            <h3 className="text-sm font-bold mt-2 group-hover:text-green-500 transition-colors">{formatDate(product.updatedAt)}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-linear-to-br from-green-500/20 to-green-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Calendar className="size-6 text-green-500" />
-                        </div>
-                    </div>
-                </div>
+            {/* Prices & Units - Full Width */}
+            <div className="glass-panel rounded-2xl p-6 border border-border/50 hover:border-primary/20 transition-all duration-300 shadow-sm shadow-primary/5">
+                <PricingSection product={product as any} />
             </div>
         </div>
     )

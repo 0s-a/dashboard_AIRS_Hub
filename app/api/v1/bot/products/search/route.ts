@@ -68,8 +68,7 @@ export async function GET(req: NextRequest) {
                         jsonb_build_object(
                             'id', pp.id,
                             'value', pp.value,
-                            'unit', pp.unit,
-                            'quantity', pp.quantity,
+                            'unitName', u.name,
                             'priceLabelId', pl.id,
                             'priceLabelName', pl.name,
                             'currencyCode', c.code,
@@ -80,6 +79,7 @@ export async function GET(req: NextRequest) {
                     FROM "ProductPrice" pp
                     JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
                     JOIN "Currency" c ON c.id = pp."currencyId"
+                    LEFT JOIN "Unit" u ON u.id = pp."unitId"
                     WHERE pp."productId" = p.id
                       AND pp."priceLabelId" IN (
                           SELECT ppl."priceLabelId" FROM "PersonPriceLabel" ppl WHERE ppl."personId" = $${personParamIdx}
@@ -93,8 +93,7 @@ export async function GET(req: NextRequest) {
                         jsonb_build_object(
                             'id', pp.id,
                             'value', pp.value,
-                            'unit', pp.unit,
-                            'quantity', pp.quantity,
+                            'unitName', u.name,
                             'priceLabelId', pl.id,
                             'priceLabelName', pl.name,
                             'currencyCode', c.code,
@@ -105,6 +104,7 @@ export async function GET(req: NextRequest) {
                     FROM "ProductPrice" pp
                     JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
                     JOIN "Currency" c ON c.id = pp."currencyId"
+                    LEFT JOIN "Unit" u ON u.id = pp."unitId"
                     WHERE pp."productId" = p.id
                 ) AS prices
             `
@@ -194,7 +194,8 @@ export async function GET(req: NextRequest) {
                 p.name ILIKE $${fbIdx} OR
                 p."itemNumber" ILIKE $${fbIdx} OR
                 p.brand ILIKE $${fbIdx} OR
-                p.description ILIKE $${fbIdx}
+                p.description ILIKE $${fbIdx} OR
+                p."alternativeNames"::text ILIKE $${fbIdx}
             )`)
             fallbackParams.push(likePattern)
             fbIdx++
@@ -222,7 +223,7 @@ export async function GET(req: NextRequest) {
                     (
                         SELECT COALESCE(jsonb_agg(
                             jsonb_build_object(
-                                'id', pp.id, 'value', pp.value, 'unit', pp.unit, 'quantity', pp.quantity,
+                                'id', pp.id, 'value', pp.value, 'unitName', u.name,
                                 'priceLabelId', pl.id, 'priceLabelName', pl.name,
                                 'currencyCode', c.code, 'currencySymbol', c.symbol, 'currencyName', c.name
                             ) ORDER BY pp."createdAt" ASC
@@ -230,6 +231,7 @@ export async function GET(req: NextRequest) {
                         FROM "ProductPrice" pp
                         JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
                         JOIN "Currency" c ON c.id = pp."currencyId"
+                        LEFT JOIN "Unit" u ON u.id = pp."unitId"
                         WHERE pp."productId" = p.id
                           AND pp."priceLabelId" IN (
                               SELECT ppl."priceLabelId" FROM "PersonPriceLabel" ppl WHERE ppl."personId" = $${fbPersonIdx}
@@ -241,7 +243,7 @@ export async function GET(req: NextRequest) {
                     (
                         SELECT COALESCE(jsonb_agg(
                             jsonb_build_object(
-                                'id', pp.id, 'value', pp.value, 'unit', pp.unit, 'quantity', pp.quantity,
+                                'id', pp.id, 'value', pp.value, 'unitName', u.name,
                                 'priceLabelId', pl.id, 'priceLabelName', pl.name,
                                 'currencyCode', c.code, 'currencySymbol', c.symbol, 'currencyName', c.name
                             ) ORDER BY pp."createdAt" ASC
@@ -249,6 +251,7 @@ export async function GET(req: NextRequest) {
                         FROM "ProductPrice" pp
                         JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
                         JOIN "Currency" c ON c.id = pp."currencyId"
+                        LEFT JOIN "Unit" u ON u.id = pp."unitId"
                         WHERE pp."productId" = p.id
                     ) AS prices
                 `

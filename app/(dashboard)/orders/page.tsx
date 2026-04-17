@@ -17,14 +17,15 @@ export default async function OrdersPage() {
         }),
     ])
 
-    const orders = (ordersRes.success ? ordersRes.data : []) as any[]
-    const persons = (personsRes.success ? personsRes.data : []) as any[]
+    // Serialize to remove Decimal objects before passing to Client Components
+    const orders = JSON.parse(JSON.stringify(ordersRes.success ? ordersRes.data : []))
+    const persons = JSON.parse(JSON.stringify(personsRes.success ? personsRes.data : []))
 
     // ── Stats ──
     const total = orders.length
-    const pending = orders.filter(o => o.status === "pending").length
-    const delivered = orders.filter(o => o.status === "delivered").length
-    const cancelled = orders.filter(o => o.status === "cancelled").length
+    const pending = orders.filter((o: any) => o.status === "pending").length
+    const delivered = orders.filter((o: any) => o.status === "delivered").length
+    const cancelled = orders.filter((o: any) => o.status === "cancelled").length
 
     const stats = [
         { label: "إجمالي الطلبات", value: total, icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-500/10" },

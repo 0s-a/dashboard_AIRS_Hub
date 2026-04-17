@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
                 productId: item.productId,
                 priceLabelId: item.priceLabelId,
                 variantId: item.variantId ?? null,
-                unitPrice: pp.value,
+                unitPrice: Number(pp.value),
                 currencyId: pp.currencyId,
                 quantity: item.quantity,
                 notes: item.notes ?? null,

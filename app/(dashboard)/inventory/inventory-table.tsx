@@ -1,11 +1,13 @@
 "use client"
 
-import { useMemo, useState, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import { columns, customGlobalFilterFn } from "./columns"
 import { VariantsList } from "@/components/inventory/variants-list"
+import { ServerPagination } from "@/components/ui/server-pagination"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
     Select,
     SelectContent,
@@ -13,71 +15,184 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { X, SlidersHorizontal, Tag, Layers, CheckCircle2, CircleDotDashed } from "lucide-react"
+import {
+    X,
+    SlidersHorizontal,
+    Tag,
+    Layers,
+    CheckCircle2,
+    CircleDotDashed,
+    Search,
+    Loader2,
+    RotateCcw,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getProductsPaginated } from "@/lib/actions/inventory"
+import type { PaginationMeta } from "@/lib/actions/inventory"
+
+interface FilterOption {
+    id: string
+    name: string
+}
 
 interface InventoryTableProps {
-    products: any[]
+    // Initial SSR data
+    initialProducts: any[]
+    initialPagination: PaginationMeta
+    // Filter options (fetched server-side once)
+    filterCategories: FilterOption[]
+    filterBrands: string[]
     onRefresh?: () => void | Promise<void>
 }
 
-export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
-    const [isMounted, setIsMounted] = useState(false)
+const SEARCH_DEBOUNCE_MS = 350
 
-    // ── Filter state ──────────────────────────────────
-    const [filterCategory, setFilterCategory] = useState<string>("all")
-    const [filterBrand, setFilterBrand]       = useState<string>("all")
-    const [filterAvail, setFilterAvail]       = useState<"all" | "available" | "unavailable">("all")
-    const [filterPriced, setFilterPriced]     = useState<"all" | "yes" | "no">("all")
+export function InventoryTable({
+    initialProducts,
+    initialPagination,
+    filterCategories,
+    filterBrands,
+    onRefresh,
+}: InventoryTableProps) {
+    const [isMounted, setIsMounted]         = useState(false)
+    const [isPending, startTransition]      = useTransition()
+
+    // ── Data state ──────────────────────────────────────────
+    const [products, setProducts]           = useState(initialProducts)
+    const [pagination, setPagination]       = useState<PaginationMeta>(initialPagination)
+
+    // ── Filter state ─────────────────────────────────────────
+    const [search, setSearch]               = useState("")
+    const [filterCategory, setFilterCategory] = useState("all")
+    const [filterBrand, setFilterBrand]     = useState("all")
+    const [filterAvail, setFilterAvail]     = useState<"all" | "available" | "unavailable">("all")
+    const [filterPriced, setFilterPriced]   = useState<"all" | "yes" | "no">("all")
+
+    // ── Pagination state ──────────────────────────────────────
+    const [page, setPage]   = useState(1)
+    const [limit, setLimit] = useState(initialPagination.limit)
+
+    const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     useEffect(() => { setIsMounted(true) }, [])
 
-    // ── Derived filter options ────────────────────────
-    const categories = useMemo(() => {
-        const seen = new Set<string>()
-        const opts: { id: string; name: string }[] = []
-        products.forEach(p => {
-            if (p.category && !seen.has(p.category.id)) {
-                seen.add(p.category.id)
-                opts.push({ id: p.category.id, name: p.category.name })
+    // ── Core fetch function ──────────────────────────────────
+    const fetchProducts = useCallback((params: {
+        search?: string
+        categoryId?: string
+        brand?: string
+        isAvailable?: boolean
+        hasPrices?: boolean
+        page?: number
+        limit?: number
+    }) => {
+        startTransition(async () => {
+            const res = await getProductsPaginated({
+                search:      params.search,
+                categoryId:  params.categoryId,
+                brand:       params.brand,
+                isAvailable: params.isAvailable,
+                hasPrices:   params.hasPrices,
+                page:        params.page ?? 1,
+                limit:       params.limit ?? limit,
+                sortBy:      'createdAt',
+                sortDir:     'desc',
+            })
+            if (res.success) {
+                setProducts(res.data)
+                setPagination(res.pagination)
             }
         })
-        return opts.sort((a, b) => a.name.localeCompare(b.name, "ar"))
-    }, [products])
+    }, [limit])
 
-    const brands = useMemo(() => {
-        const seen = new Set<string>()
-        const opts: string[] = []
-        products.forEach(p => {
-            if (p.brand && !seen.has(p.brand)) {
-                seen.add(p.brand)
-                opts.push(p.brand)
-            }
+    // ── Helpers: build complete filter params from current state ────────────
+    // NOTE: each handler passes its NEW value directly to avoid reading stale state
+    const currentFilters = () => ({
+        search:      search || undefined,
+        categoryId:  filterCategory !== "all" ? filterCategory : undefined,
+        brand:       filterBrand    !== "all" ? filterBrand    : undefined,
+        isAvailable: filterAvail    === "available"   ? true
+                   : filterAvail    === "unavailable" ? false
+                   : undefined,
+        hasPrices:   filterPriced   === "yes" ? true
+                   : filterPriced   === "no"  ? false
+                   : undefined,
+        limit,
+    })
+
+    // ── Search debounce ──────────────────────────────────────
+    const handleSearchChange = (value: string) => {
+        setSearch(value)
+        if (searchDebounce.current) clearTimeout(searchDebounce.current)
+        searchDebounce.current = setTimeout(() => {
+            setPage(1)
+            fetchProducts({ ...currentFilters(), search: value || undefined, page: 1 })
+        }, SEARCH_DEBOUNCE_MS)
+    }
+
+    // ── Individual filter handlers (reset page to 1) ─────────
+    const handleCategoryChange = (value: string) => {
+        setFilterCategory(value)
+        setPage(1)
+        fetchProducts({ ...currentFilters(), categoryId: value !== "all" ? value : undefined, page: 1 })
+    }
+
+    const handleBrandChange = (value: string) => {
+        setFilterBrand(value)
+        setPage(1)
+        fetchProducts({ ...currentFilters(), brand: value !== "all" ? value : undefined, page: 1 })
+    }
+
+    const handleAvailChange = (value: "all" | "available" | "unavailable") => {
+        setFilterAvail(value)
+        setPage(1)
+        fetchProducts({
+            ...currentFilters(),
+            isAvailable: value === "available" ? true : value === "unavailable" ? false : undefined,
+            page: 1,
         })
-        return opts.sort((a, b) => a.localeCompare(b, "ar"))
-    }, [products])
+    }
 
-    // ── Apply filters ─────────────────────────────────
-    const filteredData = useMemo(() => {
-        return products.filter(p => {
-            if (filterCategory !== "all" && p.category?.id !== filterCategory) return false
-            if (filterBrand !== "all" && p.brand !== filterBrand) return false
-            if (filterAvail === "available"   && !p.isAvailable) return false
-            if (filterAvail === "unavailable" &&  p.isAvailable) return false
-            if (filterPriced === "yes" && (!p.productPrices || p.productPrices.length === 0)) return false
-            if (filterPriced === "no"  &&   p.productPrices?.length > 0) return false
-            return true
+    const handlePricedChange = (value: "all" | "yes" | "no") => {
+        setFilterPriced(value)
+        setPage(1)
+        fetchProducts({
+            ...currentFilters(),
+            hasPrices: value === "yes" ? true : value === "no" ? false : undefined,
+            page: 1,
         })
-    }, [products, filterCategory, filterBrand, filterAvail, filterPriced])
+    }
 
-    const hasActiveFilters = filterCategory !== "all" || filterBrand !== "all" || filterAvail !== "all" || filterPriced !== "all"
+    // ── Pagination handlers ───────────────────────────────────
+    const handlePageChange = (newPage: number) => {
+        setPage(newPage)
+        fetchProducts({ ...currentFilters(), page: newPage })
+        window.scrollTo({ top: 0, behavior: "smooth" })
+    }
 
-    const resetFilters = useCallback(() => {
+    const handleLimitChange = (newLimit: number) => {
+        setLimit(newLimit)
+        setPage(1)
+        fetchProducts({ ...currentFilters(), limit: newLimit, page: 1 })
+    }
+
+    // ── Reset all filters ─────────────────────────────────────
+    const resetFilters = () => {
+        setSearch("")
         setFilterCategory("all")
         setFilterBrand("all")
         setFilterAvail("all")
         setFilterPriced("all")
-    }, [])
+        setPage(1)
+        fetchProducts({ page: 1, limit })
+    }
+
+    const hasActiveFilters =
+        search !== "" ||
+        filterCategory !== "all" ||
+        filterBrand    !== "all" ||
+        filterAvail    !== "all" ||
+        filterPriced   !== "all"
 
     if (!isMounted) {
         return (
@@ -95,7 +210,32 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
 
     return (
         <div className="space-y-3">
-            {/* ── Filter bar ── */}
+            {/* ── Search Bar ─────────────────────────────────── */}
+            <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                {isPending && (
+                    <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary animate-spin" />
+                )}
+                <Input
+                    value={search}
+                    onChange={e => handleSearchChange(e.target.value)}
+                    placeholder="ابحث بالاسم، الرقم، البراند، التصنيف، الخيار، الوصف..."
+                    className={cn(
+                        "pr-9 pl-9 h-10 rounded-xl border-border/50 bg-background transition-all",
+                        isPending && "opacity-80"
+                    )}
+                />
+                {search && (
+                    <button
+                        onClick={() => handleSearchChange("")}
+                        className="absolute left-9 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+                )}
+            </div>
+
+            {/* ── Filter bar ─────────────────────────────────── */}
             <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-border/50 bg-muted/20 backdrop-blur-sm">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground shrink-0">
                     <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -103,8 +243,8 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                 </div>
 
                 {/* Category filter */}
-                {categories.length > 0 && (
-                    <Select value={filterCategory} onValueChange={setFilterCategory}>
+                {filterCategories.length > 0 && (
+                    <Select value={filterCategory} onValueChange={handleCategoryChange}>
                         <SelectTrigger className={cn(
                             "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[120px] gap-1.5",
                             filterCategory !== "all" && "border-primary/50 bg-primary/5 text-primary"
@@ -114,7 +254,7 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                             <SelectItem value="all" className="text-xs rounded-lg">كل التصنيفات</SelectItem>
-                            {categories.map(c => (
+                            {filterCategories.map(c => (
                                 <SelectItem key={c.id} value={c.id} className="text-xs rounded-lg">{c.name}</SelectItem>
                             ))}
                         </SelectContent>
@@ -122,8 +262,8 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                 )}
 
                 {/* Brand filter */}
-                {brands.length > 0 && (
-                    <Select value={filterBrand} onValueChange={setFilterBrand}>
+                {filterBrands.length > 0 && (
+                    <Select value={filterBrand} onValueChange={handleBrandChange}>
                         <SelectTrigger className={cn(
                             "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[120px] gap-1.5",
                             filterBrand !== "all" && "border-primary/50 bg-primary/5 text-primary"
@@ -133,7 +273,7 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                             <SelectItem value="all" className="text-xs rounded-lg">كل البراندات</SelectItem>
-                            {brands.map(b => (
+                            {filterBrands.map(b => (
                                 <SelectItem key={b} value={b} className="text-xs rounded-lg">{b}</SelectItem>
                             ))}
                         </SelectContent>
@@ -141,7 +281,7 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                 )}
 
                 {/* Availability filter */}
-                <Select value={filterAvail} onValueChange={v => setFilterAvail(v as any)}>
+                <Select value={filterAvail} onValueChange={v => handleAvailChange(v as any)}>
                     <SelectTrigger className={cn(
                         "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[110px] gap-1.5",
                         filterAvail !== "all" && "border-primary/50 bg-primary/5 text-primary"
@@ -157,7 +297,7 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                 </Select>
 
                 {/* Has prices filter */}
-                <Select value={filterPriced} onValueChange={v => setFilterPriced(v as any)}>
+                <Select value={filterPriced} onValueChange={v => handlePricedChange(v as any)}>
                     <SelectTrigger className={cn(
                         "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[110px] gap-1.5",
                         filterPriced !== "all" && "border-primary/50 bg-primary/5 text-primary"
@@ -178,9 +318,9 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                         <Badge
                             variant="secondary"
                             className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => setFilterCategory("all")}
+                            onClick={() => handleCategoryChange("all")}
                         >
-                            {categories.find(c => c.id === filterCategory)?.name}
+                            {filterCategories.find(c => c.id === filterCategory)?.name}
                             <X className="h-2.5 w-2.5" />
                         </Badge>
                     )}
@@ -188,7 +328,7 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                         <Badge
                             variant="secondary"
                             className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => setFilterBrand("all")}
+                            onClick={() => handleBrandChange("all")}
                         >
                             {filterBrand}
                             <X className="h-2.5 w-2.5" />
@@ -198,7 +338,7 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                         <Badge
                             variant="secondary"
                             className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => setFilterAvail("all")}
+                            onClick={() => handleAvailChange("all")}
                         >
                             {filterAvail === "available" ? "متوفر" : "غير متوفر"}
                             <X className="h-2.5 w-2.5" />
@@ -208,7 +348,7 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                         <Badge
                             variant="secondary"
                             className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => setFilterPriced("all")}
+                            onClick={() => handlePricedChange("all")}
                         >
                             {filterPriced === "yes" ? "لديه أسعار" : "بدون أسعار"}
                             <X className="h-2.5 w-2.5" />
@@ -221,46 +361,55 @@ export function InventoryTable({ products, onRefresh }: InventoryTableProps) {
                             onClick={resetFilters}
                             className="h-6 text-[10px] px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
                         >
-                            <X className="h-3 w-3 ml-1" />
+                            <RotateCcw className="h-3 w-3 ml-1" />
                             مسح الكل
                         </Button>
                     )}
                 </div>
 
-                {/* Results count */}
-                <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                    {filteredData.length !== products.length
-                        ? <><span className="font-bold text-foreground">{filteredData.length}</span> من {products.length}</>
-                        : <><span className="font-bold text-foreground">{products.length}</span> منتج</>
-                    }
-                </span>
+                {/* Loading indicator in filter bar */}
+                {isPending && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+                )}
             </div>
 
-            {/* ── Table ── */}
-            <DataTable
-                columns={columns}
-                data={filteredData}
-                searchPlaceholder="ابحث بالاسم، الرقم، البراند، التصنيف، الوسم، الوصف..."
-                groupingOptions={[
-                    { id: "brand",       label: "البراند" },
-                    { id: "isAvailable", label: "الحالة" },
-                ]}
-                renderSubComponent={({ row }) => {
-                    const product = row.original as any
-                    const primaryPrice = product.productPrices?.[0]?.value || null
-                    const primaryImage = product.mediaImages?.find((img: any) => img.isPrimary)?.url || product.mediaImages?.[0]?.url
+            {/* ── Table ─────────────────────────────────────── */}
+            <div className={cn("transition-opacity duration-200", isPending && "opacity-60 pointer-events-none")}>
+                <DataTable
+                    columns={columns}
+                    data={products}
+                    showSearch={false}
+                    groupingOptions={[
+                        { id: "brand",       label: "البراند" },
+                        { id: "isAvailable", label: "الحالة" },
+                    ]}
+                    renderSubComponent={({ row }) => {
+                        const product = row.original as any
+                        const primaryPrice  = product.productPrices?.[0]?.value || null
+                        const primaryImage  = product.mediaImages?.find((img: any) => img.isPrimary)?.url
+                            || product.mediaImages?.[0]?.url
 
-                    const variantsWithDefaults = (product.variants || []).map((v: any) => ({
-                        ...v,
-                        price: v.price ?? primaryPrice,
-                        images: v.images?.length > 0 ? v.images : (primaryImage ? [{ url: primaryImage }] : []),
-                        imageCount: v.imageCount > 0 ? v.imageCount : (primaryImage ? 1 : 0)
-                    }))
+                        const variantsWithDefaults = (product.variants || []).map((v: any) => ({
+                            ...v,
+                            price: v.price ?? primaryPrice,
+                            images: v.images?.length > 0 ? v.images : (primaryImage ? [{ url: primaryImage }] : []),
+                            imageCount: v.imageCount > 0 ? v.imageCount : (primaryImage ? 1 : 0),
+                        }))
 
-                    return <VariantsList variants={variantsWithDefaults} />
-                }}
-                globalFilterFn={customGlobalFilterFn}
-                onRefresh={onRefresh}
+                        return <VariantsList variants={variantsWithDefaults} />
+                    }}
+                    globalFilterFn={customGlobalFilterFn}
+                    onRefresh={onRefresh}
+                />
+            </div>
+
+            {/* ── Pagination ────────────────────────────────── */}
+            <ServerPagination
+                pagination={pagination}
+                onPageChange={handlePageChange}
+                onLimitChange={handleLimitChange}
+                limitOptions={[25, 50, 100, 200]}
+                className="pt-1"
             />
         </div>
     )

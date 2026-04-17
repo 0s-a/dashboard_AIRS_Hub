@@ -110,8 +110,10 @@ export interface ProductPriceFull {
     currencySymbol: string
     currencyName: string
     value: number
-    unit: string | null
-    quantity: number | null
+    unitId: string
+    unitName: string
+    conversionFactor: number
+    isAutoCalculated: boolean
 }
 
 // ─── Order Types ────────────────────────────────────────────

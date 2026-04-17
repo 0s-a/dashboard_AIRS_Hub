@@ -151,12 +151,12 @@ export async function generateOrderNumber(): Promise<string> {
 
 /**
  * Resolve unit price and currency from ProductPrice.
- * Returns null if no matching ProductPrice found.
+ * Optionally filter by unitId for unit-specific pricing.
  */
-export async function resolveProductPrice(productId: string, priceLabelId: string) {
+export async function resolveProductPrice(productId: string, priceLabelId: string, unitId?: string) {
     return prisma.productPrice.findFirst({
-        where: { productId, priceLabelId },
-        include: { currency: true },
+        where: { productId, priceLabelId, ...(unitId ? { unitId } : {}) },
+        include: { currency: true, unit: true },
     })
 }
 

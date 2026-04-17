@@ -59,32 +59,32 @@ export default function DashboardLayout({
             </div>
 
             <div className="relative z-10 flex min-h-screen w-full flex-col">
-                <aside className={`fixed inset-y-0 right-0 z-20 hidden flex-col border-l border-border/40 glass-panel sm:flex transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-                    <div className="p-6">
-                        <div className={`flex items-center gap-3 px-2 ${isCollapsed ? 'justify-center' : ''}`}>
-                            <div className="size-10 rounded-2xl bg-linear-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg shadow-primary/25 shrink-0 group hover:rotate-6 hover:scale-105 transition-all duration-500">
-                                <span className="text-white font-black text-xl leading-none" style={{fontFamily: 'serif'}}>ن</span>
+                <aside className={`fixed inset-y-0 right-0 z-20 hidden flex-col border-l border-border/20 bg-background/95 backdrop-blur-xl sm:flex transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+                    {/* Logo Section */}
+                    <div className="p-6 pb-2">
+                        <div className={`flex items-center gap-3 px-1 ${isCollapsed ? 'justify-center' : ''}`}>
+                            <div className="size-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20 shrink-0 group transition-transform duration-300 hover:scale-105">
+                                <span className="text-primary-foreground font-black text-xl leading-none" style={{ fontFamily: 'serif' }}>ن</span>
                             </div>
                             <div className={`flex flex-col transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
-                                <span className="font-black text-lg tracking-tight whitespace-nowrap bg-linear-to-r from-primary to-indigo-500 bg-clip-text text-transparent">نواة</span>
-                                <span className="text-[9px] text-muted-foreground/60 font-bold tracking-[0.25em] -mt-0.5 whitespace-nowrap uppercase">Nawaat Platform</span>
+                                <span className="font-bold text-lg tracking-tight text-foreground">نـــواة</span>
+                                <span className="text-[9px] text-muted-foreground font-medium tracking-[0.2em] -mt-1 uppercase">Dashboard</span>
                             </div>
                         </div>
                     </div>
 
+                    {/* Navigation Links */}
                     <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-3 space-y-6">
                         <TooltipProvider delayDuration={0}>
                             {navigationGroups.map((group, groupIdx) => (
-                                <div key={groupIdx} className="space-y-1">
+                                <div key={groupIdx} className="space-y-1.5">
                                     {!isCollapsed && (
-                                        <h3 className="px-4 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                            <span className="h-px bg-border/40 flex-1" />
+                                        <h3 className="px-3 text-[11px] font-semibold text-muted-foreground/60 mb-2 mt-4">
                                             {group.title}
-                                            <span className="h-px bg-border/40 flex-1 sm:hidden" />
                                         </h3>
                                     )}
 
-                                    <div className="space-y-0.5">
+                                    <div className="space-y-1">
                                         {group.items.map((item) => {
                                             const isActive = pathname === item.href
                                             const Icon = item.icon
@@ -93,22 +93,22 @@ export default function DashboardLayout({
                                                     <TooltipTrigger asChild>
                                                         <Link
                                                             href={item.href}
-                                                            className={`relative flex items-center gap-3 rounded-xl px-4 py-2.5 transition-all duration-300 group ${
+                                                            className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group ${
                                                                 isActive 
-                                                                    ? 'bg-primary/10 text-primary shadow-sm shadow-primary/5 font-bold' 
-                                                                    : 'text-muted-foreground hover:bg-primary/5 hover:text-primary'
+                                                                    ? 'bg-primary/10 text-primary font-bold' 
+                                                                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                                                             } ${isCollapsed ? 'justify-center' : ''}`}
                                                         >
                                                             {/* Active Indicator Bar */}
-                                                            {isActive && (
-                                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-7 w-[3px] rounded-l-full bg-linear-to-b from-primary to-indigo-500 shadow-[0_0_8px] shadow-primary/40" />
+                                                            {isActive && !isCollapsed && (
+                                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-l-full bg-primary" />
                                                             )}
                                                             
-                                                            <Icon className={`h-5 w-5 transition-all duration-300 ${
-                                                                isActive ? 'scale-110' : 'group-hover:scale-110'
+                                                            <Icon className={`h-5 w-5 transition-transform duration-200 ${
+                                                                isActive ? 'scale-100' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'
                                                             } shrink-0`} />
                                                             
-                                                            <span className={`text-[13px] font-semibold transition-all duration-300 ${
+                                                            <span className={`text-[13px] transition-all duration-300 ${
                                                                 isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
                                                             }`}>
                                                                 {item.label}
@@ -116,10 +116,10 @@ export default function DashboardLayout({
 
                                                             {/* Notification unread badge */}
                                                             {item.href === "/notifications" && unreadCount > 0 && (
-                                                                <span className={`flex items-center justify-center text-[10px] font-bold text-white bg-red-500 shadow-lg shadow-red-500/30 animate-pulse ${
+                                                                <span className={`flex items-center justify-center text-[10px] font-bold text-white bg-red-500 shadow-sm shadow-red-500/20 ${
                                                                     isCollapsed
-                                                                        ? 'absolute -top-1 -left-1 size-5 rounded-full'
-                                                                        : 'mr-auto min-w-[20px] h-5 px-1.5 rounded-full'
+                                                                        ? 'absolute top-0 right-0 size-4 rounded-full border-2 border-background'
+                                                                        : 'mr-auto min-w-[18px] h-[18px] px-1 rounded-full'
                                                                 }`}>
                                                                     {unreadCount > 99 ? '99+' : unreadCount}
                                                                 </span>
@@ -127,7 +127,7 @@ export default function DashboardLayout({
                                                         </Link>
                                                     </TooltipTrigger>
                                                     {isCollapsed && (
-                                                        <TooltipContent side="left" className="font-bold text-xs bg-primary text-white border-none shadow-xl">
+                                                        <TooltipContent side="left" className="font-medium text-xs rounded-lg border-border/50">
                                                             {item.label}
                                                         </TooltipContent>
                                                     )}
@@ -140,32 +140,33 @@ export default function DashboardLayout({
                         </TooltipProvider>
                     </div>
 
+                    {/* Bottom Store Info */}
                     <div className="p-4 mt-auto">
-                        <div className={`rounded-xl border border-border/50 dark:border-white/6 bg-muted/30 dark:bg-white/3 p-3 transition-all duration-300 ${isCollapsed ? 'flex items-center justify-center p-2' : ''}`}>
+                        <div className={`rounded-xl border border-transparent hover:border-border/40 bg-muted/20 hover:bg-muted/40 p-3 transition-all duration-300 cursor-pointer ${isCollapsed ? 'flex items-center justify-center p-2' : ''}`}>
                             {isCollapsed ? (
-                                <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <div className="size-2 rounded-full bg-emerald-500" />
                             ) : (
                                 <div className="flex items-center gap-3">
                                     {storeInfo.logo ? (
-                                        <div className="relative size-9 rounded-lg overflow-hidden border border-border/50 shrink-0">
+                                        <div className="relative size-9 rounded-lg overflow-hidden border border-border/50 shrink-0 bg-white">
                                             <Image
                                                 src={storeInfo.logo}
                                                 alt="شعار المتجر"
                                                 fill
-                                                className="object-contain"
+                                                className="object-contain p-1"
                                                 unoptimized
                                             />
                                         </div>
                                     ) : (
                                         <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                            <span className="text-primary font-bold text-sm">{storeInfo.name.charAt(0)}</span>
+                                            <span className="text-primary font-bold text-sm tracking-tighter">N.</span>
                                         </div>
                                     )}
                                     <div className="flex flex-col flex-1 min-w-0">
-                                        <span className="text-[10px] font-medium text-muted-foreground">المتجر الحالي</span>
-                                        <span className="text-sm font-semibold text-foreground truncate">{storeInfo.name}</span>
+                                        <span className="text-[10px] font-medium text-muted-foreground/80">حالة النظام</span>
+                                        <span className="text-xs font-bold text-foreground truncate">{storeInfo.name}</span>
                                     </div>
-                                    <div className="size-2 rounded-full bg-emerald-500 shrink-0" />
+                                    <div className="size-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px] shadow-emerald-500/50" />
                                 </div>
                             )}
                         </div>

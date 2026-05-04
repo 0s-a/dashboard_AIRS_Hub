@@ -60,7 +60,8 @@ const routeMap: Record<string, string> = {
     "/gallery": "معرض الصور",
     "/orders": "الطلبات",
     "/notifications": "الإشعارات",
-    "/announcements": "الإعلانات",
+    "/announcements":           "الإعلانات",
+    "/announcements/templates": "قوالب الرسائل",
     "/users": "المستخدمين",
     "/profile": "الملف الشخصي",
 }

@@ -1,43 +1,49 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Check, Search, X, Users, ChevronDown } from "lucide-react"
+import { useState } from "react"
+import { Check, Search, X, Users, GitFork } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { PersonFilters } from "@/lib/actions/announcements"
+import { AudienceBuilder } from "@/components/announcements/audience-builder"
+import type { PersonFilters, FilterGroup } from "@/lib/types/announcements"
 
-interface Person { id: string; name: string | null; groupName: string | null }
+interface Person     { id: string; name: string | null; groupName: string | null }
 interface PersonType { id: string; name: string }
 
 interface PersonTargetingPanelProps {
-    value: { mode: "all" | "filter" | "manual"; filters: PersonFilters; manualIds: string[] }
+    value: { mode: "all" | "filter" | "manual" | "builder"; filters: PersonFilters; manualIds: string[] }
     onChange: (v: PersonTargetingPanelProps["value"]) => void
-    persons: Person[]
-    personTypes: PersonType[]
+    persons:      Person[]
+    personTypes:  PersonType[]
+    personTags?:  string[]
     previewCount?: number
 }
 
 const MODES = [
-    { key: "all",    label: "الكل",    desc: "جميع الأشخاص النشطين" },
-    { key: "filter", label: "تصفية",   desc: "حسب النوع أو المجموعة" },
-    { key: "manual", label: "يدوي",    desc: "اختيار أشخاص بالاسم" },
+    { key: "all",     label: "الكل",    desc: "جميع الأشخاص" },
+    { key: "filter",  label: "تصفية",   desc: "نوع أو مجموعة" },
+    { key: "builder", label: "منطقي",   desc: "AND / OR مركب" },
+    { key: "manual",  label: "يدوي",    desc: "اختيار بالاسم" },
 ] as const
 
-export function PersonTargetingPanel({ value, onChange, persons, personTypes, previewCount }: PersonTargetingPanelProps) {
-    const [search, setSearch] = useState("")
+export function PersonTargetingPanel({
+    value, onChange, persons, personTypes, personTags = [], previewCount,
+}: PersonTargetingPanelProps) {
+    const [search,      setSearch]      = useState("")
     const [groupSearch, setGroupSearch] = useState("")
-
     const { mode, filters, manualIds } = value
 
-    const setMode = (m: typeof mode) => onChange({ mode: m, filters: {}, manualIds: [] })
+    const setMode = (m: typeof mode) =>
+        onChange({ mode: m, filters: {}, manualIds: [] })
 
     const groups = [...new Set(persons.map(p => p.groupName).filter(Boolean))] as string[]
 
     const filteredPersons = persons.filter(p =>
         !search || p.name?.toLowerCase().includes(search.toLowerCase())
     )
-    const filteredGroups = groups.filter(g => !groupSearch || g.toLowerCase().includes(groupSearch.toLowerCase()))
+    const filteredGroups = groups.filter(g =>
+        !groupSearch || g.toLowerCase().includes(groupSearch.toLowerCase())
+    )
 
     const toggleManual = (id: string) => {
         const next = manualIds.includes(id)
@@ -56,12 +62,23 @@ export function PersonTargetingPanel({ value, onChange, persons, personTypes, pr
         onChange({ ...value, filters: { ...filters, groupNames: cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g] } })
     }
 
-    const removeManual = (id: string) => onChange({ ...value, manualIds: manualIds.filter(x => x !== id) })
+    const removeManual = (id: string) =>
+        onChange({ ...value, manualIds: manualIds.filter(x => x !== id) })
+
+    // Builder groups → PersonFilters
+    const handleBuilderChange = (builderGroups: FilterGroup[]) => {
+        onChange({
+            ...value,
+            filters: { filterGroups: builderGroups },
+        })
+    }
+
+    const builderGroups = (filters.filterGroups as FilterGroup[]) ?? []
 
     return (
         <div className="space-y-3">
             {/* Mode selector */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
                 {MODES.map(m => (
                     <button
                         key={m.key}
@@ -86,7 +103,6 @@ export function PersonTargetingPanel({ value, onChange, persons, personTypes, pr
             {/* Mode: filter */}
             {mode === "filter" && (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                    {/* Person types */}
                     <div>
                         <p className="text-xs font-semibold text-muted-foreground mb-1.5">نوع الشخص</p>
                         <div className="flex flex-wrap gap-1.5">
@@ -106,7 +122,6 @@ export function PersonTargetingPanel({ value, onChange, persons, personTypes, pr
                         </div>
                     </div>
 
-                    {/* Groups */}
                     {groups.length > 0 && (
                         <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1.5">المجموعة</p>
@@ -128,6 +143,19 @@ export function PersonTargetingPanel({ value, onChange, persons, personTypes, pr
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Mode: builder */}
+            {mode === "builder" && (
+                <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                    <AudienceBuilder
+                        groups={builderGroups}
+                        onChange={handleBuilderChange}
+                        personTypes={personTypes}
+                        personGroups={groups}
+                        personTags={personTags}
+                    />
                 </div>
             )}
 
@@ -191,3 +219,4 @@ export function PersonTargetingPanel({ value, onChange, persons, personTypes, pr
         </div>
     )
 }
+

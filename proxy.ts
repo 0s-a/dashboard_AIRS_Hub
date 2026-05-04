@@ -7,7 +7,13 @@ const secret = new TextEncoder().encode(AUTH_CONFIG.jwtSecret)
 
 // Routes that don't require authentication
 const PUBLIC_PATHS = ['/login']
-const PUBLIC_PREFIXES = ['/api/v1/', '/_next/', '/favicon.ico']
+const PUBLIC_PREFIXES = [
+    '/api/v1/',
+    '/api/webhooks/',   // n8n & external webhooks — secured by HMAC, not JWT
+    '/_next/',
+    '/favicon.ico',
+    '/uploads/',        // static product/gallery images — public access for WhatsApp/n8n
+]
 
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl
@@ -55,11 +61,12 @@ export async function proxy(request: NextRequest) {
 export const config = {
     matcher: [
         /*
-         * Match all request paths except:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
+         * Match all request paths EXCEPT:
+         * - _next/static  (static files)
+         * - _next/image   (image optimization)
          * - favicon.ico
+         * - uploads/      (product & gallery images — public, no auth needed)
          */
-        '/((?!_next/static|_next/image|favicon.ico).*)',
+        '/((?!_next/static|_next/image|favicon.ico|uploads/).*)',
     ],
 }

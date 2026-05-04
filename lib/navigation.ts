@@ -12,7 +12,8 @@ import {
     UsersRound,
     Store,
     Megaphone,
-    Ruler
+    Ruler,
+    Sparkles,
 } from "lucide-react"
 
 export const navigationGroups = [
@@ -39,6 +40,7 @@ export const navigationGroups = [
         title: "العملاء والشركاء",
         items: [
             { href: "/persons", label: "الأشخاص", icon: Users },
+            { href: "/persons/archived", label: "الأرشيف", icon: UserCog },
             { href: "/person-types", label: "أنواع الأشخاص", icon: UserCog },
         ]
     },
@@ -55,8 +57,9 @@ export const navigationGroups = [
     {
         title: "الذكاء الاصطناعي",
         items: [
-            { href: "/announcements", label: "الإعلانات", icon: Megaphone },
-            { href: "/notifications", label: "الإشعارات", icon: Bell },
+            { href: "/announcements",           label: "الإعلانات",   icon: Megaphone },
+            { href: "/announcements/templates",  label: "قوالب الرسائل", icon: Sparkles  },
+            { href: "/notifications",            label: "الإشعارات",   icon: Bell      },
         ]
     },
     {

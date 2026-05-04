@@ -1,23 +1,26 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { Currency } from "@prisma/client"
+import type { SerializedCurrency } from "@/app/(dashboard)/currencies/page"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { Edit, Trash2, Star, StarOff } from "lucide-react"
+import { Edit, Trash2, Star, StarOff, ArrowLeftRight, TrendingDown } from "lucide-react"
 import { deleteCurrency, setDefaultCurrency, toggleCurrencyActive } from "@/lib/actions/currencies"
 import { toast } from "sonner"
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+    Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip"
 
-function dispatchEdit(currency: Currency) {
+function dispatchEdit(currency: SerializedCurrency) {
     window.dispatchEvent(new CustomEvent("edit-currency", { detail: currency }))
 }
 
-export const columns: ColumnDef<Currency>[] = [
+export const columns: ColumnDef<SerializedCurrency>[] = [
     {
         accessorKey: "itemNumber",
         header: "الرقم",
@@ -47,24 +50,78 @@ export const columns: ColumnDef<Currency>[] = [
         }
     },
     {
-        accessorKey: "symbol",
-        header: "الرمز",
-        cell: ({ row }) => (
-            <Badge variant="outline" className="font-mono font-semibold text-sm px-3">
-                {row.original.symbol}
-            </Badge>
-        )
+        accessorKey: "exchangeRate",
+        header: () => (
+            <div className="flex items-center gap-1.5">
+                <ArrowLeftRight className="size-3.5 text-muted-foreground" />
+                سعر الصرف
+            </div>
+        ),
+        cell: ({ row, table }) => {
+            const c = row.original
+            const allRows = table.getCoreRowModel().rows
+            const baseCurrency = allRows.find(r => r.original.isDefault)?.original
+
+            if (c.isDefault) {
+                return (
+                    <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/30 text-[10px] gap-1">
+                        <Star className="size-2.5 fill-current" />
+                        عملة رئيسية
+                    </Badge>
+                )
+            }
+
+            const rate = c.exchangeRate != null ? Number(c.exchangeRate) : null
+
+            if (rate === null) {
+                return (
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground/50 italic">لم يُحدَّد</span>
+                        <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <div className="size-1.5 rounded-full bg-destructive/50 animate-pulse" />
+                                </TooltipTrigger>
+                                <TooltipContent className="text-[11px]">
+                                    هذه العملة لا يمكن استخدامها في التسعير التلقائي<br />
+                                    — أضف سعر الصرف من خيار التعديل
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                )
+            }
+
+            const baseSymbol = baseCurrency?.symbol ?? "؟"
+
+            return (
+                <div className="space-y-0.5">
+                    {/* Rate display: how many of this currency = 1 of base */}
+                    <div className="flex items-baseline gap-1.5">
+                        <span className="text-xs text-muted-foreground">1 {baseSymbol} =</span>
+                        <span className="font-mono font-bold text-sm tabular-nums">
+                            {rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground">{c.symbol}</span>
+                    </div>
+                    {/* Inverse */}
+                    <div className="text-[10px] text-muted-foreground/50 font-mono">
+                        1 {c.symbol} = {(1 / rate).toFixed(6)} {baseSymbol}
+                    </div>
+                </div>
+            )
+        }
     },
     {
         accessorKey: "isDefault",
-        header: "الافتراضية",
+        header: "الرئيسية",
         cell: ({ row }) => {
             const c = row.original
             if (c.isDefault) {
                 return (
                     <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/30 gap-1">
                         <Star className="h-3 w-3 fill-current" />
-                        افتراضية
+                        رئيسية
                     </Badge>
                 )
             }
@@ -75,12 +132,12 @@ export const columns: ColumnDef<Currency>[] = [
                     className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-amber-600"
                     onClick={async () => {
                         const res = await setDefaultCurrency(c.id)
-                        if (res.success) toast.success("تم تعيينها كعملة افتراضية")
+                        if (res.success) toast.success("تم تعيينها كعملة رئيسية")
                         else toast.error(res.error)
                     }}
                 >
                     <StarOff className="h-3 w-3" />
-                    تعيين افتراضية
+                    تعيين رئيسية
                 </Button>
             )
         }

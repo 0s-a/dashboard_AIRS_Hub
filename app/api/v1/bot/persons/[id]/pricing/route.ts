@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
 
 // GET /api/v1/bot/persons/[id]/pricing — Get person's currencies & price labels
 export async function GET(
@@ -20,63 +20,38 @@ export async function GET(
                 name: true,
                 currencies: true,
                 personType: {
-                    select: {
-                        id: true,
-                        name: true,
-                        color: true,
-                        icon: true
-                    }
+                    select: { id: true, name: true, color: true, icon: true }
                 },
                 priceLabels: {
                     include: {
                         priceLabel: {
-                            select: {
-                                id: true,
-                                itemNumber: true,
-                                name: true,
-                                notes: true,
-                            }
+                            select: { id: true, itemNumber: true, name: true, notes: true }
                         }
                     }
                 },
             },
         })
 
-        if (!person) {
-            return NextResponse.json({ error: 'الشخص غير موجود' }, { status: 404 })
-        }
+        if (!person) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
 
         // Resolve currency IDs to full currency objects
         const currencyIds = (person.currencies as string[]) || []
         const currencies = currencyIds.length > 0
             ? await prisma.currency.findMany({
                 where: { id: { in: currencyIds } },
-                select: {
-                    id: true,
-                    itemNumber: true,
-                    name: true,
-                    code: true,
-                    symbol: true,
-                    isDefault: true,
-                },
+                select: { id: true, itemNumber: true, name: true, code: true, symbol: true, isDefault: true },
             })
             : []
 
-        // Format price labels
-        const priceLabels = person.priceLabels.map(pl => pl.priceLabel)
-
-        return NextResponse.json({
-            success: true,
-            data: {
-                personId: person.id,
-                personName: person.name,
-                personType: person.personType,
-                currencies,
-                priceLabels,
-            }
+        return apiSuccess({
+            personId:   person.id,
+            personName: person.name,
+            personType: person.personType,
+            currencies,
+            priceLabels: person.priceLabels.map(pl => pl.priceLabel),
         })
     } catch (error) {
         console.error('API Error [GET /persons/id/pricing]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

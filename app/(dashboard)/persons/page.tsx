@@ -3,54 +3,46 @@ import { columns } from "../../../components/columns"
 import { getPersons } from "@/lib/actions/persons"
 import { getCurrencies } from "@/lib/actions/currencies"
 import { PersonSheet } from "@/components/persons/person-sheet"
-import { Users, UserCheck, UserPlus } from "lucide-react"
+import { Users, UserCheck, UserPlus, Archive } from "lucide-react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 export const dynamic = "force-dynamic"
 
-export default async function CRMPage() {
-    const result = await getPersons()
-    const currenciesResult = await getCurrencies()
+export default async function CRMPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ page?: string; search?: string }>
+}) {
+    const params = await searchParams
+    const page = parseInt(params.page ?? "1", 10)
+
+    const [result, currenciesResult] = await Promise.all([
+        getPersons({ page, pageSize: 100, search: params.search }),
+        getCurrencies(),
+    ])
+
     const allCurrencies = (currenciesResult.success ? currenciesResult.data : []) as any[]
-    
-    // Build lookup map
     const currencyMap = new Map(allCurrencies.map((c: any) => [c.id, { name: c.name, symbol: c.symbol, code: c.code }]))
-    
-    const rawPersons = (result.success ? result.data : []) as any[]
-    // Enrich persons with resolved currencies
-    const persons = rawPersons.map(p => ({
+
+    const { persons: rawPersons = [], total = 0 } = (result.success ? result.data : { persons: [], total: 0 }) as any
+
+    const persons = rawPersons.map((p: any) => ({
         ...p,
         resolvedCurrencies: ((p.currencies as string[]) || []).map((id: string) => currencyMap.get(id)).filter(Boolean)
     }))
-    
+
     const totalPersons = persons.length
-    const activePersons = persons.filter(p => p.isActive).length
-    
+    const activePersons = persons.filter((p: any) => p.isActive).length
+
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const latestMembers = persons.filter(p => new Date(p.createdAt) >= sevenDaysAgo).length
+    const latestMembers = persons.filter((p: any) => new Date(p.createdAt) >= sevenDaysAgo).length
 
     const stats = [
-        {
-            label: "إجمالي الأشخاص",
-            value: totalPersons,
-            icon: Users,
-            color: "text-blue-600",
-            bgColor: "bg-blue-500/10",
-        },
-        {
-            label: "النشطون الآن",
-            value: activePersons,
-            icon: UserCheck,
-            color: "text-emerald-600",
-            bgColor: "bg-emerald-500/10",
-        },
-        {
-            label: "أعضاء جدد (٧ أيام)",
-            value: latestMembers,
-            icon: UserPlus,
-            color: "text-violet-600",
-            bgColor: "bg-violet-500/10",
-        },
+        { label: "إجمالي الأشخاص", value: total, icon: Users, color: "text-blue-600", bgColor: "bg-blue-500/10" },
+        { label: "النشطون الآن", value: activePersons, icon: UserCheck, color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
+        { label: "أعضاء جدد (٧ أيام)", value: latestMembers, icon: UserPlus, color: "text-violet-600", bgColor: "bg-violet-500/10" },
     ]
 
     return (
@@ -65,6 +57,12 @@ export default async function CRMPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Link href="/persons/archived">
+                        <Button variant="outline" className="rounded-xl gap-2">
+                            <Archive className="h-4 w-4" />
+                            الأرشيف
+                        </Button>
+                    </Link>
                     <PersonSheet />
                 </div>
             </div>

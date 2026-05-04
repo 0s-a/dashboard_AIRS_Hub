@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useForm } from "react-hook-form"
-import { Eye, EyeOff, Loader2, Save, UserPlus } from "lucide-react"
+import { useForm, useFieldArray } from "react-hook-form"
+import { Eye, EyeOff, Loader2, Save, UserPlus, Phone, Mail, MessageCircle, Plus, X } from "lucide-react"
 import {
     Sheet,
     SheetContent,
@@ -20,7 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { createUser, updateUser } from "@/lib/actions/users"
+import { createUser, updateUser, replaceUserContacts } from "@/lib/actions/users"
 import { toast } from "sonner"
 import { UserAvatar } from "./user-avatar"
 import type { UserRow } from "./user-columns"
@@ -29,6 +29,7 @@ interface UserSheetProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     user?: UserRow
+    onSaved?: (updated: UserRow[]) => void
 }
 
 interface FormValues {
@@ -37,6 +38,18 @@ interface FormValues {
     password: string
     role: string
     color: string
+    contacts: {
+        type: 'phone' | 'email' | 'whatsapp'
+        value: string
+        label: string
+        isPrimary: boolean
+    }[]
+}
+
+const contactTypeLabels: Record<string, { label: string; placeholder: string }> = {
+    phone:    { label: '📞 هاتف',           placeholder: '0501234567' },
+    email:    { label: '📧 بريد إلكتروني',  placeholder: 'example@domain.com' },
+    whatsapp: { label: '💬 واتساب',         placeholder: '0501234567' },
 }
 
 const PRESET_COLORS = [
@@ -45,14 +58,19 @@ const PRESET_COLORS = [
     "#0ea5e9", "#64748b",
 ]
 
-export function UserSheet({ open, onOpenChange, user }: UserSheetProps) {
+export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps) {
     const isEditing = !!user
     const [isLoading, setIsLoading] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormValues>({
-        defaultValues: { name: "", username: "", password: "", role: "user", color: "#6366f1" },
+    const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm<FormValues>({
+        defaultValues: {
+            name: "", username: "", password: "", role: "user", color: "#6366f1",
+            contacts: [{ type: "phone", value: "", label: "", isPrimary: true }],
+        },
     })
+
+    const { fields, append, remove } = useFieldArray({ control, name: "contacts" })
 
     const watchedColor = watch("color")
     const watchedName  = watch("name")
@@ -60,9 +78,21 @@ export function UserSheet({ open, onOpenChange, user }: UserSheetProps) {
     useEffect(() => {
         if (open) {
             if (user) {
-                reset({ name: user.name, username: user.username, password: "", role: user.role, color: user.color })
+                reset({
+                    name: user.name,
+                    username: user.username,
+                    password: "",
+                    role: user.role,
+                    color: user.color,
+                    contacts: user.contacts?.length
+                        ? user.contacts.map(c => ({ type: c.type as any, value: c.value, label: c.label || "", isPrimary: c.isPrimary }))
+                        : [{ type: "phone", value: "", label: "", isPrimary: true }],
+                })
             } else {
-                reset({ name: "", username: "", password: "", role: "user", color: "#6366f1" })
+                reset({
+                    name: "", username: "", password: "", role: "user", color: "#6366f1",
+                    contacts: [{ type: "phone", value: "", label: "", isPrimary: true }],
+                })
             }
             setShowPassword(false)
         }
@@ -71,22 +101,41 @@ export function UserSheet({ open, onOpenChange, user }: UserSheetProps) {
     const onSubmit = async (data: FormValues) => {
         setIsLoading(true)
         try {
+            const cleanContacts = (data.contacts || [])
+                .filter(c => c.value.trim() !== "")
+                .map(c => ({ type: c.type, value: c.value.trim(), label: c.label || undefined, isPrimary: c.isPrimary }))
+
             if (isEditing) {
                 const updateData: Record<string, string> = {
-                    name:  data.name,
+                    name:     data.name,
                     username: data.username,
-                    role:  data.role,
-                    color: data.color,
+                    role:     data.role,
+                    color:    data.color,
                 }
                 if (data.password.trim()) updateData.password = data.password
-                const res = await updateUser(user!.id, updateData)
-                if (res.success) { toast.success("تم تحديث المستخدم بنجاح"); onOpenChange(false) }
-                else toast.error(res.error)
+                const [res, contactRes] = await Promise.all([
+                    updateUser(user!.id, updateData),
+                    replaceUserContacts(user!.id, cleanContacts),
+                ])
+                if (res.success && contactRes.success) {
+                    toast.success("تم تحديث المستخدم بنجاح")
+                    onOpenChange(false)
+                } else {
+                    toast.error((res as any).error || contactRes.error)
+                }
             } else {
                 if (!data.password.trim()) { toast.error("كلمة المرور مطلوبة للمستخدم الجديد"); setIsLoading(false); return }
                 const res = await createUser(data)
-                if (res.success) { toast.success("تم إنشاء المستخدم بنجاح"); onOpenChange(false) }
-                else toast.error(res.error)
+                if (res.success) {
+                    // بعد إنشاء المستخدم نجلب الـ ID من النتيجة ونحفظ الاتصالات
+                    if (cleanContacts.length > 0 && (res.data as any)?.id) {
+                        await replaceUserContacts((res.data as any).id, cleanContacts)
+                    }
+                    toast.success("تم إنشاء المستخدم بنجاح")
+                    onOpenChange(false)
+                } else {
+                    toast.error(res.error)
+                }
             }
         } catch {
             toast.error("حدث خطأ غير متوقع")
@@ -199,6 +248,90 @@ export function UserSheet({ open, onOpenChange, user }: UserSheetProps) {
                             </button>
                         </div>
                         {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+                    </div>
+
+                    {/* معلومات الاتصال */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                <Phone className="h-4 w-4 text-primary" />
+                                معلومات الاتصال
+                            </Label>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => append({ type: "phone", value: "", label: "", isPrimary: false })}
+                            >
+                                <Plus className="h-3 w-3" /> إضافة
+                            </Button>
+                        </div>
+
+                        <div className="space-y-2">
+                            {fields.map((field, index) => {
+                                const contactType = watch(`contacts.${index}.type`)
+                                const typeInfo = contactTypeLabels[contactType] || contactTypeLabels.phone
+                                return (
+                                    <div key={field.id} className="flex items-start gap-2 p-2.5 rounded-lg border bg-muted/30">
+                                        <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                {/* نوع الاتصال */}
+                                                <Select
+                                                    value={contactType}
+                                                    onValueChange={(v) => setValue(`contacts.${index}.type`, v as any)}
+                                                >
+                                                    <SelectTrigger className="h-8 w-[120px] text-xs">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {Object.entries(contactTypeLabels).map(([k, v]) => (
+                                                            <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                {/* القيمة */}
+                                                <Input
+                                                    placeholder={typeInfo.placeholder}
+                                                    className="h-8 text-sm font-mono flex-1"
+                                                    dir="ltr"
+                                                    {...register(`contacts.${index}.value`)}
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {/* التسمية */}
+                                                <Input
+                                                    placeholder="التسمية (شخصي، عمل...)"
+                                                    className="h-7 text-xs flex-1"
+                                                    {...register(`contacts.${index}.label`)}
+                                                />
+                                                {/* أساسي */}
+                                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={watch(`contacts.${index}.isPrimary`)}
+                                                        onChange={(e) => setValue(`contacts.${index}.isPrimary`, e.target.checked)}
+                                                        className="rounded"
+                                                    />
+                                                    أساسي
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {fields.length > 1 && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 text-muted-foreground hover:text-red-500 shrink-0 mt-0.5"
+                                                onClick={() => remove(index)}
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
                     </div>
 
                     {/* Submit */}

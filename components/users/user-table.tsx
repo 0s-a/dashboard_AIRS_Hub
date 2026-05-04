@@ -1,20 +1,22 @@
 "use client"
 
 import { DataTable } from "@/components/ui/data-table"
-import { userColumns, type UserRow } from "./user-columns"
+import { userColumns } from "./user-columns"
+import type { UserRow } from "./user-columns"
 
 interface UserTableProps {
     data: UserRow[]
-    onRefresh?: () => void | Promise<void>
+    onEdit: (user: UserRow) => void
+    onRefresh: (updated: UserRow[]) => void
 }
 
-export function UserTable({ data, onRefresh }: UserTableProps) {
+export function UserTable({ data, onEdit, onRefresh }: UserTableProps) {
+    const columns = userColumns({ onEdit, onRefresh })
     return (
         <DataTable
-            columns={userColumns}
+            columns={columns}
             data={data}
-            searchPlaceholder="بحث بالاسم أو اسم المستخدم..."
-            onRefresh={onRefresh}
+            searchPlaceholder="ابحث عن اسم أو اسم مستخدم..."
         />
     )
 }

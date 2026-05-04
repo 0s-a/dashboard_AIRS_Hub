@@ -1,18 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey, normalizePhonePatterns } from '@/lib/api-utils'
+import { z } from 'zod'
+import { validateApiKey, apiError, apiSuccess, normalizePhonePatterns } from '@/lib/api-utils'
+
+const CheckPriceSchema = z.object({
+    phoneNumber: z.string().min(1, 'phoneNumber is required'),
+    productId: z.string().min(1, 'productId is required'),
+})
 
 export async function POST(req: NextRequest) {
     const authError = validateApiKey(req)
     if (authError) return authError
 
     try {
-        const body = await req.json()
-        const { phoneNumber, productId } = body
-
-        if (!phoneNumber || !productId) {
-            return NextResponse.json({ error: 'Missing phoneNumber or productId' }, { status: 400 })
+        const rawBody = await req.json()
+        const parsed = CheckPriceSchema.safeParse(rawBody)
+        if (!parsed.success) {
+            return apiError('Missing or invalid fields', 400, {
+                code: 'VALIDATION_ERROR',
+                details: parsed.error.flatten(),
+            })
         }
+
+        const { phoneNumber, productId } = parsed.data
 
         // Get Product with prices
         const product = await prisma.product.findUnique({
@@ -29,9 +39,7 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        if (!product) {
-            return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-        }
+        if (!product) return apiError('Product not found', 404, { code: 'NOT_FOUND' })
 
         // Find person by phone number — using normalized patterns
         const patterns = normalizePhonePatterns(phoneNumber)
@@ -72,18 +80,15 @@ export async function POST(req: NextRequest) {
             unit: (pp as any).unit?.name ?? null,
         }))
 
-        return NextResponse.json({
-            success: true,
-            data: {
-                productId: product.id,
-                productName: product.name,
-                personName: person?.name || null,
-                prices,
-            }
+        return apiSuccess({
+            productId: product.id,
+            productName: product.name,
+            personName: person?.name || null,
+            prices,
         })
 
     } catch (error) {
         console.error('API Price Check Error:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

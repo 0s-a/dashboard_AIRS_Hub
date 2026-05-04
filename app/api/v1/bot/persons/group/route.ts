@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey, PERSON_INCLUDE, resolveCurrencies } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE, resolveCurrencies } from '@/lib/api-utils'
 
 // GET /api/v1/bot/persons/group?groupNumber=xxx
 export async function GET(req: NextRequest) {
@@ -12,10 +12,7 @@ export async function GET(req: NextRequest) {
         const groupNumber = searchParams.get('groupNumber') || searchParams.get('group') || searchParams.get('g')
 
         if (!groupNumber) {
-            return NextResponse.json(
-                { error: 'يجب تمرير groupNumber كمعلمة بحث' },
-                { status: 400 }
-            )
+            return apiError('يجب تمرير groupNumber كمعلمة بحث', 400, { code: 'MISSING_PARAM' })
         }
 
         const persons = await prisma.person.findMany({
@@ -37,14 +34,12 @@ export async function GET(req: NextRequest) {
 
         const firstPerson = enriched[0]
 
-        return NextResponse.json({
-            success: true,
+        return apiSuccess(enriched, 200, {
             personId: firstPerson?.id || null,
-            data: enriched,
             count: enriched.length,
         })
     } catch (error: any) {
         console.error('API Error [GET /persons/group]:', error?.message || error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

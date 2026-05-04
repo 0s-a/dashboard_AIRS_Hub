@@ -8,18 +8,18 @@ datasource db {
 }
 
 model Product {
-  id               String           @id @default(uuid())
-  itemNumber       String           @unique
+  id               String                   @id @default(uuid())
+  itemNumber       String                   @unique
   name             String
   brand            String?
   description      String?
-  isAvailable      Boolean          @default(true)
+  isAvailable      Boolean                  @default(true)
   alternativeNames Json?
   tags             Json? // ["tag1", "tag2", ...]
   categoryId       String?
-  category         Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  category         Category?                @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
   productImages    ProductImage[]
   variants         Variant[]
   productPrices    ProductPrice[]
@@ -42,25 +42,27 @@ model Category {
 }
 
 model Person {
-  id              String             @id @default(uuid())
-  name            String?
-  address         String?
-  notes           String?
-  personTypeId    String?
-  personType      PersonType?        @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
-  source          String?
-  contacts        Contact[]
-  tags            Json? // ["tag1", "tag2"]
-  currencies      Json? // ["currency-uuid-1", "currency-uuid-2"]
-  groupName       String?
-  groupNumber     String?            @unique
-  isActive        Boolean            @default(true)
-  lastInteraction DateTime           @default(now())
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  priceLabels     PersonPriceLabel[]
-  orders          Order[]
-  notifications   AiNotification[]
+  id                   String                @id @default(uuid())
+  name                 String?
+  address              String?
+  notes                String?
+  personTypeId         String?
+  personType           PersonType?           @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
+  source               String?
+  contacts             Contact[]
+  tags                 Json? // ["tag1", "tag2"]
+  currencies           Json? // kept for backward compat — use personCurrencies for new code
+  groupName            String?
+  groupNumber          String?               @unique
+  isActive             Boolean               @default(true)
+  lastInteraction      DateTime              @default(now())
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  priceLabels          PersonPriceLabel[]
+  personCurrencies     PersonCurrency[]
+  orders               Order[]
+  notifications        AiNotification[]
+  announcementMessages AnnouncementMessage[]
 
   @@map("Person")
 }
@@ -102,7 +104,7 @@ model Variant {
   name          String // display name
   type          String         @default("color") // "color" | "size" | "custom"
   hex           String? // CSS hex color (for type=color only)
-  price         Decimal? @db.Decimal(12, 2) // Variant-specific price override
+  price         Decimal?       @db.Decimal(12, 2) // Variant-specific price override
   order         Int            @default(0)
   isDefault     Boolean        @default(false)
   productId     String
@@ -157,30 +159,47 @@ model PersonType {
 // Contact information (phone, email, whatsapp) — normalized
 model Contact {
   id        String   @id @default(uuid())
-  personId  String
-  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId  String?
+  person    Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String // "phone" | "email" | "whatsapp"
   value     String // the actual number or email
   label     String? // "جوال", "عمل", etc.
   isPrimary Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  @@unique([type, value])
+  // Per-owner uniqueness — same number allowed for different persons/users
+  @@unique([personId, type, value], name: "person_contact_unique")
+  @@unique([userId, type, value], name: "user_contact_unique")
+}
+
+// Junction table: Person <-> Currency (replaces currencies Json field)
+model PersonCurrency {
+  personId   String
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  currencyId String
+  currency   Currency @relation(fields: [currencyId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@id([personId, currencyId])
 }
 
 // Currency management
 model Currency {
-  id            String         @id @default(uuid())
-  itemNumber    String         @unique
-  name          String         @unique // e.g. "ريال يمني"
-  code          String         @unique // e.g. "YER"
-  symbol        String // e.g. "ر.ي"
-  isDefault     Boolean        @default(false)
-  isActive      Boolean        @default(true)
-  productPrices ProductPrice[]
-  orderItems    OrderItem[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id               String           @id @default(uuid())
+  itemNumber       String           @unique
+  name             String           @unique // e.g. "ريال يمني"
+  code             String           @unique // e.g. "YER"
+  symbol           String // e.g. "ر.ي"
+  isDefault        Boolean          @default(false)
+  isActive         Boolean          @default(true)
+  exchangeRate     Decimal?         @db.Decimal(18, 6) // rate relative to default currency (null for default)
+  productPrices    ProductPrice[]
+  orderItems       OrderItem[]
+  personCurrencies PersonCurrency[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 }
 
 // Product prices — normalized pricing with multi-currency support
@@ -219,14 +238,14 @@ model ProductUnit {
 
 // Unit model for pricing units (e.g., Piece, Dozen, Box)
 model Unit {
-  id             String         @id @default(uuid())
-  itemNumber     String         @unique
-  name           String         @unique
-  pluralName     String?
-  notes          String?
-  isActive       Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id         String   @id @default(uuid())
+  itemNumber String   @unique
+  name       String   @unique
+  pluralName String?
+  notes      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   productPrices ProductPrice[]
   productUnits  ProductUnit[]
@@ -241,7 +260,7 @@ model Order {
   status      String      @default("pending")
   // "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
   notes       String?
-  totalAmount Decimal? @db.Decimal(12, 2) // pre-computed sum from items
+  totalAmount Decimal?    @db.Decimal(12, 2) // pre-computed sum from items
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -259,7 +278,7 @@ model OrderItem {
   priceLabelId String?
   priceLabel   PriceLabel? @relation(fields: [priceLabelId], references: [id], onDelete: SetNull)
   // Snapshot of price & currency from ProductPrice at order creation time
-  unitPrice    Decimal  @db.Decimal(12, 2)
+  unitPrice    Decimal     @db.Decimal(12, 2)
   currencyId   String?
   currency     Currency?   @relation(fields: [currencyId], references: [id], onDelete: SetNull)
   quantity     Int         @default(1)
@@ -304,6 +323,7 @@ model User {
   lastLogin DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  contacts  Contact[]
 }
 
 // Store settings — singleton row (id = "default")
@@ -311,8 +331,8 @@ model StoreSettings {
   id           String   @id @default("default")
   name         String   @default("المتجر الرئيسي")
   description  String?
-  logo         String?  // URL path to uploaded logo image
-  favicon      String?  // URL path to uploaded favicon
+  logo         String? // URL path to uploaded logo image
+  favicon      String? // URL path to uploaded favicon
   phone        String?
   email        String?
   whatsapp     String?
@@ -320,29 +340,87 @@ model StoreSettings {
   address      String?
   city         String?
   country      String?
-  workingHours Json?    // { "sun": "8:00-17:00", ... }
-  socialLinks  Json?    // { "facebook": "...", "instagram": "...", ... }
+  workingHours Json? // { "sun": "8:00-17:00", ... }
+  socialLinks  Json? // { "facebook": "...", "instagram": "...", ... }
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
 
+// Message templates for announcement campaigns
+model MessageTemplate {
+  id            String         @id @default(uuid())
+  name          String
+  type          String         @default("text") // "text" | "text_image"
+  sendMode      String         @default("combined") // "combined" | "per_product"
+  bodyTemplate  String         @db.Text
+  productBlock  String         @db.Text
+  separator     String         @default("\n---\n")
+  isDefault     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  announcements Announcement[]
+
+  @@index([isDefault])
+}
+
 // Announcements system for mass messaging
 model Announcement {
-  id                   String     @id @default(uuid())
-  title                String
-  description          String?
-  status               String     @default("pending") // pending | running | paused | sent | cancelled | failed
-  scheduledAt          DateTime
-  sentAt               DateTime?
-  personIds            String[]   // Manual specific recipients
-  productIds           String[]   // Manual specific products
-  personFilters        Json       // Filters used to define the audience
-  productFilters       Json       // Filters used to define the attached products
-  batchSize            Int        @default(50)
-  batchIntervalMinutes Int        @default(15)
-  batchProgress        Json       @default("{}") // Progress tracking state
-  sentCount            Int        @default(0)
-  createdBy            String?    // User ID
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  id                  String                @id @default(uuid())
+  title               String
+  description         String?
+  status              String                @default("pending") // pending | queueing | queued | sent | failed | cancelled
+  scheduledAt         DateTime
+  sentAt              DateTime?
+  // ── Targeting (JSON filters — single source) ──
+  personFilters       Json // { all: true } | { manualIds: [...] } | { typeIds: [...], tags: [...] }
+  productFilters      Json // { all: true } | { manualIds: [...] } | { categoryIds: [...] }
+  // ── Template ──
+  templateId          String?
+  template            MessageTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  // ── Throttle / Rate Limit ──
+  delayBetweenSeconds Int                   @default(0)
+  sendWindowStart     String? // "09:00"
+  sendWindowEnd       String? // "18:00"
+  // ── Queueing progress (0-100) ──
+  queueingProgress    Int                   @default(0)
+  // ── Metadata ──
+  createdBy           String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  // ── Relations ──
+  messages            AnnouncementMessage[]
+}
+
+// Per-person delivery record — THE source of truth for tracking
+model AnnouncementMessage {
+  id             String       @id @default(uuid())
+  // ── Campaign ──
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  messageIndex   Int // 1-based order
+  // ── Person (FK required) ──
+  personId       String
+  person         Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personName     String?
+  whatsappNumber String?
+  // ── Products (JSON array of IDs) ──
+  productIds     Json         @default("[]")
+  // ── Content ──
+  messageBody    String       @db.Text
+  imageUrls      Json         @default("[]")
+  // ── Delivery ──
+  status         String       @default("pending") // pending | sent | failed
+  providerId     String? // WhatsApp message ID
+  errorReason    String?
+  retryCount     Int          @default(0)
+  // ── Timestamps ──
+  queuedAt       DateTime     @default(now())
+  sentAt         DateTime?
+
+  @@unique([announcementId, personId])
+  @@index([announcementId])
+  @@index([announcementId, status])
+  @@index([personId])
+  @@index([announcementId, messageIndex])
+  @@index([status])
 }

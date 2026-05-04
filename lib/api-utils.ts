@@ -9,14 +9,58 @@ const BOT_API_KEY = process.env.BOT_API_KEY
 
 /**
  * Validates the x-api-key header against the BOT_API_KEY.
- * Returns null if valid, or a 401 NextResponse if invalid.
+ * Returns null if valid, or a NextResponse error if invalid.
+ *
+ * Security: if BOT_API_KEY is not configured in .env, ALL requests are blocked
+ * to prevent accidental open access (undefined !== undefined would pass).
  */
 export function validateApiKey(req: NextRequest): NextResponse | null {
+    if (!BOT_API_KEY) {
+        console.error('[API] BOT_API_KEY is not configured — blocking all requests for safety')
+        return NextResponse.json(
+            { success: false, error: 'Service unavailable — API key not configured', code: 'MISCONFIGURED' },
+            { status: 503 }
+        )
+    }
     const apiKey = req.headers.get('x-api-key')
-    if (apiKey !== BOT_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!apiKey || apiKey !== BOT_API_KEY) {
+        return NextResponse.json(
+            { success: false, error: 'Unauthorized — invalid or missing x-api-key', code: 'UNAUTHORIZED' },
+            { status: 401 }
+        )
     }
     return null
+}
+
+// ────────────────────────────────────────────────────────
+// Unified Response Helpers
+// ────────────────────────────────────────────────────────
+
+/**
+ * Standard success response.
+ * All bot API routes should use this for consistency.
+ */
+export function apiSuccess<T>(
+    data: T,
+    status = 200,
+    meta?: Record<string, unknown>
+): NextResponse {
+    return NextResponse.json({ success: true, data, ...meta }, { status })
+}
+
+/**
+ * Standard error response with optional machine-readable code.
+ * All bot API routes should use this for consistency.
+ */
+export function apiError(
+    message: string,
+    status: number,
+    options?: { code?: string; details?: unknown }
+): NextResponse {
+    const body: Record<string, unknown> = { success: false, error: message }
+    if (options?.code)    body.code    = options.code
+    if (options?.details !== undefined) body.details = options.details
+    return NextResponse.json(body, { status })
 }
 
 // ────────────────────────────────────────────────────────

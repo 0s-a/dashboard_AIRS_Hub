@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { validateApiKey, PERSON_INCLUDE, resolveCurrenciesSingle } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE, resolveCurrenciesSingle } from '@/lib/api-utils'
 
 // Zod Schemas for Validation
 const contactSchema = z.object({
@@ -41,15 +41,13 @@ export async function GET(
             include: PERSON_INCLUDE,
         })
 
-        if (!person) {
-            return NextResponse.json({ error: 'الشخص غير موجود' }, { status: 404 })
-        }
+        if (!person) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
 
         const enriched = await resolveCurrenciesSingle(person)
-        return NextResponse.json({ success: true, data: enriched })
+        return apiSuccess(enriched)
     } catch (error) {
         console.error('API Error [GET /persons/id]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }
 
@@ -64,34 +62,30 @@ export async function PUT(
     try {
         const { id } = await params
         const rawBody = await req.json()
-        
-        // Zod Validation
+
         const validationResult = updatePersonSchema.safeParse(rawBody)
         if (!validationResult.success) {
-            return NextResponse.json({ 
-                error: 'البيانات غير صالحة', 
-                details: validationResult.error.format() 
-            }, { status: 400 })
+            return apiError('البيانات غير صالحة', 400, {
+                code: 'VALIDATION_ERROR',
+                details: validationResult.error.format(),
+            })
         }
-        
+
         const body = validationResult.data
 
-        // Check person exists
         const existing = await prisma.person.findUnique({ where: { id } })
-        if (!existing) {
-            return NextResponse.json({ error: 'الشخص غير موجود' }, { status: 404 })
-        }
+        if (!existing) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
 
         const person = await prisma.person.update({
             where: { id },
             data: {
-                ...(body.name !== undefined && { name: body.name }),
-                ...(body.address !== undefined && { address: body.address }),
-                ...(body.notes !== undefined && { notes: body.notes }),
-                ...(body.source !== undefined && { source: body.source }),
-                ...(body.personTypeId !== undefined && { personTypeId: body.personTypeId || null }),
-                ...(body.isActive !== undefined && { isActive: body.isActive }),
-                ...(body.contacts !== undefined && {
+                ...(body.name          !== undefined && { name: body.name }),
+                ...(body.address       !== undefined && { address: body.address }),
+                ...(body.notes         !== undefined && { notes: body.notes }),
+                ...(body.source        !== undefined && { source: body.source }),
+                ...(body.personTypeId  !== undefined && { personTypeId: body.personTypeId || null }),
+                ...(body.isActive      !== undefined && { isActive: body.isActive }),
+                ...(body.contacts      !== undefined && {
                     contacts: {
                         deleteMany: {},
                         create: body.contacts
@@ -104,10 +98,10 @@ export async function PUT(
                             }))
                     }
                 }),
-                ...(body.tags !== undefined && { tags: body.tags ? body.tags : undefined }),
-                ...(body.currencyIds !== undefined && { currencies: body.currencyIds ? body.currencyIds : undefined }),
-                ...(body.groupName !== undefined && { groupName: body.groupName || null }),
-                ...(body.groupNumber !== undefined && { groupNumber: body.groupNumber || null }),
+                ...(body.tags          !== undefined && { tags: body.tags ?? undefined }),
+                ...(body.currencyIds   !== undefined && { currencies: body.currencyIds ?? undefined }),
+                ...(body.groupName     !== undefined && { groupName: body.groupName || null }),
+                ...(body.groupNumber   !== undefined && { groupNumber: body.groupNumber || null }),
                 ...(body.priceLabelIds !== undefined && {
                     priceLabels: {
                         deleteMany: {},
@@ -122,13 +116,13 @@ export async function PUT(
         })
 
         const enriched = await resolveCurrenciesSingle(person)
-        return NextResponse.json({ success: true, data: enriched })
+        return apiSuccess(enriched)
     } catch (error: any) {
         console.error('API Error [PUT /persons/id]:', error)
         if (error?.code === 'P2002' && error?.meta?.target?.includes('value')) {
-            return NextResponse.json({ error: 'رقم الهاتف أو البريد مسجل بالفعل لشخص آخر' }, { status: 409 })
+            return apiError('رقم الهاتف أو البريد مسجل بالفعل لشخص آخر', 409, { code: 'DUPLICATE_CONTACT' })
         }
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }
 
@@ -144,14 +138,12 @@ export async function DELETE(
         const { id } = await params
 
         const existing = await prisma.person.findUnique({ where: { id } })
-        if (!existing) {
-            return NextResponse.json({ error: 'الشخص غير موجود' }, { status: 404 })
-        }
+        if (!existing) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
 
         await prisma.person.delete({ where: { id } })
-        return NextResponse.json({ success: true, message: 'تم حذف الشخص بنجاح' })
+        return apiSuccess(null, 200, { message: 'تم حذف الشخص بنجاح' })
     } catch (error) {
         console.error('API Error [DELETE /persons/id]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

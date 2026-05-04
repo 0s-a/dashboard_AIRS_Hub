@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
 import { Prisma } from '@prisma/client'
 
 // GET /api/v1/bot/products/search — Advanced full-text search
@@ -20,10 +20,7 @@ export async function GET(req: NextRequest) {
         const offset = (page - 1) * limit
 
         if (!query.trim()) {
-            return NextResponse.json(
-                { error: 'Missing required parameter: q' },
-                { status: 400 }
-            )
+            return apiError('Missing required parameter: q', 400, { code: 'MISSING_PARAM' })
         }
 
         // ── Build WHERE clauses ──────────────────────
@@ -288,9 +285,7 @@ export async function GET(req: NextRequest) {
             ])
 
             const total = fbCount[0]?.total ?? 0
-            return NextResponse.json({
-                success: true,
-                data: fbResults,
+            return apiSuccess(fbResults, 200, {
                 count: fbResults.length,
                 searchMode: 'ilike_fallback',
                 pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -298,9 +293,7 @@ export async function GET(req: NextRequest) {
         }
 
         const total = countResult[0]?.total ?? 0
-        return NextResponse.json({
-            success: true,
-            data: results,
+        return apiSuccess(results, 200, {
             count: results.length,
             searchMode: 'fulltext',
             pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -308,6 +301,6 @@ export async function GET(req: NextRequest) {
 
     } catch (error) {
         console.error('API Error [GET /products/search]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey, parsePagination, paginationMeta } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess, parsePagination, paginationMeta } from '@/lib/api-utils'
 
 const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true, icon: true } },
@@ -82,14 +82,12 @@ export async function GET(req: NextRequest) {
             variants: p.variants,
         }))
 
-        return NextResponse.json({ 
-            success: true, 
-            data, 
+        return apiSuccess(data, 200, {
             count: data.length,
             pagination: paginationMeta(totalCount, page, limit),
         })
     } catch (error) {
         console.error('API Error [GET /products]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

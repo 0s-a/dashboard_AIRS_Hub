@@ -10,7 +10,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Pencil, Trash2, Play, Users, Package, Clock } from "lucide-react"
-import { deleteAnnouncement, executeAnnouncement } from "@/lib/actions/announcements"
+import { deleteAnnouncement, executeAnnouncementToQueue } from "@/lib/actions/announcements"
 import { toast } from "sonner"
 
 export type AnnouncementRow = {
@@ -20,9 +20,6 @@ export type AnnouncementRow = {
     scheduledAt: Date | string
     status: string
     sentAt: Date | string | null
-    sentCount: number | null
-    personIds: unknown
-    productIds: unknown
     personFilters: unknown
     productFilters: unknown
     createdAt: Date | string
@@ -37,10 +34,10 @@ function formatDate(d: Date | string | null) {
 }
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
-    draft:     { label: "مسودة",          className: "bg-muted text-muted-foreground border-0" },
-    running:   { label: "جاري الإرسال",  className: "bg-primary/10 text-primary border-0" },
-    paused:    { label: "متوقف مؤقتاً", className: "bg-amber-500/10 text-amber-600 border-0" },
-    sent:      { label: "تم الإرسال",  className: "bg-emerald-500/10 text-emerald-600 border-0" },
+    pending:   { label: "مسودة",          className: "bg-muted text-muted-foreground border-0" },
+    queueing:  { label: "جاري النشر...", className: "bg-primary/10 text-primary border-0" },
+    queued:    { label: "في الطابور",    className: "bg-indigo-500/10 text-indigo-600 border-0" },
+    sent:      { label: "تم الإرسال",   className: "bg-emerald-500/10 text-emerald-600 border-0" },
     failed:    { label: "فشل",            className: "bg-destructive/10 text-destructive border-0" },
     cancelled: { label: "ملغى",            className: "bg-muted text-muted-foreground border-0" },
 }
@@ -92,9 +89,9 @@ export const announcementColumns: ColumnDef<AnnouncementRow>[] = [
             const pf = row.original.personFilters as any
             const prf = row.original.productFilters as any
             const personLabel = pf?.all ? "الكل" :
-                (row.original.personIds as string[])?.length > 0 ? `${(row.original.personIds as string[]).length} شخص` : "—"
+                pf?.manualIds?.length > 0 ? `${pf.manualIds.length} شخص` : "فلتر"
             const productLabel = prf?.all ? "الكل" :
-                (row.original.productIds as string[])?.length > 0 ? `${(row.original.productIds as string[]).length} منتج` : "—"
+                prf?.manualIds?.length > 0 ? `${prf.manualIds.length} منتج` : "فلتر"
             return (
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><Users className="size-3.5" />{personLabel}</span>
@@ -117,16 +114,16 @@ export const announcementColumns: ColumnDef<AnnouncementRow>[] = [
             }
 
             const handleExecute = async () => {
-                if (!confirm(`تنفيذ الإعلان "${ann.title}" الآن؟`)) return
-                const toastId = toast.loading("جاري الإرسال...")
-                const res = await executeAnnouncement(ann.id)
+                if (!confirm(`إطلاق حملة "${ann.title}" إلى RabbitMQ؟`)) return
+                const toastId = toast.loading("جاري النشر...")
+                const res = await executeAnnouncementToQueue(ann.id)
                 toast.dismiss(toastId)
                 if (res.success) {
                     const d = res.data as any
-                    toast.success(`✅ تم إرسال الإعلان إلى ${d?.sentCount ?? 0} شخص`)
+                    toast.success(`✅ تم وضع ${d?.totalBatches ?? 0} دُفعة في الطابور`)
                     window.dispatchEvent(new Event("refresh-announcements"))
                 } else {
-                    toast.error(res.error)
+                    toast.error((res as any).error)
                 }
             }
 

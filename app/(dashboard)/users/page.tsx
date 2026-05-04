@@ -1,49 +1,13 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { Plus, Users, UserCheck, Clock } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { UserSheet } from "@/components/users/user-sheet"
-import { UserTable } from "@/components/users/user-table"
+import { Users, UserCheck, Clock } from "lucide-react"
 import { getUsers } from "@/lib/actions/users"
+import { UsersClient } from "@/components/users/users-client"
 import type { UserRow } from "@/components/users/user-columns"
 
-export default function UsersPage() {
-    const [isSheetOpen, setIsSheetOpen] = useState(false)
-    const [selectedUser, setSelectedUser] = useState<UserRow | undefined>()
-    const [users, setUsers] = useState<UserRow[]>([])
+export const dynamic = "force-dynamic"
 
-    const loadUsers = async () => {
-        const res = await getUsers()
-        if (res.success && res.data) setUsers(res.data as UserRow[])
-    }
-
-    useEffect(() => {
-        loadUsers()
-
-        const handleEdit = (e: Event) => {
-            const customEvent = e as CustomEvent
-            setSelectedUser(customEvent.detail)
-            setIsSheetOpen(true)
-        }
-
-        const handleRefresh = () => loadUsers()
-
-        window.addEventListener("edit-user", handleEdit)
-        window.addEventListener("refresh-users", handleRefresh)
-        return () => {
-            window.removeEventListener("edit-user", handleEdit)
-            window.removeEventListener("refresh-users", handleRefresh)
-        }
-    }, [])
-
-    const handleSheetClose = (open: boolean) => {
-        if (!open) {
-            setIsSheetOpen(false)
-            setSelectedUser(undefined)
-            loadUsers()
-        }
-    }
+export default async function UsersPage() {
+    const res = await getUsers()
+    const users = (res.success && res.data ? res.data : []) as UserRow[]
 
     const activeUsers = users.filter(u => u.isActive)
     const lastLogin = users
@@ -62,10 +26,7 @@ export default function UsersPage() {
                         أضف وعدّل حسابات المستخدمين في النظام
                     </p>
                 </div>
-                <Button onClick={() => { setSelectedUser(undefined); setIsSheetOpen(true) }} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    إضافة مستخدم
-                </Button>
+                {/* Add button rendered inside UsersClient */}
             </div>
 
             {/* Stats Cards */}
@@ -97,10 +58,7 @@ export default function UsersPage() {
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">آخر تسجيل دخول</p>
                             <h3 className="text-lg font-bold mt-2 truncate">
-                                {lastLogin
-                                    ? `${lastLogin.name}`
-                                    : "لا يوجد"
-                                }
+                                {lastLogin ? lastLogin.name : "لا يوجد"}
                             </h3>
                         </div>
                         <div className="size-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
@@ -110,17 +68,8 @@ export default function UsersPage() {
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="glass-panel rounded-xl border border-border/50 p-6">
-                <UserTable data={users} onRefresh={loadUsers} />
-            </div>
-
-            {/* Sheet */}
-            <UserSheet
-                open={isSheetOpen}
-                onOpenChange={handleSheetClose}
-                user={selectedUser}
-            />
+            {/* Interactive part */}
+            <UsersClient initialUsers={users} />
         </div>
     )
 }

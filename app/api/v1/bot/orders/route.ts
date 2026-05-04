@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
 import { resolveProductPrice, generateItemNumber } from '@/lib/action-utils'
 import { ORDER_INCLUDE } from '@/lib/prisma-includes'
 import { z } from 'zod'
@@ -37,10 +37,10 @@ export async function POST(req: NextRequest) {
         const parsed = CreateOrderSchema.safeParse(body)
 
         if (!parsed.success) {
-            return NextResponse.json(
-                { error: 'بيانات غير صالحة', details: parsed.error.flatten() },
-                { status: 400 }
-            )
+            return apiError('بيانات غير صالحة', 400, {
+                code: 'VALIDATION_ERROR',
+                details: parsed.error.flatten(),
+            })
         }
 
         const { personId, groupNumber, notes, items } = parsed.data
@@ -70,9 +70,10 @@ export async function POST(req: NextRequest) {
         for (const item of items) {
             const pp = await resolveProductPrice(item.productId, item.priceLabelId)
             if (!pp) {
-                return NextResponse.json(
-                    { error: `لا توجد تسعيرة للمنتج ${item.productId} مع التسعيرة ${item.priceLabelId}` },
-                    { status: 400 }
+                return apiError(
+                    `لا توجد تسعيرة للمنتج ${item.productId} مع التسعيرة ${item.priceLabelId}`,
+                    400,
+                    { code: 'PRICE_NOT_FOUND' }
                 )
             }
             resolvedItems.push({
@@ -105,10 +106,10 @@ export async function POST(req: NextRequest) {
             include: ORDER_INCLUDE,
         })
 
-        return NextResponse.json({ success: true, data: order }, { status: 201 })
+        return apiSuccess(order, 201)
     } catch (error: any) {
         console.error('API Error [POST /orders]:', error?.message || error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }
 
@@ -142,10 +143,7 @@ export async function GET(req: NextRequest) {
             if (person) {
                 where.personId = person.id
             } else {
-                return NextResponse.json({
-                    success: true, data: [], count: 0,
-                    pagination: { total: 0, page, limit, totalPages: 0 },
-                })
+                return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
             }
         }
 
@@ -162,9 +160,7 @@ export async function GET(req: NextRequest) {
             prisma.order.count({ where }),
         ])
 
-        return NextResponse.json({
-            success: true,
-            data: orders,
+        return apiSuccess(orders, 200, {
             count: orders.length,
             pagination: {
                 total, page, limit,
@@ -173,6 +169,6 @@ export async function GET(req: NextRequest) {
         })
     } catch (error: any) {
         console.error('API Error [GET /orders]:', error?.message || error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

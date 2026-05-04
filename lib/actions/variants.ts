@@ -133,19 +133,22 @@ export async function removeVariant(
             }
         }
 
-        // Re-order remaining
+        // Re-order remaining (parallel)
         const remaining = await prisma.variant.findMany({
             where: { productId },
             orderBy: { order: 'asc' },
         })
-        for (let i = 0; i < remaining.length; i++) {
-            if (remaining[i].order !== i) {
-                await prisma.variant.update({
-                    where: { id: remaining[i].id },
-                    data: { order: i },
-                })
-            }
-        }
+        await Promise.all(
+            remaining
+                .map((v, i) => ({ v, i }))
+                .filter(({ v, i }) => v.order !== i)
+                .map(({ v, i }) =>
+                    prisma.variant.update({
+                        where: { id: v.id },
+                        data: { order: i },
+                    })
+                )
+        )
 
         revalidateProduct(productId)
         return { success: true }

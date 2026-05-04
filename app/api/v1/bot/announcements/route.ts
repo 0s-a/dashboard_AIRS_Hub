@@ -1,25 +1,49 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess, parsePagination, paginationMeta } from '@/lib/api-utils'
 
-// GET /api/v1/bot/announcements — List sent announcements
+// GET /api/v1/bot/announcements — List announcements with filters and pagination
 export async function GET(req: NextRequest) {
     const authError = validateApiKey(req)
     if (authError) return authError
 
     try {
         const { searchParams } = new URL(req.url)
-        const limit = Math.min(100, parseInt(searchParams.get('limit') || '50'))
+        const status = searchParams.get('status') // 'sent' | 'draft' | 'sending' | etc.
+        const { page, limit, skip } = parsePagination(searchParams)
 
-        const announcements = await prisma.announcement.findMany({
-            where: { status: 'sent' },
-            orderBy: { sentAt: 'desc' },
-            take: limit,
+        const where: any = {}
+        // Default to 'sent' if no status provided (backward compat)
+        if (status) {
+            where.status = status
+        } else {
+            where.status = 'sent'
+        }
+
+        const [total, announcements] = await Promise.all([
+            prisma.announcement.count({ where }),
+            prisma.announcement.findMany({
+                where,
+                select: {
+                    id: true,
+                    title: true,
+                    status: true,
+                    sentAt: true,
+                    createdAt: true,
+                    _count: { select: { messages: true } },
+                },
+                orderBy: { sentAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+        ])
+
+        return apiSuccess(announcements, 200, {
+            count: announcements.length,
+            pagination: paginationMeta(total, page, limit),
         })
-
-        return NextResponse.json({ success: true, data: announcements, count: announcements.length })
     } catch (error) {
         console.error('API Error [GET /announcements]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

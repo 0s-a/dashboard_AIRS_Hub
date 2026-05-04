@@ -77,7 +77,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             name: product?.name || "",
             brand: (product as any)?.brand || "",
             description: product?.description || "",
-
+            categoryId: (product as any)?.categoryId || "",
             isAvailable: product?.isAvailable ?? true,
             alternativeNames: (product as any)?.alternativeNames || [],
             tags: (product as any)?.tags || [],

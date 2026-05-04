@@ -32,6 +32,7 @@ import { Person } from "@prisma/client"
 import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins, UsersRound } from "lucide-react"
 import { useState, useEffect } from "react"
 import { MultiSelect, OptionType } from "@/components/ui/multi-select"
+import { TagInput } from "@/components/ui/tag-input"
 
 const contactSchema = z.object({
     type: z.enum(["phone", "email", "whatsapp"]),
@@ -47,7 +48,7 @@ const formSchema = z.object({
     personTypeId: z.string().optional(),
     source: z.string().optional(),
     contacts: z.array(contactSchema),
-    tags: z.string().optional(),
+    tags: z.array(z.string()).optional(),
     priceLabelIds: z.array(z.string()).optional(),
     currencyIds: z.array(z.string()).optional(),
     groupName: z.string().optional(),
@@ -114,7 +115,7 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
             contacts: existingContacts.length > 0
                 ? existingContacts.map(c => ({ ...c, label: c.label || "" }))
                 : [{ type: "phone" as const, value: "", label: "", isPrimary: true }],
-            tags: existingTags.join("، "),
+            tags: existingTags,
             priceLabelIds: (person as any)?.priceLabels?.map((pl: any) => pl.priceLabelId) || [],
             currencyIds: (person?.currencies as string[] | null) || [],
             groupName: (person as any)?.groupName || "",
@@ -130,10 +131,8 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
     async function onSubmit(values: FormValues) {
         setIsSubmitting(true)
         try {
-            // Parse tags from comma-separated string
-            const parsedTags = values.tags
-                ? values.tags.split(/[,،]/).map(t => t.trim()).filter(Boolean)
-                : null
+            // Tags are now an array directly
+            const parsedTags = Array.isArray(values.tags) && values.tags.length > 0 ? values.tags : null
 
             // Clean contacts
             const cleanContacts: ContactInput[] = (values.contacts || [])
@@ -503,10 +502,14 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                             <FormItem>
                                 <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
                                     <Tag className="h-3 w-3" />
-                                    الوسوم (مفصولة بفاصلة)
+                                    الوسوم
                                 </FormLabel>
                                 <FormControl>
-                                    <Input placeholder="مثال: مهم، دائم، جملة" {...field} className="h-9" />
+                                    <TagInput
+                                        value={Array.isArray(field.value) ? field.value : []}
+                                        onChange={field.onChange}
+                                        placeholder="أضف وسماً واضغط Enter..."
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>

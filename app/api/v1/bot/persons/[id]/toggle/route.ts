@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
 
 // PATCH /api/v1/bot/persons/[id]/toggle — Toggle active/inactive
 export async function PATCH(
@@ -18,9 +18,7 @@ export async function PATCH(
             select: { id: true, isActive: true, name: true },
         })
 
-        if (!existing) {
-            return NextResponse.json({ error: 'الشخص غير موجود' }, { status: 404 })
-        }
+        if (!existing) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
 
         const person = await prisma.person.update({
             where: { id },
@@ -28,13 +26,11 @@ export async function PATCH(
             select: { id: true, name: true, isActive: true },
         })
 
-        return NextResponse.json({
-            success: true,
-            data: person,
+        return apiSuccess(person, 200, {
             message: person.isActive ? 'تم تفعيل الشخص' : 'تم إلغاء تفعيل الشخص',
         })
     } catch (error) {
         console.error('API Error [PATCH /persons/id/toggle]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

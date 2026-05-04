@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { 
-    validateApiKey, 
-    PERSON_INCLUDE, 
-    resolveCurrencies, 
+import {
+    validateApiKey,
+    apiError,
+    apiSuccess,
+    PERSON_INCLUDE,
+    resolveCurrencies,
     normalizePhonePatterns,
     parsePagination,
-    paginationMeta 
+    paginationMeta
 } from '@/lib/api-utils'
 
 // Zod Schemas for Validation
@@ -77,14 +79,12 @@ export async function GET(req: NextRequest) {
 
         const enriched = await resolveCurrencies(persons)
 
-        return NextResponse.json({ 
-            success: true, 
-            data: enriched, 
+        return apiSuccess(enriched, 200, {
             pagination: paginationMeta(totalCount, page, limit),
         })
     } catch (error) {
         console.error('API Error [GET /persons]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }
 
@@ -99,10 +99,10 @@ export async function POST(req: NextRequest) {
         // Zod Validation
         const validationResult = createPersonSchema.safeParse(rawBody)
         if (!validationResult.success) {
-            return NextResponse.json({ 
-                error: 'البيانات غير صالحة', 
-                details: validationResult.error.format() 
-            }, { status: 400 })
+            return apiError('البيانات غير صالحة', 400, {
+                code: 'VALIDATION_ERROR',
+                details: validationResult.error.format(),
+            })
         }
         
         const body = validationResult.data
@@ -185,11 +185,7 @@ export async function POST(req: NextRequest) {
 
             const [enriched] = await resolveCurrencies([updatedPerson])
 
-            return NextResponse.json({ 
-                success: true, 
-                action: 'updated',
-                data: enriched 
-            }, { status: 200 })
+            return apiSuccess(enriched, 200, { action: 'updated' })
         }
 
         // ── CREATE new person ──
@@ -226,26 +222,22 @@ export async function POST(req: NextRequest) {
 
         const [enriched] = await resolveCurrencies([person])
 
-        return NextResponse.json({ 
-            success: true, 
-            action: 'created',
-            data: enriched 
-        }, { status: 201 })
+        return apiSuccess(enriched, 201, { action: 'created' })
     } catch (error: any) {
         console.error('API Error [POST /persons]:', error)
         if (error?.code === 'P2002') {
             const target = error?.meta?.target
             if (target?.includes('value')) {
-                return NextResponse.json({ 
-                    error: 'رقم الهاتف أو البريد مسجل بالفعل لشخص آخر',
-                    details: `Duplicate contact: ${target}`
-                }, { status: 409 })
+                return apiError('رقم الهاتف أو البريد مسجل بالفعل لشخص آخر', 409, {
+                    code: 'DUPLICATE_CONTACT',
+                    details: `Duplicate contact: ${target}`,
+                })
             }
-            return NextResponse.json({ 
-                error: 'بيانات مكررة',
-                details: `Duplicate field: ${target}`
-            }, { status: 409 })
+            return apiError('بيانات مكررة', 409, {
+                code: 'DUPLICATE_FIELD',
+                details: `Duplicate field: ${target}`,
+            })
         }
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

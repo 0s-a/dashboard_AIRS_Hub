@@ -1,6 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey } from '@/lib/api-utils'
+import { z } from 'zod'
+import { validateApiKey, apiError, apiSuccess, parsePagination, paginationMeta } from '@/lib/api-utils'
+
+const NotificationType = z.enum(['out_of_stock', 'not_found'])
+
+const CreateNotificationSchema = z.object({
+    type: NotificationType,
+    searchQuery: z.string().min(1, 'searchQuery is required'),
+    productId: z.string().optional().nullable(),
+    productName: z.string().optional().nullable(),
+    phoneNumber: z.string().optional().nullable(),
+    personId: z.string().optional().nullable(),
+    source: z.string().optional().nullable(),
+})
 
 // POST /api/v1/bot/notifications — Create an AI notification
 export async function POST(req: NextRequest) {
@@ -8,22 +21,17 @@ export async function POST(req: NextRequest) {
     if (authError) return authError
 
     try {
-        const body = await req.json()
-        const { type, searchQuery, productId, productName, phoneNumber, personId, source } = body
+        const rawBody = await req.json()
+        const parsed = CreateNotificationSchema.safeParse(rawBody)
 
-        if (!type || !searchQuery) {
-            return NextResponse.json(
-                { error: 'Missing required fields: type, searchQuery' },
-                { status: 400 }
-            )
+        if (!parsed.success) {
+            return apiError('Missing or invalid fields', 400, {
+                code: 'VALIDATION_ERROR',
+                details: parsed.error.flatten(),
+            })
         }
 
-        if (!['out_of_stock', 'not_found'].includes(type)) {
-            return NextResponse.json(
-                { error: 'type must be "out_of_stock" or "not_found"' },
-                { status: 400 }
-            )
-        }
+        const { type, searchQuery, productId, productName, phoneNumber, personId, source } = parsed.data
 
         // Validate foreign keys — ignore invalid IDs instead of failing
         let validProductId: string | null = null
@@ -50,49 +58,50 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        return NextResponse.json({ success: true, data: notification }, { status: 201 })
+        return apiSuccess(notification, 201)
     } catch (error) {
         console.error('API Error [POST /notifications]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }
 
-// GET /api/v1/bot/notifications — List notifications
+// GET /api/v1/bot/notifications — List notifications with pagination
 export async function GET(req: NextRequest) {
     const authError = validateApiKey(req)
     if (authError) return authError
 
     try {
         const { searchParams } = new URL(req.url)
-        const type = searchParams.get('type')
-        const isRead = searchParams.get('isRead')
-        const limit = Math.min(100, parseInt(searchParams.get('limit') || '50'))
+        const type    = searchParams.get('type')
+        const isRead  = searchParams.get('isRead')
+        const { page, limit, skip } = parsePagination(searchParams)
 
         const where: any = {}
         if (type) where.type = type
-        if (isRead === 'true') where.isRead = true
+        if (isRead === 'true')  where.isRead = true
         if (isRead === 'false') where.isRead = false
 
-        const [notifications, unreadCount] = await Promise.all([
+        const [total, notifications, unreadCount] = await Promise.all([
+            prisma.aiNotification.count({ where }),
             prisma.aiNotification.findMany({
                 where,
                 include: {
                     person: { select: { id: true, name: true } },
                 },
                 orderBy: { createdAt: 'desc' },
+                skip,
                 take: limit,
             }),
             prisma.aiNotification.count({ where: { isRead: false } }),
         ])
 
-        return NextResponse.json({
-            success: true,
-            data: notifications,
-            unreadCount,
+        return apiSuccess(notifications, 200, {
             count: notifications.length,
+            unreadCount,
+            pagination: paginationMeta(total, page, limit),
         })
     } catch (error) {
         console.error('API Error [GET /notifications]:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

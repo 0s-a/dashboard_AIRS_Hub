@@ -48,12 +48,18 @@ export async function safeAction<T>(
             return { success: false, error: 'لا يمكن الحذف — مرتبط بعناصر أخرى' }
         }
 
+        // If the error has a human-readable message (thrown explicitly), show it
+        if (error?.message && typeof error.message === 'string' && error.message.length < 200) {
+            return { success: false, error: error.message }
+        }
+
         return {
             success: false,
             error: errorMessage || 'حدث خطأ غير متوقع',
         }
     }
 }
+
 
 /**
  * Same as safeAction but also calls revalidatePath after success.

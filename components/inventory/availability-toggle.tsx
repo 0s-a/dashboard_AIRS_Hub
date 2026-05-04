@@ -17,7 +17,7 @@ export function AvailabilityToggle({ id, isAvailable: initialStatus }: Availabil
         // Optimistic update
         setIsAvailable(checked)
 
-        const result = await toggleProductAvailability(id, isAvailable)
+        const result = await toggleProductAvailability(id, !checked)
 
         if (!result.success) {
             // Revert on failure

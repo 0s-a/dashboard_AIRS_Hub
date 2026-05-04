@@ -117,6 +117,27 @@ export type ProductsFilters = {
     sortDir?: 'asc' | 'desc'
 }
 
+// ─── Serialized Product (output of serializeProduct) ─────────
+
+/** The shape returned by serializeProduct() — used in table/list views */
+export type SerializedProduct = {
+    id: string
+    itemNumber: string
+    name: string
+    brand: string | null
+    description: string | null
+    isAvailable: boolean
+    alternativeNames: string[] | null
+    tags: string[] | null
+    categoryId: string | null
+    createdAt: Date
+    updatedAt: Date
+    mediaImages: ProductMediaImage[]
+    variants: ProductVariantWithImages[]
+    productPrices: SerializedPrice[]
+    productUnits: ProductUnitEntry[]
+}
+
 // ─── Full Product Detail Type (for detail page) ──────────────
 
 /** Full product data shape for the product detail page */
@@ -152,6 +173,7 @@ export type ProductVariantWithImages = {
     name: string
     type: string
     hex: string | null
+    price?: number | null
     order: number
     isDefault: boolean
     imageCount: number

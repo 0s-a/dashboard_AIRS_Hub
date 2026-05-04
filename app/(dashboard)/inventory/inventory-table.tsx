@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { DataTable } from "@/components/ui/data-table"
-import { columns, customGlobalFilterFn } from "./columns"
+import { columns } from "./columns"
 import { VariantsList } from "@/components/inventory/variants-list"
 import { ServerPagination } from "@/components/ui/server-pagination"
 import { Badge } from "@/components/ui/badge"
@@ -76,6 +76,13 @@ export function InventoryTable({
 
     useEffect(() => { setIsMounted(true) }, [])
 
+    // ── Cleanup debounce timer on unmount ─────────────────────
+    useEffect(() => {
+        return () => {
+            if (searchDebounce.current) clearTimeout(searchDebounce.current)
+        }
+    }, [])
+
     // ── Core fetch function ──────────────────────────────────
     const fetchProducts = useCallback((params: {
         search?: string
@@ -104,6 +111,11 @@ export function InventoryTable({
             }
         })
     }, [limit])
+
+    // ── Re-fetch after product deletion ───────────────────────
+    const handleProductDeleted = useCallback(() => {
+        fetchProducts({ ...currentFilters(), page })
+    }, [fetchProducts, page])
 
     // ── Helpers: build complete filter params from current state ────────────
     // NOTE: each handler passes its NEW value directly to avoid reading stale state
@@ -379,6 +391,8 @@ export function InventoryTable({
                     columns={columns}
                     data={products}
                     showSearch={false}
+                    showPagination={false}
+                    totalCount={pagination.total}
                     groupingOptions={[
                         { id: "brand",       label: "البراند" },
                         { id: "isAvailable", label: "الحالة" },
@@ -398,8 +412,7 @@ export function InventoryTable({
 
                         return <VariantsList variants={variantsWithDefaults} />
                     }}
-                    globalFilterFn={customGlobalFilterFn}
-                    onRefresh={onRefresh}
+                    onRefresh={handleProductDeleted}
                 />
             </div>
 

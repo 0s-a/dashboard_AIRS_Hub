@@ -117,7 +117,7 @@ export function VariantsList({ variants }: VariantsListProps) {
                             <div className="flex items-center justify-between gap-2 mt-auto">
                                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/30 px-2 py-0.5 rounded-full border border-border/20">
                                     <TagIcon className="h-3 w-3" />
-                                    <span>Suffix: {variant.suffix}</span>
+                                    <span>اللاحقة: {variant.suffix}</span>
                                 </div>
                                 
                                 {variant.price ? (

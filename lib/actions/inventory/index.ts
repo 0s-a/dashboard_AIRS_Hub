@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 
 // Types (re-exported so consumers can import from one place)
-export type { ProductInput, SerializedPrice, ProductUnitEntry, PaginationMeta, ProductsFilters } from '@/lib/types/product'
+export type { ProductInput, SerializedPrice, SerializedProduct, ProductUnitEntry, PaginationMeta, ProductsFilters } from '@/lib/types/product'
 
 // Queries (read-only)
 export {

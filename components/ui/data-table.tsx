@@ -47,6 +47,8 @@ interface DataTableProps<TData, TValue> {
     data: TData[]
     searchPlaceholder?: string
     showSearch?: boolean
+    showPagination?: boolean
+    totalCount?: number
     groupingOptions?: GroupingOption[]
     renderSubComponent?: (props: { row: any }) => React.ReactElement
     globalFilterFn?: (row: any, columnId: string, filterValue: string) => boolean
@@ -68,6 +70,8 @@ export function DataTable<TData, TValue>({
     data,
     searchPlaceholder = "ابحث...",
     showSearch = true,
+    showPagination = true,
+    totalCount,
     groupingOptions = [],
     renderSubComponent,
     globalFilterFn,
@@ -125,6 +129,7 @@ export function DataTable<TData, TValue>({
         onSortingChange: setSorting,
         onGroupingChange: setGrouping,
         onExpandedChange: setExpanded,
+        manualPagination: !showPagination,
         getCoreRowModel: coreRowModel,
         getFilteredRowModel: filteredRowModel,
         getPaginationRowModel: paginationRowModel,
@@ -156,7 +161,7 @@ export function DataTable<TData, TValue>({
     return (
         <div className="space-y-4">
             {/* Header / Toolbar Area */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                 <div className="flex flex-1 items-center gap-4">
                     {/* Search Bar UI */}
                     {showSearch && (
@@ -167,7 +172,7 @@ export function DataTable<TData, TValue>({
                                 placeholder={searchPlaceholder}
                                 value={globalFilter ?? ""}
                                 onChange={(e) => setGlobalFilter(e.target.value)}
-                                className="pr-10 pl-12 h-11 rounded-xl bg-background border-border/50 focus-visible:ring-primary/20 focus-visible:border-primary transition-all shadow-sm"
+                                className="pr-10 pl-12 h-9 rounded-xl bg-background border-border/50 focus-visible:ring-primary/20 focus-visible:border-primary transition-all shadow-sm"
                             />
                             {globalFilter && (
                                 <button
@@ -190,7 +195,7 @@ export function DataTable<TData, TValue>({
                                 value={grouping[0] || "none"}
                                 onValueChange={(val) => setGrouping(val === "none" ? [] : [val])}
                             >
-                                <SelectTrigger className="h-11 rounded-xl glass-panel border-border/50">
+                                <SelectTrigger className="h-9 rounded-xl glass-panel border-border/50">
                                     <div className="flex items-center gap-2">
                                         <Layers className="h-4 w-4 text-muted-foreground" />
                                         <SelectValue placeholder="تجميع حسب..." />
@@ -214,21 +219,21 @@ export function DataTable<TData, TValue>({
                         onClick={handleRefresh}
                         disabled={isRefreshing}
                         title="تحديث البيانات"
-                        className="group relative h-9 w-9 flex items-center justify-center rounded-xl border border-border/50 bg-background hover:bg-primary/5 hover:border-primary/30 hover:shadow-sm active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group relative h-8 w-8 flex items-center justify-center rounded-xl border border-border/50 bg-background hover:bg-primary/5 hover:border-primary/30 hover:shadow-sm active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <RefreshCcw className={cn(
-                            "h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors",
+                            "h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors",
                             isRefreshing && "animate-spin"
                         )} />
                     </button>
-                    <div className="text-xs text-muted-foreground font-medium bg-muted/30 px-3 py-1.5 rounded-lg border border-border/40 whitespace-nowrap">
-                        العدد الإجمالي: <span className="text-foreground font-bold">{data.length}</span>
+                    <div className="text-[11px] text-muted-foreground font-medium bg-muted/30 px-2.5 py-1 rounded-lg border border-border/40 whitespace-nowrap">
+                        الإجمالي: <span className="text-foreground font-bold">{(totalCount ?? data.length).toLocaleString('ar-EG')}</span>
                     </div>
                 </div>
             </div>
 
-            <div className="card-premium overflow-hidden flex flex-col max-h-[calc(100vh-280px)]">
-                <div className="overflow-auto custom-scrollbar">
+            <div className="card-premium overflow-hidden flex flex-col max-h-[calc(100vh-200px)]">
+                <div className="overflow-auto custom-scrollbar flex-1">
                     <Table>
                         <TableHeader className="bg-muted/30 sticky top-0 z-10 backdrop-blur-md shadow-sm">
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -240,9 +245,14 @@ export function DataTable<TData, TValue>({
                                         <TableHead
                                             key={header.id}
                                             className={cn(
-                                                "h-10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right",
+                                                "h-9 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right",
                                                 isSortable && "cursor-pointer select-none hover:text-foreground transition-colors"
                                             )}
+                                            style={{
+                                                width: header.getSize() !== 150 ? header.getSize() : undefined,
+                                                minWidth: header.column.columnDef.minSize,
+                                                maxWidth: header.column.columnDef.maxSize,
+                                            }}
                                             onClick={header.column.getToggleSortingHandler()}
                                         >
                                             <div className="flex items-center justify-end gap-2">
@@ -289,9 +299,14 @@ export function DataTable<TData, TValue>({
                                                     <TableCell
                                                         key={cell.id}
                                                         className={cn(
-                                                            "px-3 py-2",
-                                                            isGrouped && "py-2"
+                                                            "px-2 py-1.5",
+                                                            isGrouped && "py-1.5"
                                                         )}
+                                                        style={{
+                                                            width: cell.column.getSize() !== 150 ? cell.column.getSize() : undefined,
+                                                            minWidth: cell.column.columnDef.minSize,
+                                                            maxWidth: cell.column.columnDef.maxSize,
+                                                        }}
                                                     >
                                                         {cell.getIsGrouped() ? (
                                                             <div
@@ -330,7 +345,7 @@ export function DataTable<TData, TValue>({
                                         </TableRow>
                                         {row.getIsExpanded() && renderSubComponent && (
                                             <TableRow className="hover:bg-transparent bg-muted/5 border-b border-border/40">
-                                                <TableCell colSpan={row.getVisibleCells().length} className="p-4">
+                                                <TableCell colSpan={row.getVisibleCells().length} className="p-3">
                                                     {renderSubComponent({ row })}
                                                 </TableCell>
                                             </TableRow>
@@ -373,6 +388,7 @@ export function DataTable<TData, TValue>({
             </div>
 
             {/* Pagination UI */}
+            {showPagination && (
             <div className="flex items-center justify-between px-2 py-4 border-t border-border/40">
                 <div className="flex-1 text-sm text-muted-foreground">
                     <div className="flex items-center gap-6">
@@ -397,7 +413,7 @@ export function DataTable<TData, TValue>({
                             </Select>
                         </div>
                         <span className="hidden sm:inline-block">
-                            إجمالي العناصر: <span className="font-bold text-foreground">{data.length}</span>
+                            إجمالي العناصر: <span className="font-bold text-foreground">{(totalCount ?? data.length).toLocaleString('ar-EG')}</span>
                         </span>
                     </div>
                 </div>
@@ -446,6 +462,7 @@ export function DataTable<TData, TValue>({
                     </div>
                 </div>
             </div>
+            )}
         </div>
     )
 }

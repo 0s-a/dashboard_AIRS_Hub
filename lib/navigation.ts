@@ -14,6 +14,7 @@ import {
     Megaphone,
     Ruler,
     Sparkles,
+    Bookmark,
 } from "lucide-react"
 
 export const navigationGroups = [
@@ -26,8 +27,9 @@ export const navigationGroups = [
     {
         title: "إدارة المخزون",
         items: [
-            { href: "/inventory", label: "المخزون", icon: Package },
-            { href: "/categories", label: "التصنيفات", icon: Layers },
+            { href: "/inventory",  label: "المخزون",     icon: Package  },
+            { href: "/categories", label: "التصنيفات",  icon: Layers   },
+            { href: "/brands",     label: "البراندات",   icon: Bookmark },
         ]
     },
     {

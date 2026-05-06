@@ -52,11 +52,15 @@ type ProductData = {
     id: string
     itemNumber: string
     name: string
-    brand: string | null
+    brandId: string | null
+    brandRef: {
+        id: string
+        name: string
+        code: string
+        logo: string | null
+    } | null
     description: string | null
-    unit: string
-    packaging: string | null
-    productPrices: Array<{ id: string; priceLabelId: string; priceLabelName: string; currencyId: string; currencySymbol: string; currencyName: string; value: number; unit: string | null; quantity: number | null }>
+    productPrices: Array<{ id: string; priceLabelId: string; priceLabelName: string; currencyId: string; currencySymbol: string; currencyName: string; value: number; unitId: string; unitName: string; conversionFactor: number; isAutoCalculated: boolean }>
     isAvailable: boolean
     variants: VariantWithImages[]
     mediaImages: ProductImageRecord[]
@@ -220,25 +224,14 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                         <Copy className="h-3 w-3 text-muted-foreground/50" />
                                     )}
                                 </Badge>
-                                {product.brand && (
+                                {product.brandRef && (
                                     <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15">
-                                        {product.brand}
+                                        {product.brandRef.name}
                                     </Badge>
                                 )}
                             </div>
                         </div>
 
-                        {/* Basic Details Grid */}
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                            <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors border border-border/30">
-                                <p className="text-xs text-muted-foreground">الوحدة الأساسية</p>
-                                <p className="font-semibold text-sm">{product.unit}</p>
-                            </div>
-                            <div className="space-y-1 p-3 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors border border-border/30">
-                                <p className="text-xs text-muted-foreground">التعبئة</p>
-                                <p className="font-semibold text-sm">{product.packaging || "غير محدد"}</p>
-                            </div>
-                        </div>
 
                         {/* Description */}
                         {product.description && (

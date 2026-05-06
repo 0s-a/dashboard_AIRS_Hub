@@ -37,10 +37,10 @@ export async function GET(req: NextRequest) {
         const where: any = {}
         if (search) {
             where.OR = [
-                { name: { contains: search, mode: 'insensitive' } },
-                { itemNumber: { contains: search, mode: 'insensitive' } },
-                { brand: { contains: search, mode: 'insensitive' } },
+                { name:        { contains: search, mode: 'insensitive' } },
+                { itemNumber:  { contains: search, mode: 'insensitive' } },
                 { description: { contains: search, mode: 'insensitive' } },
+                { brandRef: { name: { contains: search, mode: 'insensitive' } } },
             ]
         }
         if (available === 'true') where.isAvailable = true
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
             id: p.id,
             itemNumber: p.itemNumber,
             name: p.name,
-            brand: p.brand,
+            brandId:     p.brandId,
             description: p.description,
             isAvailable: p.isAvailable,
             category: p.category,

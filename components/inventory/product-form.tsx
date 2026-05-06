@@ -18,10 +18,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { createProduct, updateProduct } from "@/lib/actions/inventory"
 import { getCategories } from "@/lib/actions/categories"
+import { getBrands } from "@/lib/actions/brands"
 
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { Product, Category } from "@prisma/client"
+import { Product, Category, Brand } from "@prisma/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useState, useEffect } from "react"
@@ -40,7 +41,7 @@ import { Loader2, X, Trash2, Plus, Hash } from "lucide-react"
 const formSchema = z.object({
     itemNumber: z.string().min(1, { message: "رقم الصنف مطلوب" }),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
-    brand: z.string().optional().nullable(),
+    brandId: z.string().optional().nullable(),
     description: z.string().optional().nullable(),
     isAvailable: z.boolean().default(true),
     categoryId: z.string().optional().nullable(),
@@ -58,29 +59,34 @@ interface ProductFormProps {
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
     const router = useRouter()
     const [categories, setCategories] = useState<Category[]>([])
+    const [brands, setBrands]         = useState<Brand[]>([])
 
     useEffect(() => {
         loadCategories()
+        loadBrands()
     }, [])
 
     const loadCategories = async () => {
-        const res = await getCategories(true) // Load only active categories
-        if (res.success && res.data) {
-            setCategories(res.data)
-        }
+        const res = await getCategories(true)
+        if (res.success && res.data) setCategories(res.data)
+    }
+
+    const loadBrands = async () => {
+        const res = await getBrands()
+        if (res.success && res.data) setBrands(res.data as Brand[])
     }
 
     const form = useForm({
         resolver: zodResolver(formSchema) as any,
         defaultValues: {
-            itemNumber: product?.itemNumber || "",
-            name: product?.name || "",
-            brand: (product as any)?.brand || "",
-            description: product?.description || "",
-            categoryId: (product as any)?.categoryId || "",
-            isAvailable: product?.isAvailable ?? true,
+            itemNumber:       product?.itemNumber || "",
+            name:             product?.name || "",
+            brandId:          (product as any)?.brandId || null,
+            description:      product?.description || "",
+            categoryId:       (product as any)?.categoryId || "",
+            isAvailable:      product?.isAvailable ?? true,
             alternativeNames: (product as any)?.alternativeNames || [],
-            tags: (product as any)?.tags || [],
+            tags:             (product as any)?.tags || [],
         },
     } as any)
 
@@ -225,13 +231,33 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                     />
                     <FormField
                         control={form.control}
-                        name="brand"
+                        name="brandId"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>البراند (العلامة التجارية)</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Apple، Samsung..." {...field} />
-                                </FormControl>
+                                <FormLabel>البراند</FormLabel>
+                                <Select
+                                    onValueChange={v => field.onChange(v === "none" ? null : v)}
+                                    value={field.value ?? "none"}
+                                >
+                                    <FormControl>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="اختر البراند" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="none" className="text-muted-foreground text-sm">
+                                            بدون براند
+                                        </SelectItem>
+                                        {brands.map(b => (
+                                            <SelectItem key={b.id} value={b.id}>
+                                                {b.name}
+                                                {(b as any).code && (
+                                                    <span className="mr-2 text-xs text-muted-foreground font-mono">{(b as any).code}</span>
+                                                )}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}

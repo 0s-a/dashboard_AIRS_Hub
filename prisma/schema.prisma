@@ -11,11 +11,12 @@ model Product {
   id               String                   @id @default(uuid())
   itemNumber       String                   @unique
   name             String
-  brand            String?
+  brandId          String?
+  brandRef         Brand?                   @relation(fields: [brandId], references: [id], onDelete: SetNull)
   description      String?
   isAvailable      Boolean                  @default(true)
   alternativeNames Json?
-  tags             Json? // ["tag1", "tag2", ...]
+  tags             Json?
   categoryId       String?
   category         Category?                @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt        DateTime                 @default(now())
@@ -27,6 +28,17 @@ model Product {
   orderItems       OrderItem[]
   notifications    AiNotification[]
   search_vector    Unsupported("tsvector")?
+}
+
+model Brand {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  code        String    @unique // 2-letter code e.g. "SM" — used in item numbers
+  logo        String?   // URL path to uploaded logo image
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
 }
 
 model Category {

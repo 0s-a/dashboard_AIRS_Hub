@@ -28,7 +28,7 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
         const {
             search,
             categoryId,
-            brand,
+            brandId,
             isAvailable,
             hasPrices,
             page = 1,
@@ -49,8 +49,8 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
             where.OR = [
                 { name:        { contains: q, mode: 'insensitive' } },
                 { itemNumber:  { contains: q, mode: 'insensitive' } },
-                { brand:       { contains: q, mode: 'insensitive' } },
                 { description: { contains: q, mode: 'insensitive' } },
+                { brandRef: { name: { contains: q, mode: 'insensitive' } } },
                 { variants: { some: {
                     OR: [
                         { name:          { contains: q, mode: 'insensitive' } },
@@ -62,7 +62,7 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
         }
 
         if (categoryId && categoryId !== 'all') where.categoryId = categoryId
-        if (brand && brand !== 'all') where.brand = brand
+        if (brandId   && brandId   !== 'all') where.brandId = brandId
         if (typeof isAvailable === 'boolean') where.isAvailable = isAvailable
         if (hasPrices === true)  where.productPrices = { some: {} }
         if (hasPrices === false) where.productPrices = { none: {} }
@@ -108,11 +108,9 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
 export async function getProductFilterOptions() {
     try {
         const [brands, categories] = await Promise.all([
-            prisma.product.findMany({
-                where:   { brand: { not: null } },
-                select:  { brand: true },
-                distinct: ['brand'],
-                orderBy: { brand: 'asc' },
+            prisma.brand.findMany({
+                select:  { id: true, name: true, code: true },
+                orderBy: { name: 'asc' },
             }),
             prisma.category.findMany({
                 where:   { isActive: true },
@@ -123,7 +121,7 @@ export async function getProductFilterOptions() {
 
         return {
             success: true,
-            brands: brands.map(b => b.brand!).filter(Boolean),
+            brands,      // { id, name, code }[]
             categories,
         }
     } catch (error) {
@@ -158,8 +156,8 @@ export async function searchProducts(query: string) {
                 OR: [
                     { name:        { contains: q, mode: 'insensitive' } },
                     { itemNumber:  { contains: q, mode: 'insensitive' } },
-                    { brand:       { contains: q, mode: 'insensitive' } },
                     { description: { contains: q, mode: 'insensitive' } },
+                    { brandRef: { name: { contains: q, mode: 'insensitive' } } },
                 ],
             },
             orderBy: { name: 'asc' },

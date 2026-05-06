@@ -56,7 +56,7 @@ export function validateProductImages(images: ProductImage[]): { valid: boolean;
 export interface ProductInput {
     itemNumber: string
     name: string
-    brand?: string | null
+    brandId?: string | null
     description?: string | null
     isAvailable?: boolean
     categoryId?: string | null
@@ -108,7 +108,7 @@ export type PaginationMeta = {
 export type ProductsFilters = {
     search?: string
     categoryId?: string
-    brand?: string
+    brandId?: string
     isAvailable?: boolean
     hasPrices?: boolean
     page?: number
@@ -124,7 +124,13 @@ export type SerializedProduct = {
     id: string
     itemNumber: string
     name: string
-    brand: string | null
+    brandId: string | null
+    brandRef: {
+        id: string
+        name: string
+        code: string
+        logo: string | null
+    } | null
     description: string | null
     isAvailable: boolean
     alternativeNames: string[] | null

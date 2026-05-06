@@ -59,7 +59,7 @@ export const customGlobalFilterFn = (row: any, columnId: string, filterValue: st
     // Primary fields
     if (product.name?.toLowerCase().includes(searchValue)) return true
     if (product.itemNumber?.toLowerCase().includes(searchValue)) return true
-    if (product.brand?.toLowerCase().includes(searchValue)) return true
+    if (product.brandRef?.name?.toLowerCase().includes(searchValue)) return true
     if (product.description?.toLowerCase().includes(searchValue)) return true
     if (product.category?.name?.toLowerCase().includes(searchValue)) return true
 
@@ -443,23 +443,42 @@ export const columns: ColumnDef<SerializedProduct>[] = [
         cell: ({ row }) => <ProductNameCell product={row.original} row={row} />,
     },
 
+    // ── Brand column ──────────────────────────────────────────
     {
-        accessorKey: "brand",
+        id: "brand",
         header: "البراند",
-        enableGrouping: true,
-        size: 100,
-        maxSize: 130,
+        size: 110,
+        maxSize: 140,
         cell: ({ row }) => {
-            const brand = row.original.brand
+            const brand = row.original.brandRef
+            if (!brand) return <span className="text-xs text-muted-foreground">—</span>
+
+            const gradients = [
+                "from-violet-500 to-purple-600",
+                "from-blue-500  to-cyan-600",
+                "from-emerald-500 to-teal-600",
+                "from-orange-500 to-amber-600",
+                "from-rose-500  to-pink-600",
+            ]
+            const gradient = gradients[brand.name.charCodeAt(0) % gradients.length]
+
             return (
-                <div className="flex items-center">
-                    {brand ? (
-                        <Badge variant="outline" className="px-2 py-1 text-xs bg-primary/10 text-primary font-medium border-primary/20 hover:bg-primary/20">
-                            {brand}
-                        </Badge>
+                <div className="flex items-center gap-2">
+                    {brand.logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={brand.logo}
+                            alt={brand.name}
+                            className="h-6 w-6 rounded-md object-contain border border-border/40 bg-white p-0.5 shrink-0"
+                        />
                     ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
+                        <div className={`h-6 w-6 rounded-md bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
+                            {brand.code}
+                        </div>
                     )}
+                    <span className="text-xs font-medium truncate max-w-[70px]" title={brand.name}>
+                        {brand.name}
+                    </span>
                 </div>
             )
         },

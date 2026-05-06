@@ -30,7 +30,7 @@ export async function getProductsByTag(tag: string) {
                 tags: true,
                 isAvailable: true,
                 productImages: { include: { mediaImage: { select: { url: true } } }, where: { isPrimary: true }, take: 1 },
-                brand: true,
+                brandId: true,
             },
             orderBy: { name: 'asc' }
         })

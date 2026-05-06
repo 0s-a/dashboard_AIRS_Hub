@@ -35,13 +35,19 @@ interface FilterOption {
     name: string
 }
 
+interface BrandOption {
+    id: string
+    name: string
+    code: string | null
+}
+
 interface InventoryTableProps {
     // Initial SSR data
     initialProducts: any[]
     initialPagination: PaginationMeta
     // Filter options (fetched server-side once)
     filterCategories: FilterOption[]
-    filterBrands: string[]
+    filterBrands: BrandOption[]
     onRefresh?: () => void | Promise<void>
 }
 
@@ -87,7 +93,7 @@ export function InventoryTable({
     const fetchProducts = useCallback((params: {
         search?: string
         categoryId?: string
-        brand?: string
+        brandId?: string
         isAvailable?: boolean
         hasPrices?: boolean
         page?: number
@@ -97,7 +103,7 @@ export function InventoryTable({
             const res = await getProductsPaginated({
                 search:      params.search,
                 categoryId:  params.categoryId,
-                brand:       params.brand,
+                brandId:     params.brandId,
                 isAvailable: params.isAvailable,
                 hasPrices:   params.hasPrices,
                 page:        params.page ?? 1,
@@ -122,7 +128,7 @@ export function InventoryTable({
     const currentFilters = () => ({
         search:      search || undefined,
         categoryId:  filterCategory !== "all" ? filterCategory : undefined,
-        brand:       filterBrand    !== "all" ? filterBrand    : undefined,
+        brandId:     filterBrand    !== "all" ? filterBrand    : undefined,
         isAvailable: filterAvail    === "available"   ? true
                    : filterAvail    === "unavailable" ? false
                    : undefined,
@@ -152,7 +158,7 @@ export function InventoryTable({
     const handleBrandChange = (value: string) => {
         setFilterBrand(value)
         setPage(1)
-        fetchProducts({ ...currentFilters(), brand: value !== "all" ? value : undefined, page: 1 })
+        fetchProducts({ ...currentFilters(), brandId: value !== "all" ? value : undefined, page: 1 })
     }
 
     const handleAvailChange = (value: "all" | "available" | "unavailable") => {
@@ -286,7 +292,10 @@ export function InventoryTable({
                         <SelectContent className="rounded-xl">
                             <SelectItem value="all" className="text-xs rounded-lg">كل البراندات</SelectItem>
                             {filterBrands.map(b => (
-                                <SelectItem key={b} value={b} className="text-xs rounded-lg">{b}</SelectItem>
+                                <SelectItem key={b.id} value={b.id} className="text-xs rounded-lg">
+                                    {b.name}
+                                    {b.code && <span className="mr-1 text-muted-foreground font-mono"> · {b.code}</span>}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -342,7 +351,7 @@ export function InventoryTable({
                             className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
                             onClick={() => handleBrandChange("all")}
                         >
-                            {filterBrand}
+                            {filterBrands.find(b => b.id === filterBrand)?.name ?? filterBrand}
                             <X className="h-2.5 w-2.5" />
                         </Badge>
                     )}
@@ -394,7 +403,6 @@ export function InventoryTable({
                     showPagination={false}
                     totalCount={pagination.total}
                     groupingOptions={[
-                        { id: "brand",       label: "البراند" },
                         { id: "isAvailable", label: "الحالة" },
                     ]}
                     renderSubComponent={({ row }) => {

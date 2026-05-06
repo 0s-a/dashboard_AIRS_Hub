@@ -47,7 +47,7 @@ function mapRecord(v: any): VariantRecord {
         name: v.name,
         type: v.type,
         hex: v.hex,
-        price: v.price,
+        price: v.price != null ? Number(v.price) : null,   // Decimal → number
         order: v.order,
         isDefault: v.isDefault,
     }

@@ -16,7 +16,6 @@ export default function CategoriesPage() {
     useEffect(() => {
         loadCategories()
 
-        // Listen for edit events from the table
         const handleEdit = (e: Event) => {
             const customEvent = e as CustomEvent
             setSelectedCategory(customEvent.detail)
@@ -39,8 +38,6 @@ export default function CategoriesPage() {
         setSelectedCategory(undefined)
         loadCategories()
     }
-
-    const activeCount = categories.filter(c => c.isActive).length
 
     return (
         <div className="space-y-6">
@@ -66,32 +63,17 @@ export default function CategoriesPage() {
                 </Button>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
-                <div className="glass-panel rounded-xl p-6 border border-border/50">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">إجمالي التصنيفات</p>
-                            <h3 className="text-3xl font-bold mt-2">{categories.length}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                            <Layers className="size-6 text-primary" />
-                        </div>
+            {/* Stats Card */}
+            <div className="glass-panel rounded-xl p-6 border border-border/50 w-fit min-w-48">
+                <div className="flex items-center justify-between gap-8">
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground">إجمالي التصنيفات</p>
+                        <h3 className="text-3xl font-bold mt-2">{categories.length}</h3>
+                    </div>
+                    <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Layers className="size-6 text-primary" />
                     </div>
                 </div>
-
-                <div className="glass-panel rounded-xl p-6 border border-border/50">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">التصنيفات النشطة</p>
-                            <h3 className="text-3xl font-bold mt-2">{activeCount}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                            <span className="text-2xl">✓</span>
-                        </div>
-                    </div>
-                </div>
-
             </div>
 
             {/* Table */}

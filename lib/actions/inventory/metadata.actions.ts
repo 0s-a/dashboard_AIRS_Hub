@@ -22,11 +22,12 @@ export async function addAlternativeNameToProduct(productId: string, newName: st
             return { success: false, error: 'هذا الاسم البديل موجود بالفعل' }
         }
 
-        const updated = await prisma.product.update({
+        await prisma.product.update({
             where: { id: productId },
             data: { alternativeNames: [...current, trimmed] as any },
         })
 
+        const updated = await requireProduct(productId)
         revalidateProduct(productId)
         return { success: true, data: serializeProduct(updated) }
     } catch (error: any) {
@@ -46,11 +47,12 @@ export async function removeAlternativeNameFromProduct(productId: string, name: 
             return { success: false, error: 'الاسم البديل غير موجود' }
         }
 
-        const updated = await prisma.product.update({
+        await prisma.product.update({
             where: { id: productId },
             data: { alternativeNames: remaining.length ? (remaining as any) : Prisma.JsonNull },
         })
 
+        const updated = await requireProduct(productId)
         revalidateProduct(productId)
         return { success: true, data: serializeProduct(updated) }
     } catch (error: any) {
@@ -74,11 +76,12 @@ export async function addTagToProduct(productId: string, newTag: string) {
             return { success: false, error: 'هذا الوسم موجود بالفعل' }
         }
 
-        const updated = await prisma.product.update({
+        await prisma.product.update({
             where: { id: productId },
             data: { tags: [...current, trimmed] as any },
         })
 
+        const updated = await requireProduct(productId)
         revalidateProduct(productId)
         return { success: true, data: serializeProduct(updated) }
     } catch (error: any) {
@@ -98,11 +101,12 @@ export async function removeTagFromProduct(productId: string, tag: string) {
             return { success: false, error: 'الوسم غير موجود' }
         }
 
-        const updated = await prisma.product.update({
+        await prisma.product.update({
             where: { id: productId },
             data: { tags: remaining.length ? (remaining as any) : Prisma.JsonNull },
         })
 
+        const updated = await requireProduct(productId)
         revalidateProduct(productId)
         return { success: true, data: serializeProduct(updated) }
     } catch (error: any) {

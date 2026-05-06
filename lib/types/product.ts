@@ -136,8 +136,8 @@ export type SerializedProduct = {
     alternativeNames: string[] | null
     tags: string[] | null
     categoryId: string | null
-    createdAt: Date
-    updatedAt: Date
+    createdAt: string
+    updatedAt: string
     mediaImages: ProductMediaImage[]
     variants: ProductVariantWithImages[]
     productPrices: SerializedPrice[]
@@ -167,8 +167,8 @@ export type ProductDetailData = {
         name: string
         color: string | null
     }>
-    createdAt: Date
-    updatedAt: Date
+    createdAt: string
+    updatedAt: string
 }
 
 /** Variant with image links — used in product detail */

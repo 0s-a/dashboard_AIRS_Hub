@@ -113,7 +113,6 @@ export async function getProductFilterOptions() {
                 orderBy: { name: 'asc' },
             }),
             prisma.category.findMany({
-                where:   { isActive: true },
                 select:  { id: true, name: true, icon: true },
                 orderBy: { name: 'asc' },
             }),

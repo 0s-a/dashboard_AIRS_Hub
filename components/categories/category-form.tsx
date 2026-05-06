@@ -15,18 +15,20 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
 import { createCategory, updateCategory } from "@/lib/actions/categories"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Category } from "@prisma/client"
 
 const formSchema = z.object({
-    itemNumber: z.string().optional(),
+    code: z
+        .string()
+        .min(3, { message: "الكود يجب أن يكون 3 خانات بالضبط" })
+        .max(3, { message: "الكود يجب أن يكون 3 خانات فقط" })
+        .regex(/^[A-Za-z0-9]{3}$/, { message: "الكود يجب أن يحتوي على أحرف إنجليزية أو أرقام فقط" }),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     description: z.string().nullable().optional(),
     icon: z.string().nullable().optional(),
-    isActive: z.boolean(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -39,18 +41,17 @@ interface CategoryFormProps {
 export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
     const router = useRouter()
 
-    const form = useForm({
+    const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            itemNumber: category?.itemNumber ?? undefined,
+            code: category?.code ?? "",
             name: category?.name || "",
             description: category?.description || "",
             icon: category?.icon || "",
-            isActive: category?.isActive ?? true,
         },
     })
 
-    async function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: FormValues) {
         try {
             let res
             if (category) {
@@ -66,7 +67,7 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
             } else {
                 toast.error(res.error || "حدث خطأ ما")
             }
-        } catch (error) {
+        } catch {
             toast.error("خطأ في الإرسال")
         }
     }
@@ -74,20 +75,34 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
+                {/* Code — الحقل الأول والأهم */}
                 <FormField
                     control={form.control}
-                    name="itemNumber"
+                    name="code"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>رقم الصنف</FormLabel>
+                            <FormLabel>كود التصنيف *</FormLabel>
                             <FormControl>
-                                <Input placeholder="مثال: CAT-001" {...field} />
+                                <Input
+                                    placeholder="مثال: ELC"
+                                    maxLength={3}
+                                    className="font-mono uppercase tracking-widest text-center text-lg w-28"
+                                    {...field}
+                                    onChange={(e) =>
+                                        field.onChange(e.target.value.toUpperCase())
+                                    }
+                                />
                             </FormControl>
+                            <FormDescription className="text-xs">
+                                3 أحرف إنجليزية أو أرقام — مثال: ELC، A12، MOB
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
                 />
 
+                {/* Name */}
                 <FormField
                     control={form.control}
                     name="name"
@@ -102,6 +117,29 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
                     )}
                 />
 
+                {/* Icon */}
+                <FormField
+                    control={form.control}
+                    name="icon"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>الأيقونة/الرمز</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder="📱 أو emoji..."
+                                    {...field}
+                                    value={field.value || ""}
+                                />
+                            </FormControl>
+                            <FormDescription className="text-xs">
+                                يمكنك استخدام emoji أو نص
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                {/* Description */}
                 <FormField
                     control={form.control}
                     name="description"
@@ -118,46 +156,6 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
                                 />
                             </FormControl>
                             <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control}
-                    name="icon"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>الأيقونة/الرمز</FormLabel>
-                            <FormControl>
-                                <Input placeholder="📱 أو emoji..." {...field} value={field.value || ""} />
-                            </FormControl>
-                            <FormDescription className="text-xs">
-                                يمكنك استخدام emoji أو نص
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control}
-                    name="isActive"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-row items-center gap-2 space-y-0 rounded-md border p-4 shadow-sm">
-                            <FormControl>
-                                <Checkbox
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                                <FormLabel>
-                                    التصنيف نشط
-                                </FormLabel>
-                                <FormDescription className="text-xs">
-                                    التصنيفات النشطة فقط ستظهر في قائمة اختيار المنتجات
-                                </FormDescription>
-                            </div>
                         </FormItem>
                     )}
                 />

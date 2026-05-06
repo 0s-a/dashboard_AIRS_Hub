@@ -44,12 +44,11 @@ model Brand {
 model Category {
   id          String    @id @default(uuid())
   name        String    @unique
+  code        String    @unique // 3-char alphanumeric e.g. "ELC", "A12" — used in item numbers
   description String?
   icon        String?
-  isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  itemNumber  String?   @unique
   products    Product[]
 }
 

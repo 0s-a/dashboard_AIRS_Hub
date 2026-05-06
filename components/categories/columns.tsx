@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { Category } from "@prisma/client"
-import { MoreHorizontal, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -22,24 +22,20 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { deleteCategory, toggleCategoryStatus } from "@/lib/actions/categories"
+import { deleteCategory } from "@/lib/actions/categories"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 export const columns: ColumnDef<Category>[] = [
     {
-        accessorKey: "itemNumber",
-        header: "رقم الصنف",
-        cell: ({ row }) => {
-            const itemNumber = row.original.itemNumber
-            return (
-                <div className="font-mono text-sm font-medium">
-                    {itemNumber || "—"}
-                </div>
-            )
-        },
+        accessorKey: "code",
+        header: "الكود",
+        cell: ({ row }) => (
+            <div className="font-mono text-sm font-bold tracking-widest bg-primary/10 text-primary rounded-md px-2 py-1 inline-block">
+                {row.original.code}
+            </div>
+        ),
     },
     {
         accessorKey: "name",
@@ -47,7 +43,6 @@ export const columns: ColumnDef<Category>[] = [
         cell: ({ row }) => {
             const icon = row.original.icon
             const name = row.original.name
-
             return (
                 <div className="flex items-center gap-2">
                     {icon && <span className="text-xl">{icon}</span>}
@@ -59,28 +54,11 @@ export const columns: ColumnDef<Category>[] = [
     {
         accessorKey: "description",
         header: "الوصف",
-        cell: ({ row }) => {
-            const description = row.original.description
-            return (
-                <div className="max-w-[300px] truncate text-sm text-muted-foreground">
-                    {description || "—"}
-                </div>
-            )
-        },
-    },
-
-
-    {
-        accessorKey: "isActive",
-        header: "الحالة",
-        cell: ({ row }) => {
-            const isActive = row.original.isActive
-            return (
-                <Badge variant={isActive ? "default" : "outline"}>
-                    {isActive ? "نشط" : "غير نشط"}
-                </Badge>
-            )
-        },
+        cell: ({ row }) => (
+            <div className="max-w-[300px] truncate text-sm text-muted-foreground">
+                {row.original.description || "—"}
+            </div>
+        ),
     },
     {
         id: "actions",
@@ -88,16 +66,6 @@ export const columns: ColumnDef<Category>[] = [
             const router = useRouter()
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
             const category = row.original
-
-            const handleToggleStatus = async () => {
-                const res = await toggleCategoryStatus(category.id, category.isActive)
-                if (res.success) {
-                    toast.success(`تم ${category.isActive ? "تعطيل" : "تفعيل"} التصنيف`)
-                    router.refresh()
-                } else {
-                    toast.error("حدث خطأ ما")
-                }
-            }
 
             const handleDelete = async () => {
                 const res = await deleteCategory(category.id)
@@ -123,28 +91,14 @@ export const columns: ColumnDef<Category>[] = [
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onClick={() => {
-                                    // This will be handled by the parent page component
                                     const event = new CustomEvent("edit-category", {
-                                        detail: category
+                                        detail: category,
                                     })
                                     window.dispatchEvent(event)
                                 }}
                             >
                                 <Pencil className="ml-2 h-4 w-4" />
                                 تعديل
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleToggleStatus}>
-                                {category.isActive ? (
-                                    <>
-                                        <ToggleLeft className="ml-2 h-4 w-4" />
-                                        تعطيل
-                                    </>
-                                ) : (
-                                    <>
-                                        <ToggleRight className="ml-2 h-4 w-4" />
-                                        تفعيل
-                                    </>
-                                )}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -162,8 +116,7 @@ export const columns: ColumnDef<Category>[] = [
                             <AlertDialogHeader>
                                 <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    سيتم حذف التصنيف "{category.name}" بشكل نهائي.
-
+                                    سيتم حذف التصنيف &quot;{category.name}&quot; بشكل نهائي.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

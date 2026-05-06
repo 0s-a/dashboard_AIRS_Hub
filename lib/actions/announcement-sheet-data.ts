@@ -31,7 +31,6 @@ export async function getAnnouncementSheetData() {
 
 
             prisma.category.findMany({
-                where: { isActive: true },
                 select: { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),

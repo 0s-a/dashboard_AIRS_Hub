@@ -117,8 +117,12 @@ export function serializeProduct(product: any) {
         alternativeNames: product.alternativeNames ?? null,
         tags:             product.tags ?? null,
         categoryId:       product.categoryId ?? null,
-        createdAt:        product.createdAt,
-        updatedAt:        product.updatedAt,
+        createdAt:        product.createdAt instanceof Date
+                              ? product.createdAt.toISOString()
+                              : product.createdAt,
+        updatedAt:        product.updatedAt instanceof Date
+                              ? product.updatedAt.toISOString()
+                              : product.updatedAt,
         // ── serialized relations ──
         brandRef,
         mediaImages,

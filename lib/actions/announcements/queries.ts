@@ -294,7 +294,6 @@ export async function dbGetAnnouncementFormData() {
                 orderBy: { name: 'asc' },
             }),
             prisma.category.findMany({
-                where:   { isActive: true },
                 select:  { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),

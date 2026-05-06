@@ -67,7 +67,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
     }, [])
 
     const loadCategories = async () => {
-        const res = await getCategories(true)
+        const res = await getCategories()
         if (res.success && res.data) setCategories(res.data)
     }
 
@@ -213,7 +213,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                     <SelectContent>
                                         {categories.length === 0 ? (
                                             <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                                                لا توجد تصنيفات نشطة
+                                                لا توجد تصنيفات
                                             </div>
                                         ) : (
                                             categories.map((cat) => (

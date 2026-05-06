@@ -71,8 +71,8 @@ type ProductData = {
         name: string
         color: string | null
     }>
-    createdAt: Date
-    updatedAt: Date
+    createdAt: string
+    updatedAt: string
 }
 
 
@@ -120,7 +120,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
         setLightboxOpen(true)
     }
 
-    const formatDate = (date: Date) => {
+    const formatDate = (date: string) => {
         return new Date(date).toLocaleDateString('ar-SA', {
             year: 'numeric',
             month: 'long',

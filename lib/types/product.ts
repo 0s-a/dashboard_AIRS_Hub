@@ -92,6 +92,14 @@ export type ProductUnitEntry = {
     order: number
 }
 
+/** Serialized category returned to the client */
+export type SerializedCategory = {
+    id: string
+    name: string
+    code: string
+    icon: string | null
+}
+
 // ─── Pagination ──────────────────────────────────────────────
 
 export type PaginationMeta = {
@@ -136,6 +144,7 @@ export type SerializedProduct = {
     alternativeNames: string[] | null
     tags: string[] | null
     categoryId: string | null
+    category: SerializedCategory | null
     createdAt: string
     updatedAt: string
     mediaImages: ProductMediaImage[]
@@ -144,32 +153,6 @@ export type SerializedProduct = {
     productUnits: ProductUnitEntry[]
 }
 
-// ─── Full Product Detail Type (for detail page) ──────────────
-
-/** Full product data shape for the product detail page */
-export type ProductDetailData = {
-    id: string
-    itemNumber: string
-    name: string
-    brand: string | null
-    description: string | null
-    unit: string
-    packaging: string | null
-    productPrices: SerializedPrice[]
-    productUnits?: ProductUnitEntry[]
-    isAvailable: boolean
-    variants: ProductVariantWithImages[]
-    mediaImages: ProductMediaImage[]
-    alternativeNames: string[] | null
-    tags: string[] | null
-    productTags: Array<{
-        id: string
-        name: string
-        color: string | null
-    }>
-    createdAt: string
-    updatedAt: string
-}
 
 /** Variant with image links — used in product detail */
 export type ProductVariantWithImages = {

@@ -18,9 +18,15 @@ export async function GET(
             select: {
                 id: true,
                 name: true,
-                currencies: true,
+                personCurrencies: {
+                    include: {
+                        currency: {
+                            select: { id: true, itemNumber: true, name: true, code: true, symbol: true, isDefault: true }
+                        }
+                    }
+                },
                 personType: {
-                    select: { id: true, name: true, color: true, icon: true }
+                    select: { id: true, name: true }
                 },
                 priceLabels: {
                     include: {
@@ -34,21 +40,14 @@ export async function GET(
 
         if (!person) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
 
-        // Resolve currency IDs to full currency objects
-        const currencyIds = (person.currencies as string[]) || []
-        const currencies = currencyIds.length > 0
-            ? await prisma.currency.findMany({
-                where: { id: { in: currencyIds } },
-                select: { id: true, itemNumber: true, name: true, code: true, symbol: true, isDefault: true },
-            })
-            : []
+        const currencies = person.personCurrencies.map(pc => pc.currency)
 
         return apiSuccess({
-            personId:   person.id,
-            personName: person.name,
-            personType: person.personType,
+            personId:    person.id,
+            personName:  person.name,
+            personType:  person.personType,
             currencies,
-            priceLabels: person.priceLabels.map(pl => pl.priceLabel),
+            priceLabels: person.priceLabels.map((pl: any) => pl.priceLabel),
         })
     } catch (error) {
         console.error('API Error [GET /persons/id/pricing]:', error)

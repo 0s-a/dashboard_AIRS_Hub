@@ -37,7 +37,7 @@ export function buildPersonWhere(
                     switch (c.type) {
                         case 'type':  return { personTypeId: c.value }
                         case 'group': return { groupName: c.value }
-                        case 'tag':   return { tags: { array_contains: c.value } }
+                        case 'tag':   return { tags: { some: { tag: { name: c.value } } } }
                         default:      return {}
                     }
                 })
@@ -46,7 +46,7 @@ export function buildPersonWhere(
 
             // AND-NOT for exclusions in this group
             for (const c of exclusions) {
-                AND.push({ NOT: { tags: { array_contains: c.value } } })
+                AND.push({ NOT: { tags: { some: { tag: { name: c.value } } } } })
             }
         }
 
@@ -67,7 +67,7 @@ export function buildPersonWhere(
             OR.push({ groupName: { in: filters.groupNames } })
 
         if (filters.tags?.length)
-            OR.push({ OR: filters.tags.map(tag => ({ tags: { array_contains: tag } })) })
+            OR.push({ OR: filters.tags.map(tag => ({ tags: { some: { tag: { name: tag } } } })) })
 
         if (manualIds.length)
             OR.push({ id: { in: manualIds } })
@@ -82,7 +82,7 @@ export function buildPersonWhere(
     if (filters.excludeTags?.length) {
         AND.push({
             NOT: {
-                OR: filters.excludeTags.map(tag => ({ tags: { array_contains: tag } })),
+                OR: filters.excludeTags.map(tag => ({ tags: { some: { tag: { name: tag } } } })),
             },
         })
     }

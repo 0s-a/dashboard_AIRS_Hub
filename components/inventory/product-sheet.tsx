@@ -11,11 +11,11 @@ import {
 import { ProductForm } from "./product-form"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit } from "lucide-react"
-import { Product } from "@prisma/client"
+import { Plus } from "lucide-react"
+import type { SerializedProduct } from "@/lib/actions/inventory"
 
 interface ProductSheetProps {
-    product?: Product
+    product?: SerializedProduct
     trigger?: React.ReactNode
 }
 
@@ -23,7 +23,7 @@ export function ProductSheet({ product, trigger }: ProductSheetProps) {
     const [open, setOpen] = useState(false)
 
     return (
-        <Sheet  open={open} onOpenChange={setOpen}>
+        <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
                 {trigger || (
                     <Button className="rounded-xl shadow-lg shadow-primary/20">

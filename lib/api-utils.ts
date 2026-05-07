@@ -109,48 +109,6 @@ export function normalizePhonePatterns(input: string): string[] {
 }
 
 // ────────────────────────────────────────────────────────
-// Currency Resolution
-// ────────────────────────────────────────────────────────
-
-/**
- * Resolve currency UUID arrays (stored as JSON) to full Currency objects.
- * Works for an array of persons.
- */
-export async function resolveCurrencies(persons: any[]): Promise<any[]> {
-    const allIds = new Set<string>()
-    for (const p of persons) {
-        if (Array.isArray(p.currencies)) {
-            p.currencies.forEach((id: string) => allIds.add(id))
-        }
-    }
-    if (allIds.size === 0) return persons
-
-    const currencies = await prisma.currency.findMany({
-        where: { id: { in: Array.from(allIds) } },
-        select: { id: true, name: true, code: true, symbol: true },
-    })
-    const map = new Map(currencies.map(c => [c.id, c]))
-
-    return persons.map(p => ({
-        ...p,
-        currencies: Array.isArray(p.currencies)
-            ? p.currencies.map((id: string) => map.get(id) || { id }).filter(Boolean)
-            : [],
-    }))
-}
-
-/**
- * Resolve currency UUIDs for a single person.
- */
-export async function resolveCurrenciesSingle(person: any): Promise<any> {
-    if (!person || !Array.isArray(person.currencies) || person.currencies.length === 0) {
-        return { ...person, currencies: [] }
-    }
-    const [enriched] = await resolveCurrencies([person])
-    return enriched
-}
-
-// ────────────────────────────────────────────────────────
 // Pagination Helper
 // ────────────────────────────────────────────────────────
 

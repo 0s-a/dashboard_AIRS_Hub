@@ -80,12 +80,10 @@ export async function getPersons(options?: {
                 select: {
                     id: true,
                     name: true,
-                    address: true,
-                    notes: true,
                     source: true,
                     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
-                    tags: true,
-                    currencies: true,
+                    tags: { include: { tag: { select: { id: true, name: true } } } },
+                    personCurrencies: { include: { currency: { select: { id: true, name: true, code: true, symbol: true } } } },
                     groupName: true,
                     groupNumber: true,
                     isActive: true,
@@ -154,9 +152,7 @@ export async function getPersonById(id: string) {
 
 export interface CreatePersonData {
     name: string
-    address?: string | null
-    notes?: string | null
-    source?: string | null
+    source?: 'bot' | 'manual' | 'import' | 'api' | null
     contacts?: ContactInput[] | null
     tags?: string[] | null
     personTypeId?: string | null
@@ -169,19 +165,13 @@ export interface CreatePersonData {
 export async function createPerson(data: CreatePersonData) {
     return safeActionWithRevalidation(
         async () => {
-            let finalPersonTypeId = data.personTypeId || null
-            if (!finalPersonTypeId) {
-                const defaultType = await prisma.personType.findFirst({ where: { isDefault: true } })
-                if (defaultType) finalPersonTypeId = defaultType.id
-            }
+            const finalPersonTypeId = data.personTypeId || null
             try {
                 return await prisma.person.create({
                     data: {
                         name: data.name,
-                        address: data.address,
-                        notes: data.notes,
                         personTypeId: finalPersonTypeId,
-                        source: data.source,
+                        source: data.source || null,
                         contacts: data.contacts?.length ? {
                             create: data.contacts.filter(c => c.value?.trim()).map(c => ({
                                 type: c.type,
@@ -190,8 +180,19 @@ export async function createPerson(data: CreatePersonData) {
                                 isPrimary: c.isPrimary || false,
                             })),
                         } : undefined,
-                        tags: data.tags as any,
-                        currencies: data.currencyIds as any,
+                        tags: data.tags?.length ? {
+                            create: data.tags.map(name => ({
+                                tag: {
+                                    connectOrCreate: {
+                                        where: { name },
+                                        create: { name },
+                                    },
+                                },
+                            })),
+                        } : undefined,
+                        personCurrencies: data.currencyIds?.length ? {
+                            create: data.currencyIds.map(currencyId => ({ currencyId })),
+                        } : undefined,
                         groupName: data.groupName || null,
                         groupNumber: data.groupNumber || null,
                         lastInteraction: new Date(),
@@ -216,9 +217,7 @@ export async function createPerson(data: CreatePersonData) {
 
 export interface UpdatePersonData {
     name?: string
-    address?: string | null
-    notes?: string | null
-    source?: string | null
+    source?: 'bot' | 'manual' | 'import' | 'api' | null
     contacts?: ContactInput[] | null
     tags?: string[] | null
     personTypeId?: string | null
@@ -236,10 +235,8 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                     where: { id },
                     data: {
                         name: data.name,
-                        address: data.address,
-                        notes: data.notes,
                         personTypeId: data.personTypeId !== undefined ? data.personTypeId || null : undefined,
-                        source: data.source,
+                        source: data.source !== undefined ? data.source || null : undefined,
                         ...(data.contacts !== undefined && {
                             contacts: {
                                 deleteMany: {},
@@ -251,8 +248,25 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                                 })),
                             },
                         }),
-                        tags: data.tags !== undefined ? data.tags as any : undefined,
-                        currencies: data.currencyIds !== undefined ? data.currencyIds as any : undefined,
+                        ...(data.tags !== undefined && {
+                            tags: {
+                                deleteMany: {},
+                                create: (data.tags || []).map(name => ({
+                                    tag: {
+                                        connectOrCreate: {
+                                            where: { name },
+                                            create: { name },
+                                        },
+                                    },
+                                })),
+                            },
+                        }),
+                        ...(data.currencyIds !== undefined && {
+                            personCurrencies: {
+                                deleteMany: {},
+                                create: (data.currencyIds || []).map(currencyId => ({ currencyId })),
+                            },
+                        }),
                         groupName: data.groupName !== undefined ? data.groupName || null : undefined,
                         groupNumber: data.groupNumber !== undefined ? data.groupNumber || null : undefined,
                         lastInteraction: new Date(),

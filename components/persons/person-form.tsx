@@ -1,4 +1,5 @@
 "use client"
+import React from "react"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, useFieldArray } from "react-hook-form"
@@ -13,7 +14,6 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
     Select,
     SelectContent,
@@ -29,7 +29,7 @@ import { ContactInput } from "@/lib/person-types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Person } from "@prisma/client"
-import { User, Phone, Mail, MapPin, FileText, Loader2, Users, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins, UsersRound } from "lucide-react"
+import { User, Phone, Mail, Loader2, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins, UsersRound } from "lucide-react"
 import { useState, useEffect } from "react"
 import { MultiSelect, OptionType } from "@/components/ui/multi-select"
 import { TagInput } from "@/components/ui/tag-input"
@@ -43,8 +43,6 @@ const contactSchema = z.object({
 
 const formSchema = z.object({
     name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
-    address: z.string().optional(),
-    notes: z.string().optional(),
     personTypeId: z.string().optional(),
     source: z.string().optional(),
     contacts: z.array(contactSchema),
@@ -68,7 +66,7 @@ const contactTypeLabels: Record<string, { label: string; icon: any; placeholder:
     whatsapp: { label: "واتساب", icon: MessageCircle, placeholder: "0501234567" },
 }
 
-export function PersonForm({ person, onSuccess }: PersonFormProps) {
+export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: PersonFormProps) {
     const router = useRouter()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [personTypes, setPersonTypes] = useState<{ id: string; name: string }[]>([])
@@ -76,21 +74,23 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
     const [currencyOptions, setCurrencyOptions] = useState<OptionType[]>([])
 
     useEffect(() => {
-        getPersonTypes().then((res) => {
-            if (res.success && res.data) {
-                setPersonTypes(res.data)
+        const fetchAll = async () => {
+            const [personTypesRes, priceLabelsRes, currenciesRes] = await Promise.all([
+                getPersonTypes(),
+                getPriceLabels(),
+                getActiveCurrencies(),
+            ])
+            if (personTypesRes.success && personTypesRes.data) {
+                setPersonTypes(personTypesRes.data)
             }
-        })
-        getPriceLabels().then((res) => {
-            if (res.success && res.data) {
-                setPriceLabels(res.data.map(l => ({ label: l.name, value: l.id })))
+            if (priceLabelsRes.success && priceLabelsRes.data) {
+                setPriceLabels(priceLabelsRes.data.map(l => ({ label: l.name, value: l.id })))
             }
-        })
-        getActiveCurrencies().then((res) => {
-            if (res.success && res.data) {
-                setCurrencyOptions(res.data.map(c => ({ label: `${c.symbol} — ${c.name}`, value: c.id })))
+            if (currenciesRes.success && currenciesRes.data) {
+                setCurrencyOptions(currenciesRes.data.map(c => ({ label: `${c.symbol} — ${c.name}`, value: c.id })))
             }
-        })
+        }
+        fetchAll()
     }, [])
 
     // Parse existing contacts from person (relational — has id, type, value, label, isPrimary)
@@ -102,22 +102,23 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
             isPrimary: c.isPrimary,
         }))
         : []
-    const existingTags = (person?.tags as string[] | null) || []
+    // Parse existing tags from PersonTag relation
+    const existingTags: string[] = Array.isArray((person as any)?.tags)
+        ? (person as any).tags.map((pt: any) => pt.tag?.name ?? pt.name ?? pt).filter(Boolean)
+        : []
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: person?.name || "",
-            address: person?.address || "",
-            notes: person?.notes || "",
             personTypeId: person?.personTypeId || "",
-            source: person?.source || "",
+            source: (person?.source as string) || "",
             contacts: existingContacts.length > 0
                 ? existingContacts.map(c => ({ ...c, label: c.label || "" }))
                 : [{ type: "phone" as const, value: "", label: "", isPrimary: true }],
             tags: existingTags,
             priceLabelIds: (person as any)?.priceLabels?.map((pl: any) => pl.priceLabelId) || [],
-            currencyIds: (person?.currencies as string[] | null) || [],
+            currencyIds: (person as any)?.personCurrencies?.map((pc: any) => pc.currencyId) || [],
             groupName: (person as any)?.groupName || "",
             groupNumber: (person as any)?.groupNumber || "",
         },
@@ -146,10 +147,8 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
 
             const dataToSubmit = {
                 name: values.name,
-                address: values.address || null,
-                notes: values.notes || null,
                 personTypeId: values.personTypeId || null,
-                source: values.source || null,
+                source: (values.source || null) as 'bot' | 'manual' | 'import' | 'api' | null,
                 contacts: cleanContacts.length > 0 ? cleanContacts : null,
                 tags: parsedTags && parsedTags.length > 0 ? parsedTags : null,
                 priceLabelIds: values.priceLabelIds || null,
@@ -269,11 +268,10 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem value="موقع">موقع إلكتروني</SelectItem>
-                                            <SelectItem value="إعلان">إعلان</SelectItem>
-                                            <SelectItem value="توصية">توصية</SelectItem>
-                                            <SelectItem value="معرض">معرض</SelectItem>
-                                            <SelectItem value="أخرى">أخرى</SelectItem>
+                                            <SelectItem value="bot">بوت / واتساب</SelectItem>
+                                            <SelectItem value="manual">إدخال يدوي</SelectItem>
+                                            <SelectItem value="import">استيراد</SelectItem>
+                                            <SelectItem value="api">API</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -472,64 +470,23 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
                     </div>
                 </div>
 
-                {/* === العنوان والملاحظات === */}
+                {/* === الوسوم === */}
                 <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b pb-2">
-                        <MapPin className="h-4 w-4 text-primary" />
-                        تفاصيل إضافية
+                        <Tag className="h-4 w-4 text-primary" />
+                        الوسوم
                     </h3>
-
-                    <FormField
-                        control={form.control}
-                        name="address"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                                    العنوان
-                                </FormLabel>
-                                <FormControl>
-                                    <Input placeholder="المدينة، الحي..." {...field} className="h-9" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
 
                     <FormField
                         control={form.control}
                         name="tags"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                                    <Tag className="h-3 w-3" />
-                                    الوسوم
-                                </FormLabel>
                                 <FormControl>
                                     <TagInput
                                         value={Array.isArray(field.value) ? field.value : []}
                                         onChange={field.onChange}
                                         placeholder="أضف وسماً واضغط Enter..."
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                                    <FileText className="h-3 w-3" />
-                                    ملاحظات إضافية
-                                </FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        placeholder="أي تفاصيل إضافية عن الشخص..."
-                                        className="resize-none min-h-[70px]"
-                                        {...field}
                                     />
                                 </FormControl>
                                 <FormMessage />
@@ -551,4 +508,4 @@ export function PersonForm({ person, onSuccess }: PersonFormProps) {
             </form>
         </Form>
     )
-}
+});

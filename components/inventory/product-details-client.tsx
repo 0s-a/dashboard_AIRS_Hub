@@ -29,10 +29,9 @@ import { ProductSheet } from "@/components/inventory/product-sheet"
 import { QuickAddAlternativeName } from "@/components/inventory/quick-add-alternative-name"
 import { QuickAddTag } from "@/components/inventory/quick-add-tag"
 import { VariantManagement } from "@/components/inventory/variant-management"
-import type { VariantWithImages } from "@/components/inventory/variant-management"
-import type { VariantRecord } from "@/lib/actions/variants"
 import { PricingSection } from "@/components/inventory/pricing"
 import { deleteProduct } from "@/lib/actions/inventory"
+import type { SerializedProduct } from "@/lib/actions/inventory"
 import { ImageGalleryUpload } from "@/components/ui/image-gallery-upload"
 import type { ProductImageRecord } from "@/lib/actions/product-images"
 import { toast } from "sonner"
@@ -48,36 +47,9 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-type ProductData = {
-    id: string
-    itemNumber: string
-    name: string
-    brandId: string | null
-    brandRef: {
-        id: string
-        name: string
-        code: string
-        logo: string | null
-    } | null
-    description: string | null
-    productPrices: Array<{ id: string; priceLabelId: string; priceLabelName: string; currencyId: string; currencySymbol: string; currencyName: string; value: number; unitId: string; unitName: string; conversionFactor: number; isAutoCalculated: boolean }>
-    isAvailable: boolean
-    variants: VariantWithImages[]
-    mediaImages: ProductImageRecord[]
-    alternativeNames: string[] | null
-    tags: string[] | null
-    productTags: Array<{
-        id: string
-        name: string
-        color: string | null
-    }>
-    createdAt: string
-    updatedAt: string
-}
-
 
 interface ProductDetailsClientProps {
-    product: ProductData
+    product: SerializedProduct
 }
 
 export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
@@ -441,10 +413,10 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         {/* Interactive Image Manager */}
                         <div className="pt-4 border-t border-border/30 mt-4">
                             <ImageGalleryUpload
-                                images={galleryImages}
+                                images={galleryImages as any}
                                 productId={product.id}
                                 productItemNumber={product.itemNumber}
-                                variants={product.variants || []}
+                                variants={(product.variants || []) as any}
                                 maxImages={10}
                                 onImagesChange={handleImagesChange}
                             />
@@ -533,13 +505,19 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                 <VariantManagement
                     productId={product.id}
                     itemNumber={product.itemNumber}
-                    variants={product.variants || []}
+                    variants={(product.variants || []) as any}
+                    productImages={(product.mediaImages || []).map(img => ({
+                        id: img.id,
+                        url: img.url,
+                        filename: img.filename || '',
+                        variantIds: img.variantIds || [],
+                    }))}
                 />
             </div>
 
             {/* Prices & Units - Full Width */}
             <div className="glass-panel rounded-2xl p-6 border border-border/50 hover:border-primary/20 transition-all duration-300 shadow-sm shadow-primary/5">
-                <PricingSection product={product as any} />
+                <PricingSection product={product} />
             </div>
         </div>
     )

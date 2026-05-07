@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE, resolveCurrenciesSingle } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE } from '@/lib/api-utils'
 
 // Zod Schemas for Validation
 const contactSchema = z.object({
@@ -13,12 +13,10 @@ const contactSchema = z.object({
 
 const updatePersonSchema = z.object({
     name: z.string().min(1, 'الاسم مطلوب').optional(),
-    address: z.string().nullable().optional(),
-    notes: z.string().nullable().optional(),
     personTypeId: z.string().nullable().optional(),
-    source: z.string().nullable().optional(),
+    source: z.enum(['bot', 'manual', 'import', 'api']).nullable().optional(),
     contacts: z.array(contactSchema).optional(),
-    tags: z.any().optional(),
+    tags: z.array(z.string()).optional(),
     currencyIds: z.array(z.string()).optional(),
     groupName: z.string().nullable().optional(),
     groupNumber: z.string().nullable().optional(),
@@ -42,9 +40,7 @@ export async function GET(
         })
 
         if (!person) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
-
-        const enriched = await resolveCurrenciesSingle(person)
-        return apiSuccess(enriched)
+        return apiSuccess(person)
     } catch (error) {
         console.error('API Error [GET /persons/id]:', error)
         return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
@@ -79,13 +75,11 @@ export async function PUT(
         const person = await prisma.person.update({
             where: { id },
             data: {
-                ...(body.name          !== undefined && { name: body.name }),
-                ...(body.address       !== undefined && { address: body.address }),
-                ...(body.notes         !== undefined && { notes: body.notes }),
-                ...(body.source        !== undefined && { source: body.source }),
-                ...(body.personTypeId  !== undefined && { personTypeId: body.personTypeId || null }),
-                ...(body.isActive      !== undefined && { isActive: body.isActive }),
-                ...(body.contacts      !== undefined && {
+                ...(body.name         !== undefined && { name: body.name }),
+                ...(body.source       !== undefined && { source: body.source || null }),
+                ...(body.personTypeId !== undefined && { personTypeId: body.personTypeId || null }),
+                ...(body.isActive     !== undefined && { isActive: body.isActive }),
+                ...(body.contacts     !== undefined && {
                     contacts: {
                         deleteMany: {},
                         create: body.contacts
@@ -98,8 +92,20 @@ export async function PUT(
                             }))
                     }
                 }),
-                ...(body.tags          !== undefined && { tags: body.tags ?? undefined }),
-                ...(body.currencyIds   !== undefined && { currencies: body.currencyIds ?? undefined }),
+                ...(body.tags !== undefined && {
+                    tags: {
+                        deleteMany: {},
+                        create: (body.tags || []).map((name: string) => ({
+                            tag: { connectOrCreate: { where: { name }, create: { name } } }
+                        }))
+                    }
+                }),
+                ...(body.currencyIds !== undefined && {
+                    personCurrencies: {
+                        deleteMany: {},
+                        create: (body.currencyIds || []).map((currencyId: string) => ({ currencyId }))
+                    }
+                }),
                 ...(body.groupName     !== undefined && { groupName: body.groupName || null }),
                 ...(body.groupNumber   !== undefined && { groupNumber: body.groupNumber || null }),
                 ...(body.priceLabelIds !== undefined && {
@@ -115,8 +121,7 @@ export async function PUT(
             include: PERSON_INCLUDE,
         })
 
-        const enriched = await resolveCurrenciesSingle(person)
-        return apiSuccess(enriched)
+        return apiSuccess(person)
     } catch (error: any) {
         console.error('API Error [PUT /persons/id]:', error)
         if (error?.code === 'P2002' && error?.meta?.target?.includes('value')) {

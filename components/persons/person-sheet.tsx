@@ -8,10 +8,11 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet"
-import { PersonForm } from "./person-form"
-import { useState } from "react"
+import dynamic from "next/dynamic"
+const PersonForm = dynamic(() => import("./person-form").then(m => ({ default: m.PersonForm })), { ssr: false })
+import React, { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Person } from "@prisma/client"
 
 interface PersonSheetProps {
@@ -19,7 +20,7 @@ interface PersonSheetProps {
     trigger?: React.ReactNode
 }
 
-export function PersonSheet({ person, trigger }: PersonSheetProps) {
+export const PersonSheet = React.memo(function PersonSheet({ person, trigger }: PersonSheetProps) {
     const [open, setOpen] = useState(false)
 
     return (
@@ -46,4 +47,4 @@ export function PersonSheet({ person, trigger }: PersonSheetProps) {
             </SheetContent>
         </Sheet>
     )
-}
+});

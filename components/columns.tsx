@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { Person } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Edit, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, Wallet, Coins, UsersRound } from "lucide-react"
+import { Trash2, Edit, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, Wallet, Coins, UsersRound } from "lucide-react"
 import { softDeletePerson, hardDeletePerson, togglePersonActive } from "@/lib/actions/persons"
 import { ContactRecord } from "@/lib/person-types"
 import { toast } from "sonner"
@@ -59,7 +59,7 @@ function getContactsByType(contacts: ContactRecord[], type: string): ContactReco
 }
 
 const allIcons: Record<string, any> = {
-    Crown, Star, User, Building, Sparkles, ShieldCheck, MapPin, StickyNote, Mail, Phone, MessageCircle, Copy, ExternalLink, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power
+    Crown, Star, User, Building, Sparkles, ShieldCheck, Mail, Phone, MessageCircle, Copy, ExternalLink, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power
 }
 
 function getIcon(name: string | null) {
@@ -95,9 +95,12 @@ export const columns: ColumnDef<Person>[] = [
     {
         accessorKey: "name",
         header: "الشخص",
+        size: 220,
+        minSize: 180,
+        maxSize: 280,
         cell: ({ row }) => {
             const name = row.getValue("name") as string
-            const tags = (row.original.tags as string[] | null) || []
+            const tags: string[] = ((row.original as any).tags || []).map((pt: any) => pt.tag?.name ?? pt)
             const initials = name ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : "??"
 
             // Color based on first letter for visual variety
@@ -141,6 +144,9 @@ export const columns: ColumnDef<Person>[] = [
     {
         id: "group",
         header: "المجموعة",
+        size: 150,
+        minSize: 120,
+        maxSize: 200,
         cell: ({ row }) => {
             const groupName = (row.original as any).groupName
             const groupNumber = (row.original as any).groupNumber
@@ -163,6 +169,9 @@ export const columns: ColumnDef<Person>[] = [
     {
         accessorKey: "type",
         header: "النوع",
+        size: 130,
+        minSize: 100,
+        maxSize: 180,
         cell: ({ row }) => {
             const person = row.original as any
             const personType = person.personType
@@ -202,6 +211,9 @@ export const columns: ColumnDef<Person>[] = [
     {
         id: "priceLabels",
         header: "التسعيرات",
+        size: 160,
+        minSize: 120,
+        maxSize: 200,
         cell: ({ row }) => {
             const priceLabels = (row.original as any).priceLabels || []
             if (priceLabels.length === 0) return <span className="text-muted-foreground text-xs text-center block">-</span>
@@ -237,6 +249,9 @@ export const columns: ColumnDef<Person>[] = [
     {
         id: "currencies",
         header: "العملات",
+        size: 140,
+        minSize: 100,
+        maxSize: 180,
         cell: ({ row }) => {
             const resolvedCurrencies = (row.original as any).resolvedCurrencies || []
             if (resolvedCurrencies.length === 0) return <span className="text-muted-foreground text-xs text-center block">-</span>
@@ -272,6 +287,9 @@ export const columns: ColumnDef<Person>[] = [
     {
         accessorKey: "source",
         header: "المصدر",
+        size: 90,
+        minSize: 80,
+        maxSize: 120,
         cell: ({ row }) => {
             const source = row.original.source
             if (!source) return <span className="text-muted-foreground text-xs text-center block">-</span>
@@ -291,6 +309,9 @@ export const columns: ColumnDef<Person>[] = [
     {
         id: "contacts",
         header: "معلومات الاتصال",
+        size: 260,
+        minSize: 200,
+        maxSize: 320,
         cell: ({ row }) => {
             const contacts = getContacts(row.original)
 
@@ -456,56 +477,14 @@ export const columns: ColumnDef<Person>[] = [
     },
 
     // ──────────────────────────────────────
-    // Column 4: Address
-    // ──────────────────────────────────────
-    {
-        accessorKey: "address",
-        header: "العنوان",
-        cell: ({ row }) => {
-            const address = row.original.address
-            if (!address) return <span className="text-muted-foreground text-xs text-center block">-</span>
-            return (
-                <div className="flex items-start gap-1.5 max-w-[200px]">
-                    <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <span className="text-sm text-balance leading-tight">{address}</span>
-                </div>
-            )
-        }
-    },
-
-    // ──────────────────────────────────────
-    // Column 5: Notes
-    // ──────────────────────────────────────
-    {
-        accessorKey: "notes",
-        header: "ملاحظات",
-        cell: ({ row }) => {
-            const notes = row.original.notes
-            if (!notes) return <span className="text-muted-foreground text-xs text-center block">-</span>
-            return (
-                <TooltipProvider>
-                    <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1.5 max-w-[200px] cursor-help">
-                                <StickyNote className="h-3.5 w-3.5 text-amber-500/70 shrink-0" />
-                                <span className="text-xs text-muted-foreground truncate max-w-[180px]">{notes}</span>
-                            </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-[300px] text-xs p-3">
-                            {notes}
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            )
-        }
-    },
-
-    // ──────────────────────────────────────
     // Column 5.4: Active Status
     // ──────────────────────────────────────
     {
         accessorKey: "isActive",
         header: "الحالة",
+        size: 80,
+        minSize: 70,
+        maxSize: 100,
         cell: ({ row }) => {
             const isActive = row.original.isActive
             return (
@@ -523,6 +502,9 @@ export const columns: ColumnDef<Person>[] = [
     // ──────────────────────────────────────
     {
         id: "actions",
+        size: 70,
+        minSize: 60,
+        maxSize: 80,
         cell: ({ row }) => {
             const person = row.original
 

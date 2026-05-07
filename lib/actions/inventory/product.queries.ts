@@ -144,27 +144,3 @@ export async function getProductById(id: string) {
     }
 }
 
-/** Search products by text across key fields */
-export async function searchProducts(query: string) {
-    try {
-        const q = query.trim()
-        if (!q) return getProducts()
-
-        const products = await prisma.product.findMany({
-            where: {
-                OR: [
-                    { name:        { contains: q, mode: 'insensitive' } },
-                    { itemNumber:  { contains: q, mode: 'insensitive' } },
-                    { description: { contains: q, mode: 'insensitive' } },
-                    { brandRef: { name: { contains: q, mode: 'insensitive' } } },
-                ],
-            },
-            orderBy: { name: 'asc' },
-            include: PRODUCT_INCLUDE,
-        })
-        return { success: true, data: products.map(serializeProduct) }
-    } catch (error) {
-        console.error('Failed to search products:', error)
-        return { success: false, error: 'فشل البحث عن المنتجات', data: [] }
-    }
-}

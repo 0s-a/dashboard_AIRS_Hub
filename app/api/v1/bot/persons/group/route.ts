@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE, resolveCurrencies } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE } from '@/lib/api-utils'
 
 // GET /api/v1/bot/persons/group?groupNumber=xxx
 export async function GET(req: NextRequest) {
@@ -25,18 +25,11 @@ export async function GET(req: NextRequest) {
             include: PERSON_INCLUDE,
         })
 
-        let enriched = persons as any[]
-        try {
-            enriched = await resolveCurrencies(persons)
-        } catch (currError) {
-            console.error('Currency resolution failed (non-fatal):', currError)
-        }
+        const firstPerson = persons[0]
 
-        const firstPerson = enriched[0]
-
-        return apiSuccess(enriched, 200, {
+        return apiSuccess(persons, 200, {
             personId: firstPerson?.id || null,
-            count: enriched.length,
+            count: persons.length,
         })
     } catch (error: any) {
         console.error('API Error [GET /persons/group]:', error?.message || error)

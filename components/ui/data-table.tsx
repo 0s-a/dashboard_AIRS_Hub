@@ -119,11 +119,16 @@ export function DataTable<TData, TValue>({
     const table = useReactTable({
         data,
         columns,
+        columnResizeMode: "onChange",
+        defaultColumn: { size: 150, minSize: 60, maxSize: 500 },
         state: {
             globalFilter,
             sorting,
             grouping,
             expanded,
+        },
+        meta: {
+            onRefresh: handleRefresh,
         },
         onGlobalFilterChange: setGlobalFilter,
         onSortingChange: setSorting,
@@ -249,7 +254,7 @@ export function DataTable<TData, TValue>({
                                                 isSortable && "cursor-pointer select-none hover:text-foreground transition-colors"
                                             )}
                                             style={{
-                                                width: header.getSize() !== 150 ? header.getSize() : undefined,
+                                                width: header.getSize(),
                                                 minWidth: header.column.columnDef.minSize,
                                                 maxWidth: header.column.columnDef.maxSize,
                                             }}
@@ -303,7 +308,7 @@ export function DataTable<TData, TValue>({
                                                             isGrouped && "py-1.5"
                                                         )}
                                                         style={{
-                                                            width: cell.column.getSize() !== 150 ? cell.column.getSize() : undefined,
+                                                            width: cell.column.getSize(),
                                                             minWidth: cell.column.columnDef.minSize,
                                                             maxWidth: cell.column.columnDef.maxSize,
                                                         }}

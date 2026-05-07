@@ -42,7 +42,7 @@ const getDashboardData = unstable_cache(
                     id: true,
                     name: true,
                     contacts: { select: { id: true, type: true, value: true, isPrimary: true } },
-                    personType: { select: { id: true, name: true, color: true, icon: true } },
+                    personType: { select: { id: true, name: true } },
                     isActive: true,
                     createdAt: true,
                 }

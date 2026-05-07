@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getProductsPaginated } from "@/lib/actions/inventory"
-import type { PaginationMeta } from "@/lib/actions/inventory"
+import type { PaginationMeta, SerializedProduct } from "@/lib/actions/inventory"
 
 interface FilterOption {
     id: string
@@ -43,7 +43,7 @@ interface BrandOption {
 
 interface InventoryTableProps {
     // Initial SSR data
-    initialProducts: any[]
+    initialProducts: SerializedProduct[]
     initialPagination: PaginationMeta
     // Filter options (fetched server-side once)
     filterCategories: FilterOption[]
@@ -79,6 +79,10 @@ export function InventoryTable({
     const [limit, setLimit] = useState(initialPagination.limit)
 
     const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // ── Refs for latest filter values (avoids stale closures) ──
+    const filtersRef = useRef({ search, filterCategory, filterBrand, filterAvail, filterPriced, page, limit })
+    filtersRef.current = { search, filterCategory, filterBrand, filterAvail, filterPriced, page, limit }
 
     useEffect(() => { setIsMounted(true) }, [])
 
@@ -120,23 +124,39 @@ export function InventoryTable({
 
     // ── Re-fetch after product deletion ───────────────────────
     const handleProductDeleted = useCallback(() => {
-        fetchProducts({ ...currentFilters(), page })
-    }, [fetchProducts, page])
+        const f = filtersRef.current
+        fetchProducts({
+            search:      f.search || undefined,
+            categoryId:  f.filterCategory !== "all" ? f.filterCategory : undefined,
+            brandId:     f.filterBrand    !== "all" ? f.filterBrand    : undefined,
+            isAvailable: f.filterAvail    === "available"   ? true
+                       : f.filterAvail    === "unavailable" ? false
+                       : undefined,
+            hasPrices:   f.filterPriced   === "yes" ? true
+                       : f.filterPriced   === "no"  ? false
+                       : undefined,
+            limit: f.limit,
+            page:  f.page,
+        })
+    }, [fetchProducts])
 
     // ── Helpers: build complete filter params from current state ────────────
-    // NOTE: each handler passes its NEW value directly to avoid reading stale state
-    const currentFilters = () => ({
-        search:      search || undefined,
-        categoryId:  filterCategory !== "all" ? filterCategory : undefined,
-        brandId:     filterBrand    !== "all" ? filterBrand    : undefined,
-        isAvailable: filterAvail    === "available"   ? true
-                   : filterAvail    === "unavailable" ? false
-                   : undefined,
-        hasPrices:   filterPriced   === "yes" ? true
-                   : filterPriced   === "no"  ? false
-                   : undefined,
-        limit,
-    })
+    // Uses filtersRef to always read the latest values (no stale closures)
+    const currentFilters = useCallback(() => {
+        const f = filtersRef.current
+        return {
+            search:      f.search || undefined,
+            categoryId:  f.filterCategory !== "all" ? f.filterCategory : undefined,
+            brandId:     f.filterBrand    !== "all" ? f.filterBrand    : undefined,
+            isAvailable: f.filterAvail    === "available"   ? true
+                       : f.filterAvail    === "unavailable" ? false
+                       : undefined,
+            hasPrices:   f.filterPriced   === "yes" ? true
+                       : f.filterPriced   === "no"  ? false
+                       : undefined,
+            limit: f.limit,
+        }
+    }, [])
 
     // ── Search debounce ──────────────────────────────────────
     const handleSearchChange = (value: string) => {
@@ -429,7 +449,7 @@ export function InventoryTable({
                 pagination={pagination}
                 onPageChange={handlePageChange}
                 onLimitChange={handleLimitChange}
-                limitOptions={[25, 50, 100, 200]}
+                limitOptions={[10, 25, 50, 100, 200]}
                 className="pt-1"
             />
         </div>

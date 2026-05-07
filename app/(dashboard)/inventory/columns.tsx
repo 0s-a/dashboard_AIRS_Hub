@@ -14,9 +14,11 @@ import {
     ChevronDown,
     SearchCheck,
     Copy,
-    Check
+    Check,
+    Layers,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 import { Badge } from "@/components/ui/badge"
@@ -24,7 +26,6 @@ import { Button } from "@/components/ui/button"
 import { AvailabilityToggle } from "@/components/inventory/availability-toggle"
 import { ProductSheet } from "@/components/inventory/product-sheet"
 import { deleteProduct } from "@/lib/actions/inventory"
-import { VariantsList } from "@/components/inventory/variants-list"
 
 import {
     Dialog,
@@ -49,46 +50,10 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-// Custom Global Filter Function for Smart Search
-export const customGlobalFilterFn = (row: any, columnId: string, filterValue: string) => {
-    const searchValue = filterValue.toLowerCase().trim()
-    if (!searchValue) return true
-
-    const product = row.original
-
-    // Primary fields
-    if (product.name?.toLowerCase().includes(searchValue)) return true
-    if (product.itemNumber?.toLowerCase().includes(searchValue)) return true
-    if (product.brandRef?.name?.toLowerCase().includes(searchValue)) return true
-    if (product.description?.toLowerCase().includes(searchValue)) return true
-    if (product.category?.name?.toLowerCase().includes(searchValue)) return true
-
-    // Tags (JSON array)
-    if (Array.isArray(product.tags)) {
-        if (product.tags.some((tag: string) => tag.toLowerCase().includes(searchValue))) return true
-    }
-
-    // Alternative names (JSON array)
-    if (Array.isArray(product.alternativeNames)) {
-        if (product.alternativeNames.some((name: string) => name.toLowerCase().includes(searchValue))) return true
-    }
-
-    // Variant names & numbers
-    if (Array.isArray(product.variants)) {
-        if (product.variants.some((v: any) =>
-            v.name?.toLowerCase().includes(searchValue) ||
-            v.variantNumber?.toLowerCase().includes(searchValue) ||
-            v.suffix?.toLowerCase().includes(searchValue)
-        )) return true
-    }
-
-    return false
-}
-
 // ─── Sub-components ──────────────────────────────────────────
 
 /** Copyable item number with animated check icon */
-const CopyableItemNumber = ({ itemNumber }: { itemNumber: string }) => {
+function CopyableItemNumber({ itemNumber }: { itemNumber: string }) {
     const [copied, setCopied] = useState(false)
 
     const handleCopy = (e: React.MouseEvent) => {
@@ -117,7 +82,7 @@ const CopyableItemNumber = ({ itemNumber }: { itemNumber: string }) => {
 }
 
 /** Color dot indicators for variants */
-const VariantColorDots = ({ product, onToggle }: { product: SerializedProduct; onToggle: () => void }) => {
+function VariantColorDots({ product, onToggle }: { product: SerializedProduct; onToggle: () => void }) {
     if (!product.variants?.length) return null
 
     return (
@@ -154,7 +119,7 @@ const VariantColorDots = ({ product, onToggle }: { product: SerializedProduct; o
 }
 
 /** Alternative names badges with tooltip */
-const AlternativeNamesBadges = ({ names }: { names: string[] }) => {
+function AlternativeNamesBadges({ names }: { names: string[] }) {
     if (!names?.length) return null
 
     return (
@@ -197,7 +162,7 @@ const AlternativeNamesBadges = ({ names }: { names: string[] }) => {
 }
 
 /** Product image thumbnail with zoom dialog */
-const ProductImageCell = ({ src, alt }: { src: string | undefined; alt: string }) => {
+function ProductImageCell({ src, alt }: { src: string | undefined; alt: string }) {
     if (!src) {
         return (
             <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/30 border border-dashed flex items-center justify-center">
@@ -234,8 +199,9 @@ const ProductImageCell = ({ src, alt }: { src: string | undefined; alt: string }
     )
 }
 
-// --- Component: ProductNameCell ---
-const ProductNameCell = ({ product, row }: { product: SerializedProduct; row: any }) => {
+// ─── ProductNameCell ─────────────────────────────────────────
+
+function ProductNameCell({ product, row }: { product: SerializedProduct; row: any }) {
     const primaryImage = product.mediaImages?.find(i => i.isPrimary)?.url ?? product.mediaImages?.[0]?.url
     const altNames = Array.isArray(product.alternativeNames) ? product.alternativeNames : []
 
@@ -316,11 +282,11 @@ const ProductNameCell = ({ product, row }: { product: SerializedProduct; row: an
     )
 }
 
-// --- Component: ActionCell ---
-// Handles local state for actions (loading, dialogs)
-const ActionCell = ({ product }: { product: SerializedProduct }) => {
+// ─── ActionCell ──────────────────────────────────────────────
 
+function ActionCell({ product, onDeleted }: { product: SerializedProduct; onDeleted?: () => void }) {
     const [isDeleting, setIsDeleting] = useState(false)
+    const router = useRouter()
 
     const handleDelete = async () => {
         setIsDeleting(true)
@@ -328,10 +294,13 @@ const ActionCell = ({ product }: { product: SerializedProduct }) => {
             const res = await deleteProduct(product.id)
             if (res.success) {
                 toast.success('تم حذف المنتج بنجاح')
+                // Trigger table refresh so the deleted row disappears
+                onDeleted?.()
+                router.refresh()
             } else {
                 toast.error(res.error || 'فشل حذف المنتج')
             }
-        } catch (error) {
+        } catch {
             toast.error('حدث خطأ أثناء الحذف')
         } finally {
             setIsDeleting(false)
@@ -341,13 +310,12 @@ const ActionCell = ({ product }: { product: SerializedProduct }) => {
     return (
         <div className="flex items-center justify-end gap-2">
             <TooltipProvider delayDuration={0}>
-
                 {/* Edit Button */}
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <span>
                             <ProductSheet
-                                product={product as any}
+                                product={product}
                                 trigger={
                                     <Button
                                         variant="ghost"
@@ -388,7 +356,7 @@ const ActionCell = ({ product }: { product: SerializedProduct }) => {
                         <AlertDialogHeader>
                             <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                             <AlertDialogDescription>
-                                سيؤدي هذا الإجراء إلى حذف المنتج "{product.name}" نهائياً من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء.
+                                سيؤدي هذا الإجراء إلى حذف المنتج &quot;{product.name}&quot; نهائياً من قاعدة البيانات. لا يمكن التراجع عن هذا الإجراء.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter className="gap-2 sm:gap-0">
@@ -407,8 +375,10 @@ const ActionCell = ({ product }: { product: SerializedProduct }) => {
     )
 }
 
-// --- Table Columns Definition ---
+// ─── Table Columns ───────────────────────────────────────────
+
 export const columns: ColumnDef<SerializedProduct>[] = [
+    // ── Expander ──────────────────────────────────────────
     {
         id: "expander",
         header: () => null,
@@ -435,6 +405,8 @@ export const columns: ColumnDef<SerializedProduct>[] = [
         size: 32,
         maxSize: 32,
     },
+
+    // ── Product Name (main info cell) ─────────────────────
     {
         accessorKey: "name",
         header: "بيانات الصنف",
@@ -443,7 +415,34 @@ export const columns: ColumnDef<SerializedProduct>[] = [
         cell: ({ row }) => <ProductNameCell product={row.original} row={row} />,
     },
 
-    // ── Brand column ──────────────────────────────────────────
+    // ── Category ──────────────────────────────────────────
+    {
+        id: "category",
+        header: "التصنيف",
+        size: 110,
+        maxSize: 140,
+        cell: ({ row }) => {
+            const cat = row.original.category
+            if (!cat) return <span className="text-xs text-muted-foreground">—</span>
+
+            return (
+                <div className="flex items-center gap-2">
+                    {cat.icon ? (
+                        <span className="text-base shrink-0">{cat.icon}</span>
+                    ) : (
+                        <div className="h-6 w-6 rounded-md bg-muted/60 flex items-center justify-center shrink-0">
+                            <Layers className="h-3.5 w-3.5 text-muted-foreground/60" />
+                        </div>
+                    )}
+                    <span className="text-xs font-medium truncate max-w-[70px]" title={cat.name}>
+                        {cat.name}
+                    </span>
+                </div>
+            )
+        },
+    },
+
+    // ── Brand ─────────────────────────────────────────────
     {
         id: "brand",
         header: "البراند",
@@ -484,15 +483,15 @@ export const columns: ColumnDef<SerializedProduct>[] = [
         },
     },
 
+    // ── Prices ────────────────────────────────────────────
     {
         accessorKey: "productPrices",
         header: "الأسعار",
         size: 170,
         minSize: 140,
         cell: ({ row }) => {
-            const product = row.original;
-            const prices = product.productPrices || []
-            
+            const prices = row.original.productPrices || []
+
             if (prices.length === 0) {
                 return <span className="text-muted-foreground text-[11px] italic">لا يوجد تسعير</span>
             }
@@ -509,12 +508,12 @@ export const columns: ColumnDef<SerializedProduct>[] = [
             return (
                 <div className="flex flex-col gap-1.5 w-full min-w-[130px]">
                     {Object.entries(groupedPrices).map(([labelName, labelPrices], idx) => (
-                        <div 
-                            key={labelName} 
+                        <div
+                            key={labelName}
                             className={cn(
                                 "flex flex-col gap-1 px-2.5 py-1.5 rounded-lg border transition-colors w-full",
-                                idx === 0 
-                                    ? "bg-linear-to-r from-emerald-500/10 to-teal-500/5 hover:from-emerald-500/20 hover:to-teal-500/10 border-emerald-500/30 shadow-xs" 
+                                idx === 0
+                                    ? "bg-linear-to-r from-emerald-500/10 to-teal-500/5 hover:from-emerald-500/20 hover:to-teal-500/10 border-emerald-500/30 shadow-xs"
                                     : "bg-muted/30 hover:bg-muted/50 border-border/40"
                             )}
                         >
@@ -531,7 +530,7 @@ export const columns: ColumnDef<SerializedProduct>[] = [
                                     </span>
                                 )}
                             </div>
-                            
+
                             <div className="flex flex-wrap gap-x-3 gap-y-1">
                                 {labelPrices.map((p) => (
                                     <div key={p.id} className="flex items-baseline gap-1">
@@ -556,6 +555,8 @@ export const columns: ColumnDef<SerializedProduct>[] = [
             )
         },
     },
+
+    // ── Availability ──────────────────────────────────────
     {
         accessorKey: "isAvailable",
         header: "الحالة",
@@ -569,10 +570,17 @@ export const columns: ColumnDef<SerializedProduct>[] = [
             />
         ),
     },
+
+    // ── Actions ───────────────────────────────────────────
     {
         id: "actions",
         header: () => <div className="text-right">الإجراءات</div>,
-        cell: ({ row }) => <ActionCell product={row.original} />,
+        cell: ({ row, table }) => (
+            <ActionCell
+                product={row.original}
+                onDeleted={() => (table.options.meta as any)?.onRefresh?.()}
+            />
+        ),
         enableHiding: false,
         size: 90,
         maxSize: 100,

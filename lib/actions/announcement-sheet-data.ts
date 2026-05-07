@@ -34,17 +34,18 @@ export async function getAnnouncementSheetData() {
                 select: { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
-            // Fetch distinct tags from all persons
-            prisma.person.findMany({
-                where: { isActive: true, NOT: { tags: { equals: [] } } },
-                select: { tags: true },
+            // Fetch distinct tags from active persons via PersonTag relation
+            prisma.personTag.findMany({
+                where:  { person: { isActive: true } },
+                select: { tag: { select: { name: true } } },
+                distinct: ['tagId'],
             }),
         ])
 
-        // Flatten and deduplicate tags
-        const personTags: string[] = [...new Set(
-            rawTags.flatMap(p => (p.tags as string[]) ?? [])
-        )].sort()
+        // Collect unique tag names
+        const personTags: string[] = [
+            ...new Set(rawTags.map((pt: any) => pt.tag.name))
+        ].sort()
 
         // Map products to include first image URL
         const mappedProducts = products.map(p => ({

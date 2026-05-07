@@ -3,7 +3,7 @@ import { getPersonById } from "@/lib/actions/persons"
 import { Badge } from "@/components/ui/badge"
 import { PersonSheet } from "@/components/persons/person-sheet"
 import {
-    Phone, Mail, MessageCircle, MapPin, FileText,
+    Phone, Mail, MessageCircle,
     Tag, Users, ShoppingCart, ArrowRight, Calendar,
     Wallet, Coins, CircleCheck, CircleX,
 } from "lucide-react"
@@ -59,7 +59,7 @@ export default async function PersonProfilePage({ params }: PersonPageProps) {
                         <div className="flex items-center gap-2 flex-wrap">
                             <h1 className="text-2xl font-bold tracking-tight">{person.name ?? "بدون اسم"}</h1>
                             {person.personType && (
-                                <Badge className="border-0 font-medium" style={{ background: `${person.personType.color}20`, color: person.personType.color }}>
+                                <Badge className="border-0 font-medium bg-muted text-muted-foreground">
                                     {person.personType.name}
                                 </Badge>
                             )}
@@ -124,34 +124,25 @@ export default async function PersonProfilePage({ params }: PersonPageProps) {
                 {/* Details */}
                 <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
                     <h2 className="font-semibold flex items-center gap-2 text-sm">
-                        <FileText className="h-4 w-4 text-primary" /> تفاصيل إضافية
+                        <Tag className="h-4 w-4 text-primary" /> تفاصيل إضافية
                     </h2>
-                    {person.address && (
-                        <div className="flex gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                            <p className="text-sm">{person.address}</p>
-                        </div>
-                    )}
                     {person.source && (
                         <div className="flex gap-2">
                             <Users className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                             <p className="text-sm">المصدر: {person.source}</p>
                         </div>
                     )}
-                    {person.notes && (
-                        <div className="flex gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                            <p className="text-sm text-muted-foreground">{person.notes}</p>
-                        </div>
-                    )}
-                    {(person.tags as string[] | null)?.length ? (
+                    {person.tags?.length > 0 && (
                         <div className="flex gap-2 flex-wrap">
                             <Tag className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                            {(person.tags as string[]).map((t: string) => (
-                                <Badge key={t} className="bg-muted text-muted-foreground border-0 text-xs">{t}</Badge>
-                            ))}
+                            {person.tags.map((pt: any) => {
+                                const name = pt.tag?.name ?? pt
+                                return (
+                                    <Badge key={name} className="bg-muted text-muted-foreground border-0 text-xs">{name}</Badge>
+                                )
+                            })}
                         </div>
-                    ) : null}
+                    )}
                     {person.priceLabels?.length > 0 && (
                         <div className="flex gap-2 flex-wrap">
                             <Wallet className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />

@@ -7,6 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ── Enums ───────────────────────────────────────────────────
+
+enum PersonSource {
+  bot
+  manual
+  import
+  api
+}
+
 model Product {
   id               String                   @id @default(uuid())
   itemNumber       String                   @unique
@@ -55,14 +64,11 @@ model Category {
 model Person {
   id                   String                @id @default(uuid())
   name                 String?
-  address              String?
-  notes                String?
   personTypeId         String?
   personType           PersonType?           @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
-  source               String?
+  source               PersonSource?
   contacts             Contact[]
-  tags                 Json? // ["tag1", "tag2"]
-  currencies           Json? // kept for backward compat — use personCurrencies for new code
+  tags                 PersonTag[]
   groupName            String?
   groupNumber          String?               @unique
   isActive             Boolean               @default(true)
@@ -75,7 +81,31 @@ model Person {
   notifications        AiNotification[]
   announcementMessages AnnouncementMessage[]
 
+  @@index([personTypeId])
+  @@index([groupName])
+  @@index([isActive])
   @@map("Person")
+}
+
+// Tags — normalized labels for persons
+model Tag {
+  id      String      @id @default(uuid())
+  name    String      @unique
+  persons PersonTag[]
+
+  createdAt DateTime @default(now())
+}
+
+// Junction: Person <-> Tag (many-to-many)
+model PersonTag {
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  tagId    String
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([personId, tagId])
 }
 
 // Pure image storage — no product-specific data
@@ -155,16 +185,11 @@ model PersonPriceLabel {
 
 // Person type classifications
 model PersonType {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  color       String?  @default("#64748b")
-  icon        String?  @default("User")
-  notes       String?
-  isDefault   Boolean  @default(false)
-  persons     Person[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  name      String   @unique
+  persons   Person[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Contact information (phone, email, whatsapp) — normalized

@@ -297,14 +297,15 @@ export async function dbGetAnnouncementFormData() {
                 select:  { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
-            prisma.person.findMany({
-                where:  { isActive: true, NOT: { tags: { equals: [] } } },
-                select: { tags: true },
+            prisma.personTag.findMany({
+                where:  { person: { isActive: true } },
+                select: { tag: { select: { name: true } } },
+                distinct: ['tagId'],
             }),
         ])
 
     const personTags: string[] = [
-        ...new Set(rawTags.flatMap(p => (p.tags as string[]) ?? []))
+        ...new Set(rawTags.map(pt => pt.tag.name))
     ].sort()
 
     const products = rawProducts.map(p => ({

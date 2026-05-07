@@ -7,7 +7,7 @@
 import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import type { SerializedPrice, ProductUnitEntry } from '@/lib/types/product'
+import type { SerializedPrice, ProductUnitEntry, SerializedCategory } from '@/lib/types/product'
 
 export { prisma, Prisma }
 
@@ -17,6 +17,7 @@ export const ITEM_NUMBER_REGEX = /^\S+-\S+-\S+$/
 // ── Standard include for all product queries ──────────────────────────────
 export const PRODUCT_INCLUDE = {
     brandRef: true,
+    category: true,
     productImages: { include: { mediaImage: true, variants: { select: { id: true } } } },
     variants: {
         orderBy: { order: 'asc' as const },
@@ -106,6 +107,15 @@ export function serializeProduct(product: any) {
           }
         : null
 
+    const category: SerializedCategory | null = product.category
+        ? {
+            id:   product.category.id,
+            name: product.category.name,
+            code: product.category.code,
+            icon: product.category.icon ?? null,
+          }
+        : null
+
     // Build a clean plain object — never spread raw Prisma models
     return {
         id:               product.id,
@@ -125,6 +135,7 @@ export function serializeProduct(product: any) {
                               : product.updatedAt,
         // ── serialized relations ──
         brandRef,
+        category,
         mediaImages,
         variants,
         productPrices,

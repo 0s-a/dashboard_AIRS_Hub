@@ -1,7 +1,6 @@
 import { DataTable } from "@/components/ui/data-table"
 import { columns } from "../../../components/columns"
 import { getPersons } from "@/lib/actions/persons"
-import { getCurrencies } from "@/lib/actions/currencies"
 import { PersonSheet } from "@/components/persons/person-sheet"
 import { Users, UserCheck, UserPlus, Archive } from "lucide-react"
 import Link from "next/link"
@@ -17,19 +16,12 @@ export default async function CRMPage({
     const params = await searchParams
     const page = parseInt(params.page ?? "1", 10)
 
-    const [result, currenciesResult] = await Promise.all([
-        getPersons({ page, pageSize: 100, search: params.search }),
-        getCurrencies(),
-    ])
-
-    const allCurrencies = (currenciesResult.success ? currenciesResult.data : []) as any[]
-    const currencyMap = new Map(allCurrencies.map((c: any) => [c.id, { name: c.name, symbol: c.symbol, code: c.code }]))
-
+    const result = await getPersons({ page, pageSize: 100, search: params.search })
     const { persons: rawPersons = [], total = 0 } = (result.success ? result.data : { persons: [], total: 0 }) as any
 
     const persons = rawPersons.map((p: any) => ({
         ...p,
-        resolvedCurrencies: ((p.currencies as string[]) || []).map((id: string) => currencyMap.get(id)).filter(Boolean)
+        resolvedCurrencies: (p.personCurrencies || []).map((pc: any) => pc.currency).filter(Boolean)
     }))
 
     const totalPersons = persons.length

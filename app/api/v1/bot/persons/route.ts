@@ -6,7 +6,6 @@ import {
     apiError,
     apiSuccess,
     PERSON_INCLUDE,
-    resolveCurrencies,
     normalizePhonePatterns,
     parsePagination,
     paginationMeta
@@ -22,12 +21,10 @@ const contactSchema = z.object({
 
 const createPersonSchema = z.object({
     name: z.string().min(1, 'الاسم مطلوب'),
-    address: z.string().nullable().optional(),
-    notes: z.string().nullable().optional(),
     personTypeId: z.string().nullable().optional(),
-    source: z.string().nullable().optional(),
+    source: z.enum(['bot', 'manual', 'import', 'api']).nullable().optional(),
     contacts: z.array(contactSchema).optional(),
-    tags: z.any().optional(),
+    tags: z.array(z.string()).optional(),
     currencyIds: z.array(z.string()).optional(),
     groupName: z.string().nullable().optional(),
     groupNumber: z.string().nullable().optional(),
@@ -77,9 +74,7 @@ export async function GET(req: NextRequest) {
             })
         ])
 
-        const enriched = await resolveCurrencies(persons)
-
-        return apiSuccess(enriched, 200, {
+        return apiSuccess(persons, 200, {
             pagination: paginationMeta(totalCount, page, limit),
         })
     } catch (error) {
@@ -107,16 +102,8 @@ export async function POST(req: NextRequest) {
         
         const body = validationResult.data
 
-        // ── Resolve default person type ──
-        let finalPersonTypeId = body.personTypeId || null
-        if (!finalPersonTypeId) {
-            const defaultType = await prisma.personType.findFirst({
-                where: { isDefault: true }
-            })
-            if (defaultType) {
-                finalPersonTypeId = defaultType.id
-            }
-        }
+        // ── Resolve person type ──
+        const finalPersonTypeId = body.personTypeId || null
 
         // ── Check for existing person (duplicate detection) ──
         let existingPerson: any = null
@@ -164,10 +151,8 @@ export async function POST(req: NextRequest) {
                 where: { id: existingPerson.id },
                 data: {
                     name: existingPerson.name ? existingPerson.name : (body.name?.trim() || existingPerson.name),
-                    address: body.address || existingPerson.address,
-                    notes: body.notes || existingPerson.notes,
                     personTypeId: existingPerson.personTypeId || finalPersonTypeId,
-                    source: body.source || existingPerson.source,
+                    source: body.source || existingPerson.source || null,
                     groupName: body.groupName || existingPerson.groupName,
                     groupNumber: body.groupNumber || existingPerson.groupNumber,
                     lastInteraction: new Date(),
@@ -183,17 +168,13 @@ export async function POST(req: NextRequest) {
                 include: PERSON_INCLUDE,
             })
 
-            const [enriched] = await resolveCurrencies([updatedPerson])
-
-            return apiSuccess(enriched, 200, { action: 'updated' })
+            return apiSuccess(updatedPerson, 200, { action: 'updated' })
         }
 
         // ── CREATE new person ──
         const person = await prisma.person.create({
             data: {
                 name: body.name.trim(),
-                address: body.address || null,
-                notes: body.notes || null,
                 personTypeId: finalPersonTypeId,
                 source: body.source || null,
                 contacts: body.contacts && body.contacts.length > 0 ? {
@@ -206,8 +187,19 @@ export async function POST(req: NextRequest) {
                             isPrimary: c.isPrimary || false,
                         }))
                 } : undefined,
-                tags: body.tags ? body.tags : undefined,
-                currencies: body.currencyIds && body.currencyIds.length > 0 ? body.currencyIds : undefined,
+                tags: body.tags?.length ? {
+                    create: body.tags.map((name: string) => ({
+                        tag: {
+                            connectOrCreate: {
+                                where: { name },
+                                create: { name },
+                            },
+                        },
+                    })),
+                } : undefined,
+                personCurrencies: body.currencyIds && body.currencyIds.length > 0 ? {
+                    create: body.currencyIds.map((currencyId: string) => ({ currencyId }))
+                } : undefined,
                 groupName: body.groupName || null,
                 groupNumber: body.groupNumber || null,
                 lastInteraction: new Date(),
@@ -220,9 +212,7 @@ export async function POST(req: NextRequest) {
             include: PERSON_INCLUDE,
         })
 
-        const [enriched] = await resolveCurrencies([person])
-
-        return apiSuccess(enriched, 201, { action: 'created' })
+        return apiSuccess(person, 201, { action: 'created' })
     } catch (error: any) {
         console.error('API Error [POST /persons]:', error)
         if (error?.code === 'P2002') {

@@ -5,7 +5,7 @@ import { ProductSheet } from "@/components/inventory/product-sheet"
 export default async function InventoryPage() {
     // Run both queries in parallel
     const [result, filterOpts] = await Promise.all([
-        getProductsPaginated({ page: 1, limit: 50, sortBy: 'createdAt', sortDir: 'desc' }),
+        getProductsPaginated({ page: 1, limit: 25, sortBy: 'createdAt', sortDir: 'desc' }),
         getProductFilterOptions(),
     ])
 

@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 
 // Types (re-exported so consumers can import from one place)
-export type { ProductInput, SerializedPrice, SerializedProduct, ProductUnitEntry, PaginationMeta, ProductsFilters } from '@/lib/types/product'
+export type { ProductInput, SerializedPrice, SerializedProduct, SerializedCategory, ProductUnitEntry, PaginationMeta, ProductsFilters } from '@/lib/types/product'
 
 // Queries (read-only)
 export {
@@ -14,7 +14,6 @@ export {
     getProductsPaginated,
     getProductFilterOptions,
     getProductById,
-    searchProducts,
 } from './product.queries'
 
 // Product CRUD (write)

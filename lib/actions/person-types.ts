@@ -19,66 +19,20 @@ export async function getPersonTypeById(id: string) {
     )
 }
 
-export async function createPersonType(data: {
-    name: string
-    description?: string | null
-    color?: string | null
-    icon?: string | null
-    notes?: string | null
-    isDefault?: boolean
-}) {
+export async function createPersonType(data: { name: string }) {
     return safeActionWithRevalidation(
-        async () => {
-            if (data.isDefault) {
-                await prisma.personType.updateMany({
-                    where: { isDefault: true },
-                    data: { isDefault: false },
-                })
-            }
-            return prisma.personType.create({
-                data: {
-                    name: data.name,
-                    description: data.description,
-                    color: data.color,
-                    icon: data.icon,
-                    notes: data.notes,
-                    isDefault: data.isDefault || false,
-                },
-            })
-        },
+        () => prisma.personType.create({ data: { name: data.name } }),
         PATHS,
         'تعذّر إنشاء نوع الشخص'
     )
 }
 
-export async function updatePersonType(id: string, data: {
-    name?: string
-    description?: string | null
-    color?: string | null
-    icon?: string | null
-    notes?: string | null
-    isDefault?: boolean
-}) {
+export async function updatePersonType(id: string, data: { name?: string }) {
     return safeActionWithRevalidation(
-        async () => {
-            if (data.isDefault) {
-                await prisma.personType.updateMany({
-                    where: { id: { not: id }, isDefault: true },
-                    data: { isDefault: false },
-                })
-            }
-            return prisma.personType.update({
-                where: { id },
-                data: {
-                    name: data.name,
-                    description: data.description,
-                    color: data.color,
-                    icon: data.icon,
-                    notes: data.notes,
-                    ...(data.isDefault !== undefined && { isDefault: data.isDefault }),
-                },
-            })
-        },
+        () => prisma.personType.update({
+            where: { id },
+            data: { name: data.name },
+        }),
         PATHS,
         'تعذّر تعديل نوع الشخص'
     )

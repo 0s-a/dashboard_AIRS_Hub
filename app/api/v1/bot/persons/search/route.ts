@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE, resolveCurrencies, normalizePhonePatterns, parsePagination, paginationMeta } from '@/lib/api-utils'
+import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE, normalizePhonePatterns, parsePagination, paginationMeta } from '@/lib/api-utils'
 
 // GET /api/v1/bot/persons/search?q=xxx or ?value=xxx or ?phone=xxx
 export async function GET(req: NextRequest) {
@@ -70,12 +70,7 @@ export async function GET(req: NextRequest) {
             })
         ])
 
-        let enrichedPersons = persons.map(p => ({ ...p, _type: 'person' })) as any[]
-        try {
-            enrichedPersons = await resolveCurrencies(enrichedPersons)
-        } catch (currError) {
-            console.error('Currency resolution failed (non-fatal):', currError)
-        }
+        const enrichedPersons = persons.map(p => ({ ...p, _type: 'person' }))
 
         const mappedUsers = users.map(u => ({ ...u, _type: 'user' }))
 

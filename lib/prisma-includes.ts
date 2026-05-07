@@ -21,8 +21,10 @@ export const ORDER_INCLUDE = {
 
 export const PERSON_INCLUDE = {
     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
-    personType: { select: { id: true, name: true, color: true, icon: true } },
+    personType: { select: { id: true, name: true } },
     priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
+    tags: { include: { tag: { select: { id: true, name: true } } } },
+    personCurrencies: { include: { currency: { select: { id: true, name: true, code: true, symbol: true } } } },
 } as const
 
 // ─── Product ────────────────────────────────────────────────

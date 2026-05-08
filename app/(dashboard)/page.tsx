@@ -5,6 +5,7 @@ import { RecentProducts } from "@/components/dashboard/recent-products"
 import { RecentPersons } from "@/components/dashboard/recent-persons"
 import { prisma } from "@/lib/prisma"
 import { unstable_cache } from "next/cache"
+import { toDisplayUrl } from "@/lib/utils/image-paths"
 
 // Cache dashboard data for 60 seconds to improve performance
 const getDashboardData = unstable_cache(
@@ -63,7 +64,7 @@ const getDashboardData = unstable_cache(
             recentProducts: recentProducts.map((p: any) => ({
                 ...p,
                 mediaImages: (p.productImages || []).map((pi: any) => ({
-                    url: pi.mediaImage.url,
+                    url: toDisplayUrl(pi.mediaImage.url),
                     isPrimary: pi.isPrimary,
                 })),
                 productPrices: (p.productPrices || []).map((pp: any) => ({

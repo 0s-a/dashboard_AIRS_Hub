@@ -111,7 +111,7 @@ model PersonTag {
 // Pure image storage — no product-specific data
 model MediaImage {
   id            String         @id @default(uuid())
-  url           String
+  url           String         // Sub-path only, e.g. "products/001-bf-607/main.webp" — base path is in .env
   filename      String
   alt           String?
   sizeBytes     Int?

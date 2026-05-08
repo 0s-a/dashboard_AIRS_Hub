@@ -1,11 +1,17 @@
 'use server'
 
-import { writeFile, unlink, readdir, rm } from 'fs/promises'
+import { writeFile, unlink, rm } from 'fs/promises'
 import { join } from 'path'
 import { mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { processImageToWebP } from '@/lib/utils/image-processor'
 import { prisma } from '@/lib/prisma'
+import {
+    buildSubPath,
+    toDiskPath,
+    toDiskDir,
+    toDisplayUrl,
+} from '@/lib/utils/image-paths'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -38,30 +44,24 @@ function isValidImageType(file: File): boolean {
     return ALLOWED_IMAGE_TYPES.includes(file.type as any)
 }
 
-function getPublicDir(): string {
-    return join(process.cwd(), 'public')
+/**
+ * Build the sub-path for a product image folder.
+ * e.g. "products/001-bf-607" or "products/001-bf-607/colors"
+ */
+function getProductSubDir(itemNumber: string, subFolder?: string): string {
+    const slug = sanitizeSlug(itemNumber)
+    return subFolder
+        ? buildSubPath('products', slug, sanitizeSlug(subFolder))
+        : buildSubPath('products', slug)
 }
 
 /**
- * Build the organized folder path for a product
- * Structure: public/uploads/products/{itemNumber}/
+ * Build the sub-path for a product image file.
+ * e.g. "products/001-bf-607/main.webp"
  */
-function getProductUploadDir(itemNumber: string, subFolder?: string): string {
-    const slug = sanitizeSlug(itemNumber)
-    const parts = [getPublicDir(), 'uploads', 'products', slug]
-    if (subFolder) parts.push(sanitizeSlug(subFolder))
-    return join(...parts)
-}
-
-/**
- * Build the public URL for a product image
- */
-function getProductImageUrl(itemNumber: string, filename: string, subFolder?: string): string {
-    const slug = sanitizeSlug(itemNumber)
-    const parts = ['/uploads', 'products', slug]
-    if (subFolder) parts.push(sanitizeSlug(subFolder))
-    parts.push(filename)
-    return parts.join('/')
+function getProductImageSubPath(itemNumber: string, filename: string, subFolder?: string): string {
+    const dir = getProductSubDir(itemNumber, subFolder)
+    return buildSubPath(dir, filename)
 }
 
 // ─── Core Upload ──────────────────────────────────────────────────────────────
@@ -108,7 +108,8 @@ export async function uploadProductImage(
         }
 
         // ── Prepare paths ────────────────────────────────────────────────────
-        const uploadDir = getProductUploadDir(itemNumber, subFolder)
+        const dirSubPath = getProductSubDir(itemNumber, subFolder)
+        const uploadDir = toDiskDir(dirSubPath)
         await mkdir(uploadDir, { recursive: true })
 
         const safeSlot = sanitizeSlug(slot) || 'img'
@@ -134,12 +135,13 @@ export async function uploadProductImage(
 
         await writeFile(filePath, buffer)
 
-        const url = getProductImageUrl(itemNumber, filename, subFolder)
+        // Sub-path for DB storage (no prefix)
+        const subPath = getProductImageSubPath(itemNumber, filename, subFolder)
 
         // CREATE MediaImage record
         const mediaImage = await prisma.mediaImage.create({
             data: {
-                url,
+                url: subPath,
                 filename,
                 sizeBytes: size,
                 width: width || null,
@@ -149,13 +151,14 @@ export async function uploadProductImage(
             }
         })
 
+        const displayUrl = toDisplayUrl(subPath)
         console.log(
             wasConverted
-                ? `✓ Image uploaded & logged: ${url} | ${width}×${height} | ${(size / 1024).toFixed(0)}KB | saved ${savedPercent}%`
-                : `⚠ Image saved as-is & logged: ${url} | ${(size / 1024).toFixed(0)}KB (format not convertible)`
+                ? `✓ Image uploaded & logged: ${displayUrl} | ${width}×${height} | ${(size / 1024).toFixed(0)}KB | saved ${savedPercent}%`
+                : `⚠ Image saved as-is & logged: ${displayUrl} | ${(size / 1024).toFixed(0)}KB (format not convertible)`
         )
 
-        return { success: true, url, mediaId: mediaImage.id }
+        return { success: true, url: subPath, mediaId: mediaImage.id }
     } catch (error) {
         console.error('Image upload error:', error)
         return {
@@ -202,44 +205,11 @@ export async function uploadProductImages(
     }
 }
 
-/**
- * Upload an image to the standalone gallery (not tied to a product).
- * Saves to public/uploads/gallery/{uuid}.webp
- * Returns url, filename, width, height, sizeBytes for MediaImage record.
- */
-export async function uploadGalleryImage(
-    file: File
-): Promise<{ success: boolean; url?: string; filename?: string; width?: number; height?: number; sizeBytes?: number; error?: string }> {
-    try {
-        if (!file || file.size === 0) return { success: false, error: 'لم يتم اختيار ملف' }
-        if (file.size > MAX_FILE_SIZE) return { success: false, error: `حجم الملف يتجاوز 20MB` }
-        if (!isValidImageType(file)) return { success: false, error: 'صيغة الملف غير مدعومة' }
-
-        const uploadDir = join(getPublicDir(), 'uploads', 'gallery')
-        await mkdir(uploadDir, { recursive: true })
-
-        const rawBuffer = Buffer.from(await file.arrayBuffer())
-        const { buffer, width, height, size } = await processImageToWebP(rawBuffer)
-
-        const { v4: uuidv4 } = await import('crypto').then(m => ({ v4: () => m.randomUUID() }))
-        const filename = `${uuidv4()}.webp`
-        const filePath = join(uploadDir, filename)
-        await writeFile(filePath, buffer)
-
-        const url = `/uploads/gallery/${filename}`
-        console.log(`✓ Gallery image uploaded: ${url} | ${width}×${height} | ${(size / 1024).toFixed(0)}KB`)
-
-        return { success: true, url, filename, width, height, sizeBytes: size }
-    } catch (error) {
-        console.error('Gallery upload error:', error)
-        return { success: false, error: 'تعذّر رفع الصورة' }
-    }
-}
-
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
 /**
  * Delete a single product image file.
+ * Accepts either a sub-path or a legacy full URL path.
  */
 export async function deleteProductImage(
     imagePath: string
@@ -247,12 +217,13 @@ export async function deleteProductImage(
     try {
         if (!imagePath) return { success: true }
 
-        if (!imagePath.startsWith('/uploads/')) {
-            console.warn('Attempted to delete file outside uploads:', imagePath)
-            return { success: false, error: 'مسار الملف غير صالح — تعذّر تحديد موقع الصورة' }
-        }
+        // Resolve to disk path — handles both sub-paths and legacy full paths
+        const fullPath = toDiskPath(
+            imagePath.startsWith('/uploads/')
+                ? imagePath.replace(/^\/uploads\//, '')
+                : imagePath
+        )
 
-        const fullPath = join(getPublicDir(), imagePath)
         if (existsSync(fullPath)) {
             await unlink(fullPath)
             console.log(`✓ Image deleted: ${imagePath}`)
@@ -275,7 +246,7 @@ export async function deleteProductFolder(
     try {
         if (!itemNumber?.trim()) return { success: true }
 
-        const folderPath = getProductUploadDir(itemNumber)
+        const folderPath = toDiskDir(getProductSubDir(itemNumber))
         if (existsSync(folderPath)) {
             await rm(folderPath, { recursive: true, force: true })
             console.log(`✓ Product folder deleted: ${folderPath}`)
@@ -302,13 +273,14 @@ export async function moveProductImages(
         if (!oldItemNumber || !newItemNumber) return { success: true }
         if (sanitizeSlug(oldItemNumber) === sanitizeSlug(newItemNumber)) return { success: true }
 
-        const oldDir = getProductUploadDir(oldItemNumber)
-        const newDir = getProductUploadDir(newItemNumber)
+        const oldDir = toDiskDir(getProductSubDir(oldItemNumber))
+        const newDir = toDiskDir(getProductSubDir(newItemNumber))
 
         if (!existsSync(oldDir)) return { success: true }
 
         // Ensure parent exists
-        await mkdir(join(getPublicDir(), 'uploads', 'products'), { recursive: true })
+        const parentDir = toDiskDir('products')
+        await mkdir(parentDir, { recursive: true })
 
         // Read all files and move them
         const { rename } = await import('fs/promises')
@@ -321,4 +293,3 @@ export async function moveProductImages(
         return { success: false, error: 'تعذّر نقل مجلد الصور — يُرجى المحاولة مجدداً' }
     }
 }
-

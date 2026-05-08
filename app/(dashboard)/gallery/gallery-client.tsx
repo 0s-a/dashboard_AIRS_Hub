@@ -1,52 +1,32 @@
 "use client"
 
-import { useState, useTransition, useCallback } from "react"
+import { useState, useCallback } from "react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
 import {
     Images,
-    Search,
-    Filter,
-    Link2,
-    Link2Off,
-    Trash2,
-    Package,
-    LayoutGrid,
-    Loader2,
-    Eye,
     X,
     ChevronLeft,
     ChevronRight,
     Download,
     ZoomIn,
+    Package,
+    ExternalLink,
+    Star,
+    Loader2,
+    ChevronDown,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { toast } from "sonner"
-import { deleteGalleryImage } from "@/lib/actions/gallery"
-import { GalleryUploadZone } from "@/components/gallery/gallery-upload-zone"
-import { LinkToProductDialog } from "@/components/gallery/link-to-product-dialog"
-import type { GalleryImageData } from "@/lib/actions/gallery"
+import { Button } from "@/components/ui/button"
+import { getGalleryImages } from "@/lib/actions/gallery"
+import type { GalleryImage, GalleryStats } from "@/lib/actions/gallery"
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type Filter = 'all' | 'linked' | 'unlinked'
-
 interface GalleryClientProps {
-    initialImages: GalleryImageData[]
-    stats: { total: number; linked: number; unlinked: number }
+    initialImages: GalleryImage[]
+    initialCursor: string | null
+    stats: GalleryStats
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
@@ -58,7 +38,7 @@ function Lightbox({
     onNext,
     onPrev,
 }: {
-    images: GalleryImageData[]
+    images: GalleryImage[]
     index: number
     onClose: () => void
     onNext: () => void
@@ -69,34 +49,40 @@ function Lightbox({
 
     return (
         <div
-            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center"
             onClick={onClose}
         >
             {/* Close */}
             <button
-                className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-all"
+                className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-all z-10"
                 onClick={onClose}
             >
                 <X className="h-6 w-6" />
             </button>
 
             {/* Counter */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm bg-black/40 px-3 py-1 rounded-full">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm bg-black/40 backdrop-blur-sm px-4 py-1.5 rounded-full">
                 {index + 1} / {images.length}
             </div>
 
-            {/* Product badge */}
-            {img.product && (
-                <div className="absolute top-4 left-4 bg-primary/90 text-white text-xs px-3 py-1 rounded-full">
-                    {img.product.name}
-                </div>
-            )}
+            {/* Product info top-left */}
+            <div className="absolute top-4 left-4 z-10">
+                <Link
+                    href={`/inventory/${img.productId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-2 bg-primary/90 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-xl hover:bg-primary transition-colors shadow-lg"
+                >
+                    <Package className="h-4 w-4" />
+                    <span className="font-medium">{img.productName}</span>
+                    <span className="text-white/70 font-mono text-xs">#{img.itemNumber}</span>
+                </Link>
+            </div>
 
             {/* Prev */}
             {images.length > 1 && (
                 <button
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-3 rounded-full hover:bg-white/10 transition-all"
-                    onClick={e => { e.stopPropagation(); onPrev() }}
+                    onClick={(e) => { e.stopPropagation(); onPrev() }}
                 >
                     <ChevronRight className="h-8 w-8" />
                 </button>
@@ -105,11 +91,11 @@ function Lightbox({
             {/* Image */}
             <div
                 className="relative max-w-5xl max-h-[85vh] w-full h-full mx-20"
-                onClick={e => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
             >
                 <Image
                     src={img.url}
-                    alt={img.alt || img.filename}
+                    alt={img.alt || img.productName}
                     fill
                     className="object-contain"
                     priority
@@ -120,21 +106,26 @@ function Lightbox({
             {images.length > 1 && (
                 <button
                     className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-3 rounded-full hover:bg-white/10 transition-all"
-                    onClick={e => { e.stopPropagation(); onNext() }}
+                    onClick={(e) => { e.stopPropagation(); onNext() }}
                 >
                     <ChevronLeft className="h-8 w-8" />
                 </button>
             )}
 
             {/* Bottom info */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 text-white/60 text-xs">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 text-white/60 text-xs bg-black/40 backdrop-blur-sm px-5 py-2.5 rounded-xl">
+                {img.isPrimary && (
+                    <span className="flex items-center gap-1 text-amber-400">
+                        <Star className="h-3 w-3 fill-current" />
+                        رئيسية
+                    </span>
+                )}
                 <span>{img.filename}</span>
                 {img.width && img.height && <span>{img.width}×{img.height}</span>}
-                {img.sizeBytes && <span>{(img.sizeBytes / 1024).toFixed(0)}KB</span>}
                 <a
                     href={img.url}
                     download={img.filename}
-                    onClick={e => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1 text-white/60 hover:text-white transition-colors"
                 >
                     <Download className="h-3.5 w-3.5" />
@@ -150,30 +141,12 @@ function Lightbox({
 function ImageCard({
     image,
     onLightbox,
-    onLink,
-    onDelete,
 }: {
-    image: GalleryImageData
+    image: GalleryImage
     onLightbox: () => void
-    onLink: () => void
-    onDelete: () => void
 }) {
-    const [deleting, setDeleting] = useState(false)
-
-    const handleDelete = async () => {
-        setDeleting(true)
-        const res = await deleteGalleryImage(image.id)
-        if (res.success) {
-            toast.success('تم حذف الصورة')
-            onDelete()
-        } else {
-            toast.error('فشل الحذف', { description: res.error })
-            setDeleting(false)
-        }
-    }
-
     return (
-        <div className="group relative rounded-2xl overflow-hidden border border-border/50 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 bg-muted/10 hover:-translate-y-0.5">
+        <div className="group relative rounded-2xl overflow-hidden border border-border/50 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 bg-card hover:-translate-y-0.5">
             {/* Image */}
             <div
                 className="aspect-square relative cursor-zoom-in overflow-hidden"
@@ -181,219 +154,149 @@ function ImageCard({
             >
                 <Image
                     src={image.url}
-                    alt={image.alt || image.filename}
+                    alt={image.alt || image.productName}
                     fill
                     className="object-cover transition-all duration-500 group-hover:scale-105 group-hover:brightness-105"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 />
 
                 {/* Hover overlay */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-all duration-300 flex items-center justify-center">
                     <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 drop-shadow-lg" />
                 </div>
 
-                {/* Top badges */}
-                <div className="absolute top-2 right-2 flex flex-col gap-1">
-                    {image.product && (
-                        <Badge className="text-[10px] px-1.5 py-0.5 bg-primary/90 text-white border-0 backdrop-blur-sm shadow-md">
-                            {image.product.name}
+                {/* Primary badge */}
+                {image.isPrimary && (
+                    <div className="absolute top-2 right-2">
+                        <div className="flex items-center gap-1 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+                            <Star className="h-2.5 w-2.5 fill-current" />
+                            رئيسية
+                        </div>
+                    </div>
+                )}
+
+                {/* Category badge */}
+                {image.categoryName && (
+                    <div className="absolute top-2 left-2">
+                        <Badge
+                            variant="secondary"
+                            className="text-[10px] px-1.5 py-0.5 bg-background/80 backdrop-blur-sm border-0 shadow-sm"
+                        >
+                            {image.categoryName}
                         </Badge>
-                    )}
-                </div>
-
-                {/* Action buttons top right */}
-                <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <button
-                                type="button"
-                                disabled={deleting}
-                                className="h-7 w-7 rounded-full bg-destructive/80 backdrop-blur text-white flex items-center justify-center hover:bg-destructive transition-colors"
-                                onClick={e => e.stopPropagation()}
-                            >
-                                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                            </button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent dir="rtl">
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>حذف الصورة؟</AlertDialogTitle>
-                                <AlertDialogDescription>سيتم حذف الصورة نهائياً من المعرض والقرص. لا يمكن التراجع.</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                                    حذف
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </div>
+                    </div>
+                )}
             </div>
 
-            {/* Footer */}
-            <div className="p-3 space-y-2">
-                <p className="text-xs font-medium truncate text-muted-foreground">{image.filename}</p>
-                <div className="flex items-center gap-1.5">
-                    {image.width && image.height && (
-                        <span className="text-[10px] text-muted-foreground/60">{image.width}×{image.height}</span>
-                    )}
-                    {image.sizeBytes && (
-                        <span className="text-[10px] text-muted-foreground/60">• {(image.sizeBytes / 1024).toFixed(0)}KB</span>
-                    )}
+            {/* Footer — Product Info */}
+            <Link
+                href={`/inventory/${image.productId}`}
+                className="block p-3 group/link hover:bg-muted/30 transition-colors"
+            >
+                <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate text-foreground group-hover/link:text-primary transition-colors">
+                            {image.productName}
+                        </p>
+                        <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                            #{image.itemNumber}
+                        </p>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50 group-hover/link:text-primary transition-colors shrink-0 mt-0.5" />
                 </div>
-                <button
-                    type="button"
-                    onClick={onLink}
-                    className={`w-full flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg border transition-all ${image.productId
-                        ? 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10'
-                        : 'border-border/50 text-muted-foreground hover:border-primary/30 hover:text-primary hover:bg-primary/5'
-                        }`}
-                >
-                    {image.productId ? <Link2 className="h-3 w-3" /> : <Link2Off className="h-3 w-3" />}
-                    {image.product ? `مرتبط: ${image.product.name}` : 'ربط بمنتج'}
-                </button>
-            </div>
+            </Link>
         </div>
     )
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-export function GalleryClient({ initialImages, stats }: GalleryClientProps) {
-    const router = useRouter()
-    const [images, setImages] = useState<GalleryImageData[]>(initialImages)
-    const [filter, setFilter] = useState<Filter>('all')
-    const [search, setSearch] = useState("")
+export function GalleryClient({ initialImages, initialCursor, stats }: GalleryClientProps) {
+    const [images, setImages] = useState<GalleryImage[]>(initialImages)
+    const [cursor, setCursor] = useState<string | null>(initialCursor)
+    const [loading, setLoading] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
-    const [linkTarget, setLinkTarget] = useState<GalleryImageData | null>(null)
-    const [isPending, startTransition] = useTransition()
 
-    const refresh = useCallback(() => {
-        startTransition(() => router.refresh())
-    }, [router])
-
-    // Filter + search
-    const filtered = images
-        .filter(img => {
-            if (filter === 'linked') return !!img.productId
-            if (filter === 'unlinked') return !img.productId
-            return true
-        })
-        .filter(img => {
-            if (!search.trim()) return true
-            const q = search.toLowerCase()
-            return (
-                img.filename.toLowerCase().includes(q) ||
-                img.product?.name.toLowerCase().includes(q) ||
-                img.product?.itemNumber.toLowerCase().includes(q) ||
-                img.alt?.toLowerCase().includes(q)
-            )
-        })
-
-    const filterBtns: { key: Filter; label: string; count: number }[] = [
-        { key: 'all', label: 'الكل', count: stats.total },
-        { key: 'linked', label: 'مرتبطة', count: stats.linked },
-        { key: 'unlinked', label: 'غير مرتبطة', count: stats.unlinked },
-    ]
+    const loadMore = useCallback(async () => {
+        if (!cursor || loading) return
+        setLoading(true)
+        try {
+            const res = await getGalleryImages(cursor)
+            if (res.success) {
+                setImages((prev) => [...prev, ...res.data])
+                setCursor(res.nextCursor)
+            }
+        } finally {
+            setLoading(false)
+        }
+    }, [cursor, loading])
 
     return (
         <div className="space-y-6" dir="rtl">
             {/* Header */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                            <Images className="h-5 w-5 text-primary" />
-                        </div>
-                        معرض الصور
-                    </h1>
-                    <p className="text-muted-foreground mt-1 text-sm">
-                        {stats.total} صورة — {stats.linked} مرتبطة بمنتجات، {stats.unlinked} غير مرتبطة
-                    </p>
-                </div>
-            </div>
-
-            {/* Upload Zone */}
-            <div className="glass-panel rounded-2xl p-5 border border-border/50">
-                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
-                    <LayoutGrid className="h-4 w-4" />
-                    رفع صور جديدة
-                </h2>
-                <GalleryUploadZone onUploadComplete={refresh} />
-            </div>
-
-            {/* Filters + Search */}
-            <div className="flex items-center gap-3 flex-wrap">
-                <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="بحث في الصور..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="pr-9"
-                    />
-                </div>
-                <div className="flex items-center gap-1.5 p-1 rounded-xl border border-border/50 bg-muted/20" role="group">
-                    {filterBtns.map(btn => (
-                        <button
-                            key={btn.key}
-                            type="button"
-                            onClick={() => setFilter(btn.key)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === btn.key
-                                ? 'bg-primary text-white shadow-md shadow-primary/20'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                                }`}
-                        >
-                            {btn.label}
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${filter === btn.key ? 'bg-white/20' : 'bg-muted'}`}>
-                                {btn.count}
-                            </span>
-                        </button>
-                    ))}
-                </div>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Images className="h-5 w-5 text-primary" />
+                    </div>
+                    معرض صور المنتجات
+                </h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                    {stats.totalImages} صورة من {stats.totalProducts} منتج
+                </p>
             </div>
 
             {/* Gallery Grid */}
-            {filtered.length === 0 ? (
+            {images.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
                     <div className="h-20 w-20 rounded-2xl bg-muted/30 flex items-center justify-center">
                         <Images className="h-10 w-10 opacity-30" />
                     </div>
                     <p className="font-medium">لا توجد صور</p>
-                    <p className="text-sm opacity-70">ارفع صوراً جديدة للبدء</p>
+                    <p className="text-sm opacity-70">أضف صوراً للمنتجات من صفحة المنتج</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                    {filtered.map((img, idx) => (
-                        <ImageCard
-                            key={img.id}
-                            image={img}
-                            onLightbox={() => setLightboxIndex(idx)}
-                            onLink={() => setLinkTarget(img)}
-                            onDelete={refresh}
-                        />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {images.map((img, idx) => (
+                            <ImageCard
+                                key={`${img.id}-${img.productId}`}
+                                image={img}
+                                onLightbox={() => setLightboxIndex(idx)}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Load More */}
+                    {cursor && (
+                        <div className="flex justify-center pt-4">
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                onClick={loadMore}
+                                disabled={loading}
+                                className="gap-2 px-8 rounded-xl"
+                            >
+                                {loading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <ChevronDown className="h-4 w-4" />
+                                )}
+                                {loading ? "جاري التحميل..." : "عرض المزيد"}
+                            </Button>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Lightbox */}
-            {lightboxIndex !== null && filtered.length > 0 && (
+            {lightboxIndex !== null && images.length > 0 && (
                 <Lightbox
-                    images={filtered}
+                    images={images}
                     index={lightboxIndex}
                     onClose={() => setLightboxIndex(null)}
-                    onNext={() => setLightboxIndex(i => i !== null ? (i + 1) % filtered.length : 0)}
-                    onPrev={() => setLightboxIndex(i => i !== null ? (i - 1 + filtered.length) % filtered.length : 0)}
-                />
-            )}
-
-            {/* Link Dialog */}
-            {linkTarget && (
-                <LinkToProductDialog
-                    image={linkTarget}
-                    open={!!linkTarget}
-                    onOpenChange={open => { if (!open) setLinkTarget(null) }}
-                    onSuccess={refresh}
+                    onNext={() => setLightboxIndex((i) => i !== null ? (i + 1) % images.length : 0)}
+                    onPrev={() => setLightboxIndex((i) => i !== null ? (i - 1 + images.length) % images.length : 0)}
                 />
             )}
         </div>

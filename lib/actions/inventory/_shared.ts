@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type { SerializedPrice, ProductUnitEntry, SerializedCategory } from '@/lib/types/product'
+import { toDisplayUrl } from '@/lib/utils/image-paths'
 
 export { prisma, Prisma }
 
@@ -42,7 +43,7 @@ export function serializeProduct(product: any) {
     const mediaImages = (product.productImages || []).map((pi: any) => ({
         id: pi.id,
         mediaImageId: pi.mediaImageId,
-        url: pi.mediaImage.url,
+        url: toDisplayUrl(pi.mediaImage.url),
         filename: pi.mediaImage.filename,
         alt: pi.mediaImage.alt,
         isPrimary: pi.isPrimary,
@@ -66,7 +67,7 @@ export function serializeProduct(product: any) {
         imageCount: (v.variantImages || []).length,
         images: (v.variantImages || []).map((vi: any) => ({
             id: vi.id,
-            url: vi.mediaImage.url,
+            url: toDisplayUrl(vi.mediaImage.url),
             filename: vi.mediaImage.filename,
             alt: vi.mediaImage.alt,
         })),

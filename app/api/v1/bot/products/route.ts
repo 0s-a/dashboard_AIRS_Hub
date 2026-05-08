@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateApiKey, apiError, apiSuccess, parsePagination, paginationMeta } from '@/lib/api-utils'
+import { toDisplayUrl } from '@/lib/utils/image-paths'
 
 const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true, icon: true } },
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
             isAvailable: p.isAvailable,
             category: p.category,
             images: p.productImages.map(pi => ({
-                url: pi.mediaImage.url,
+                url: toDisplayUrl(pi.mediaImage.url),
                 alt: pi.mediaImage.alt,
                 isPrimary: pi.isPrimary,
             })),

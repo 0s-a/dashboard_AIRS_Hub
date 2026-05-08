@@ -3,19 +3,20 @@ import { GalleryClient } from "./gallery-client"
 
 export const metadata = {
     title: "معرض الصور | نواة",
-    description: "معرض الصور المركزي — رفع وإدارة وربط الصور بالمنتجات",
+    description: "عرض صور جميع المنتجات في معرض مرئي احترافي",
 }
 
 export default async function GalleryPage() {
-    const [imagesRes, statsRes] = await Promise.all([
-        getGalleryImages('all'),
+    const [galleryRes, statsRes] = await Promise.all([
+        getGalleryImages(),
         getGalleryStats(),
     ])
 
     return (
         <GalleryClient
-            initialImages={imagesRes.data ?? []}
-            stats={statsRes.data ?? { total: 0, linked: 0, unlinked: 0 }}
+            initialImages={galleryRes.data ?? []}
+            initialCursor={galleryRes.nextCursor ?? null}
+            stats={statsRes.data ?? { totalImages: 0, totalProducts: 0 }}
         />
     )
 }

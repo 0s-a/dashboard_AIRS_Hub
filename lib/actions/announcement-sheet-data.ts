@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { safeAction } from '@/lib/action-utils'
+import { toDisplayUrl } from '@/lib/utils/image-paths'
 
 /** Lightweight data needed to populate the announcement sheet */
 export async function getAnnouncementSheetData() {
@@ -53,7 +54,7 @@ export async function getAnnouncementSheetData() {
             name:       p.name,
             itemNumber: p.itemNumber,
             categoryId: p.categoryId,
-            mainImage:  (p as any).productImages?.[0]?.mediaImage?.url ?? null,
+            mainImage:  (p as any).productImages?.[0]?.mediaImage?.url ? toDisplayUrl((p as any).productImages[0].mediaImage.url) : null,
         }))
 
 

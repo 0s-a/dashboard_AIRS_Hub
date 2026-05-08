@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { uploadProductImage, deleteProductImage as deleteImageFile } from './upload'
+import { toDisplayUrl } from '@/lib/utils/image-paths'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ function mapRecord(pi: any): ProductImageRecord {
     return {
         id: pi.id,
         mediaImageId: pi.mediaImageId,
-        url: pi.mediaImage.url,
+        url: toDisplayUrl(pi.mediaImage.url),
         filename: pi.mediaImage.filename,
         alt: pi.mediaImage.alt,
         isPrimary: pi.isPrimary,

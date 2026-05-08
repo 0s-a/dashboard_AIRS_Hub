@@ -1,5 +1,5 @@
 import fs from 'fs'
-import path from 'path'
+import { toDiskPath, extractSubPath } from '@/lib/utils/image-paths'
 
 const globalBase64Cache = new Map<string, string>()
 
@@ -12,21 +12,18 @@ const globalBase64Cache = new Map<string, string>()
  */
 export function convertUrlsToBase64(urls: string[]): string[] {
     if (!urls || urls.length === 0) return urls
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') ?? ''
     
     return urls.map(url => {
         if (!url) return url
         if (globalBase64Cache.has(url)) return globalBase64Cache.get(url)!
 
-        let relativePath = url
-        if (baseUrl && url.startsWith(baseUrl)) {
-            relativePath = url.substring(baseUrl.length)
-        }
-        if (relativePath.startsWith('/uploads/')) {
+        // Extract sub-path (handles both legacy "/uploads/..." and new sub-paths)
+        const subPath = extractSubPath(url)
+        if (subPath) {
             try {
-                const filePath = path.join(process.cwd(), 'public', relativePath)
+                const filePath = toDiskPath(subPath)
                 if (fs.existsSync(filePath)) {
-                    const ext = path.extname(relativePath).toLowerCase().replace('.', '') || 'jpeg'
+                    const ext = subPath.split('.').pop()?.toLowerCase() || 'jpeg'
                     const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
                     const b64 = fs.readFileSync(filePath, 'base64')
                     const b64Url = `data:${mimeType};base64,${b64}`
@@ -34,7 +31,7 @@ export function convertUrlsToBase64(urls: string[]): string[] {
                     return b64Url
                 }
             } catch (e) {
-                console.error("Base64 conversion failed for", relativePath, e)
+                console.error("Base64 conversion failed for", subPath, e)
             }
         }
         // Cache the original url if it failed or isn't a local upload

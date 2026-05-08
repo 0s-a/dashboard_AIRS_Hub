@@ -9,6 +9,7 @@
 
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { toDisplayUrl } from '@/lib/utils/image-paths'
 import {
     resolveProducts,
     streamPersons,
@@ -313,7 +314,7 @@ export async function dbGetAnnouncementFormData() {
         name:       p.name,
         itemNumber: p.itemNumber,
         categoryId: p.categoryId,
-        mainImage:  (p as any).productImages?.[0]?.mediaImage?.url ?? null,
+        mainImage:  (p as any).productImages?.[0]?.mediaImage?.url ? toDisplayUrl((p as any).productImages[0].mediaImage.url) : null,
     }))
 
     return { persons, personTypes, products, categories, personTags }

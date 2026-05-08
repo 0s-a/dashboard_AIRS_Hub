@@ -9,6 +9,7 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import type { PersonFilters, ProductFilters, PersonPayload, ProductPayload } from '@/lib/types/announcements'
+import { toExternalUrl, toDisplayUrl } from '@/lib/utils/image-paths'
 
 export type { PersonFilters, ProductFilters, PersonPayload, ProductPayload }
 
@@ -244,19 +245,16 @@ const PRODUCT_SELECT = {
     },
 }
 
-// ─── Image URL helpers ────────────────────────────────────────────────────────
-
 /**
- * Converts a relative image path (e.g. /uploads/products/...) to an absolute
+ * Converts a sub-path (e.g. "products/001-bf-607/main.webp") to an absolute
  * URL using NEXT_PUBLIC_BASE_URL so n8n / WhatsApp can fetch images directly.
  *
  * Falls back to the path as-is if it is already an absolute URL.
  */
-function toAbsoluteUrl(url: string | undefined | null): string | null {
-    if (!url) return null
-    if (url.startsWith('http://') || url.startsWith('https://')) return url
-    const base = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') ?? ''
-    return `${base}${url}`
+function toAbsoluteUrl(subPath: string | undefined | null): string | null {
+    if (!subPath) return null
+    if (subPath.startsWith('http://') || subPath.startsWith('https://')) return subPath
+    return toExternalUrl(subPath)
 }
 
 function toProductPayload(p: any): ProductPayload {

@@ -1,6 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
+import { toDisplayUrl } from '@/lib/utils/image-paths'
 
 // Get all unique tags used across all products
 export async function getProductTags(): Promise<string[]> {
@@ -34,7 +35,14 @@ export async function getProductsByTag(tag: string) {
             },
             orderBy: { name: 'asc' }
         })
-        return { success: true, data: products }
+        const mapped = products.map((p: any) => ({
+            ...p,
+            productImages: (p.productImages || []).map((pi: any) => ({
+                ...pi,
+                mediaImage: { ...pi.mediaImage, url: toDisplayUrl(pi.mediaImage.url) },
+            })),
+        }))
+        return { success: true, data: mapped }
     } catch (error) {
         console.error('Failed to fetch products by tag:', error)
         return { success: false, error: 'فشل جلب المنتجات', data: [] }

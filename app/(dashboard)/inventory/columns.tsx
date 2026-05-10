@@ -240,8 +240,6 @@ function ProductNameCell({ product, row }: { product: SerializedProduct; row: an
                     )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                    <CopyableItemNumber itemNumber={product.itemNumber} />
-
                     {/* Variants Badge */}
                     {product.variants?.length > 0 && (
                         <TooltipProvider>
@@ -413,6 +411,30 @@ export const columns: ColumnDef<SerializedProduct>[] = [
         size: 350,
         minSize: 250,
         cell: ({ row }) => <ProductNameCell product={row.original} row={row} />,
+    },
+
+    // ── Product Code ──────────────────────────────────────
+    {
+        id: "productCode",
+        header: "الرقم المركب",
+        size: 140,
+        maxSize: 160,
+        cell: ({ row }) => {
+            const product = row.original
+            const code = (product as any).productCode as string | undefined
+            if (!code) return <span className="text-xs text-muted-foreground">—</span>
+
+            return (
+                <div className="flex flex-col gap-1">
+                    <CopyableItemNumber itemNumber={code} />
+                    {product.itemNumber && (
+                        <span className="text-[9px] text-muted-foreground/60 font-mono px-1.5">
+                            {product.itemNumber}
+                        </span>
+                    )}
+                </div>
+            )
+        },
     },
 
     // ── Category ──────────────────────────────────────────

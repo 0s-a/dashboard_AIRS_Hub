@@ -12,11 +12,10 @@ export type ProductImage = {
     alt?: string
     isPrimary: boolean
     order?: number
-    mediaImageId?: string
 }
 
 /** Image entry for create/update operations */
-export type ImageEntry = { url?: string; alt?: string; isPrimary: boolean; order?: number; mediaImageId?: string }
+export type ImageEntry = { url?: string; alt?: string; isPrimary: boolean; order?: number }
 
 // ─── Image Helpers ──────────────────────────────────────────
 
@@ -54,7 +53,7 @@ export function validateProductImages(images: ProductImage[]): { valid: boolean;
 
 /** Input for creating/updating a product */
 export interface ProductInput {
-    itemNumber: string
+    itemNumber?: string | null    // Optional manual code
     name: string
     brandId?: string | null
     description?: string | null
@@ -130,7 +129,8 @@ export type ProductsFilters = {
 /** The shape returned by serializeProduct() — used in table/list views */
 export type SerializedProduct = {
     id: string
-    itemNumber: string
+    productCode: string          // Auto-generated composite code
+    itemNumber: string | null     // Optional manual code
     name: string
     brandId: string | null
     brandRef: {
@@ -177,7 +177,6 @@ export type ProductVariantWithImages = {
 /** Media image record used in gallery and product detail */
 export type ProductMediaImage = {
     id: string
-    mediaImageId: string
     url: string
     filename?: string
     alt?: string | null

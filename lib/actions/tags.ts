@@ -30,7 +30,7 @@ export async function getProductsByTag(tag: string) {
                 itemNumber: true,
                 tags: true,
                 isAvailable: true,
-                productImages: { include: { mediaImage: { select: { url: true } } }, where: { isPrimary: true }, take: 1 },
+                productImages: { select: { url: true, isPrimary: true }, where: { isPrimary: true }, take: 1 },
                 brandId: true,
             },
             orderBy: { name: 'asc' }
@@ -39,7 +39,7 @@ export async function getProductsByTag(tag: string) {
             ...p,
             productImages: (p.productImages || []).map((pi: any) => ({
                 ...pi,
-                mediaImage: { ...pi.mediaImage, url: toDisplayUrl(pi.mediaImage.url) },
+                url: toDisplayUrl(pi.url),
             })),
         }))
         return { success: true, data: mapped }

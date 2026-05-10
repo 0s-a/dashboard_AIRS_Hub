@@ -68,11 +68,11 @@ export async function addVariant(
 
         const product = await prisma.product.findUnique({
             where: { id: productId },
-            select: { itemNumber: true },
+            select: { productCode: true },
         })
         if (!product) return { success: false, error: 'المنتج غير موجود' }
 
-        const variantNumber = buildVariantNumber(product.itemNumber, suffix)
+        const variantNumber = buildVariantNumber(product.productCode, suffix)
 
         // Check uniqueness
         const existing = await prisma.variant.findFirst({
@@ -165,7 +165,7 @@ export async function updateVariant(
     try {
         const variant = await prisma.variant.findUnique({
             where: { id: variantId },
-            include: { product: { select: { itemNumber: true } } },
+            include: { product: { select: { productCode: true } } },
         })
         if (!variant) return { success: false, error: 'المتغير غير موجود' }
 
@@ -185,7 +185,7 @@ export async function updateVariant(
             })
             if (dup) return { success: false, error: 'هذا الرمز مستخدم بالفعل لهذا المنتج' }
 
-            newVariantNumber = buildVariantNumber(variant.product.itemNumber, newSuffix)
+            newVariantNumber = buildVariantNumber(variant.product.productCode, newSuffix)
             const globalDup = await prisma.variant.findFirst({
                 where: { variantNumber: newVariantNumber, id: { not: variantId } },
             })

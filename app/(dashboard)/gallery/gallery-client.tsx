@@ -199,7 +199,7 @@ function ImageCard({
                             {image.productName}
                         </p>
                         <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                            #{image.itemNumber}
+                            #{image.productCode}
                         </p>
                     </div>
                     <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50 group-hover/link:text-primary transition-colors shrink-0 mt-0.5" />

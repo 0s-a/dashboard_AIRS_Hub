@@ -28,7 +28,7 @@ const getDashboardData = unstable_cache(
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    productImages: { include: { mediaImage: true } },
+                    productImages: true,
                     productPrices: {
                         include: { priceLabel: true, currency: true },
                         orderBy: { createdAt: 'asc' },
@@ -64,7 +64,7 @@ const getDashboardData = unstable_cache(
             recentProducts: recentProducts.map((p: any) => ({
                 ...p,
                 mediaImages: (p.productImages || []).map((pi: any) => ({
-                    url: toDisplayUrl(pi.mediaImage.url),
+                    url: toDisplayUrl(pi.url),
                     isPrimary: pi.isPrimary,
                 })),
                 productPrices: (p.productPrices || []).map((pp: any) => ({

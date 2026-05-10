@@ -39,7 +39,7 @@ import type { SerializedProduct } from "@/lib/actions/inventory"
 // ─── Schema ──────────────────────────────────────────────────
 
 const formSchema = z.object({
-    itemNumber: z.string().min(1, { message: "رقم الصنف مطلوب" }),
+    itemNumber: z.string().optional().nullable(),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     brandId: z.string().optional().nullable(),
     description: z.string().optional().nullable(),
@@ -179,21 +179,19 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                 <CardTitle>البيانات الأساسية</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {/* Item Number + Name */}
+                                {/* Product Code — Read-only (auto-generated on creation) */}
+                                {product && (
+                                    <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                                        <Hash className="h-4 w-4 text-primary" />
+                                        <span className="text-sm text-muted-foreground">الرقم المركب:</span>
+                                        <span className="font-mono text-sm font-bold text-primary tracking-wider">
+                                            {(product as any).productCode}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Name + Item Number (optional) */}
                                 <div className="grid grid-cols-1 gap-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="itemNumber"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>رقم الصنف</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="رقم الصنف..." {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
                                     <FormField
                                         control={form.control}
                                         name="name"
@@ -202,6 +200,19 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                                 <FormLabel>اسم المنتج</FormLabel>
                                                 <FormControl>
                                                     <Input placeholder="مثال: آيفون 15..." {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="itemNumber"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>رقم الصنف (اختياري)</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="رقم يدوي اختياري..." {...field} value={field.value ?? ""} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

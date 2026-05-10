@@ -4,12 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { uploadProductImage, deleteProductImage as deleteImageFile } from './upload'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
+import { IMAGE_STORAGE_CONFIG } from '@/lib/config/image-storage.config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ProductImageRecord = {
-    id: string          // ProductImage junction record id
-    mediaImageId: string
+    id: string
     url: string
     filename: string
     alt: string | null
@@ -28,25 +28,24 @@ function revalidateProduct(productId: string) {
     revalidatePath(`/inventory/${productId}`)
 }
 
-/** Map a productImage + nested mediaImage into a flat record */
+/** Map a ProductImage DB record into a flat client-safe record */
 function mapRecord(pi: any): ProductImageRecord {
     return {
         id: pi.id,
-        mediaImageId: pi.mediaImageId,
-        url: toDisplayUrl(pi.mediaImage.url),
-        filename: pi.mediaImage.filename,
-        alt: pi.mediaImage.alt,
+        url: toDisplayUrl(pi.url),
+        filename: pi.filename,
+        alt: pi.alt,
         isPrimary: pi.isPrimary,
         order: pi.order,
-        width: pi.mediaImage.width,
-        height: pi.mediaImage.height,
-        sizeBytes: pi.mediaImage.sizeBytes,
+        width: pi.width,
+        height: pi.height,
+        sizeBytes: pi.sizeBytes,
         variantIds: (pi.variants || []).map((v: any) => v.id),
     }
 }
 
-// Include clause used consistently
-const INCLUDE_MEDIA = { mediaImage: true, variants: { select: { id: true } } } as const
+// Include clause for variant ids
+const INCLUDE_VARIANTS = { variants: { select: { id: true } } } as const
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -54,7 +53,7 @@ export async function getProductImages(productId: string): Promise<{ success: bo
     try {
         const pis = await prisma.productImage.findMany({
             where: { productId },
-            include: INCLUDE_MEDIA,
+            include: INCLUDE_VARIANTS,
             orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { createdAt: 'asc' }],
         })
 
@@ -74,33 +73,36 @@ export async function addProductImage(
     try {
         const product = await prisma.product.findUnique({
             where: { id: productId },
-            select: { itemNumber: true },
+            select: { productCode: true },
         })
         if (!product) return { success: false, error: 'المنتج غير موجود' }
 
         const existingCount = await prisma.productImage.count({ where: { productId } })
-        if (existingCount >= 10) {
-            return { success: false, error: 'الحد الأقصى 10 صور للمنتج الواحد' }
+        if (existingCount >= IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct) {
+            return { success: false, error: `الحد الأقصى ${IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct} صور للمنتج الواحد` }
         }
 
-        const slot = `${product.itemNumber}-${existingCount + 1}`
         const isFirst = existingCount === 0
 
-        // Upload the file → creates a MediaImage record
-        const result = await uploadProductImage(file, product.itemNumber, slot)
-        if (!result.success || !result.mediaId) {
+        // Upload the file to disk — filename will be 01.webp, 02.webp, etc.
+        const result = await uploadProductImage(file, product.productCode, existingCount)
+        if (!result.success || !result.url) {
             return { success: false, error: result.error || 'فشل رفع الصورة' }
         }
 
-        // Create the junction record linking product ↔ image
+        // Create ProductImage record with image metadata directly
         const pi = await prisma.productImage.create({
             data: {
                 productId,
-                mediaImageId: result.mediaId,
+                url: result.url,
+                filename: result.filename!,
+                sizeBytes: result.sizeBytes ?? null,
+                width: result.width ?? null,
+                height: result.height ?? null,
                 isPrimary: isFirst,
                 order: existingCount,
             },
-            include: INCLUDE_MEDIA,
+            include: INCLUDE_VARIANTS,
         })
 
         revalidateProduct(productId)
@@ -117,17 +119,16 @@ export async function removeProductImage(
     try {
         const pi = await prisma.productImage.findUnique({
             where: { id: productImageId },
-            include: INCLUDE_MEDIA,
         })
         if (!pi) return { success: false, error: 'الصورة غير موجودة' }
 
         const { productId, isPrimary: wasPrimary } = pi
 
         // Delete the file from disk
-        await deleteImageFile(pi.mediaImage.url)
+        await deleteImageFile(pi.url)
 
-        // Delete the MediaImage record (cascade deletes the junction record too)
-        await prisma.mediaImage.delete({ where: { id: pi.mediaImageId } })
+        // Delete the ProductImage record
+        await prisma.productImage.delete({ where: { id: productImageId } })
 
         // If deleted image was primary, make the first remaining one primary
         if (wasPrimary) {
@@ -247,4 +248,3 @@ export async function toggleVariantForProductImage(
         return { success: false, error: 'فشل ربط المتغير بالصورة' }
     }
 }
-

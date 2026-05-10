@@ -48,6 +48,7 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
             const q = search.trim()
             where.OR = [
                 { name:        { contains: q, mode: 'insensitive' } },
+                { productCode: { contains: q, mode: 'insensitive' } },
                 { itemNumber:  { contains: q, mode: 'insensitive' } },
                 { description: { contains: q, mode: 'insensitive' } },
                 { brandRef: { name: { contains: q, mode: 'insensitive' } } },

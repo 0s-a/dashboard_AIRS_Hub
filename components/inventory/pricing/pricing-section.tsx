@@ -13,7 +13,7 @@ import type { SerializedPrice, ProductUnitEntry } from '@/lib/types/product'
 interface PricingSectionProps {
     product: {
         id: string
-        itemNumber: string
+        itemNumber: string | null
         name: string
         productPrices: SerializedPrice[]
         productUnits?: ProductUnitEntry[]

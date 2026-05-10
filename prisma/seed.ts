@@ -62,13 +62,14 @@ async function main() {
 
     console.log('📦 Seeding Products...')
     for (const p of products) {
+        const { prices: _prices, ...productData } = p as any
         // نستخدم upsert بدلاً من create لتجنب تكرار البيانات عند تشغيل الأمر مرتين
         const product = await prisma.product.upsert({
-            where: { itemNumber: p.itemNumber }, // البحث برقم الصنف
-            update: p, // تحديث البيانات إذا كان موجوداً
-            create: p, // إنشاؤه إذا لم يكن موجوداً
+            where: { productCode: `GEN-XX-${p.itemNumber}` }, // البحث بالرقم المركب
+            update: productData,
+            create: { ...productData, productCode: `GEN-XX-${p.itemNumber}` },
         })
-        console.log(`  └─ Created/Updated product: ${product.name} (#${product.itemNumber})`)
+        console.log(`  └─ Created/Updated product: ${product.name} (#${product.productCode})`)
     }
 
     // 2. تعريف الأشخاص

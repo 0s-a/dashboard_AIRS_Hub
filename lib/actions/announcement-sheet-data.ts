@@ -22,7 +22,7 @@ export async function getAnnouncementSheetData() {
                 select: {
                     id: true, name: true, itemNumber: true, categoryId: true,
                     productImages: {
-                        select: { mediaImage: { select: { url: true } } },
+                        select: { url: true },
                         orderBy: { order: 'asc' },
                         take: 1,
                     },
@@ -54,7 +54,7 @@ export async function getAnnouncementSheetData() {
             name:       p.name,
             itemNumber: p.itemNumber,
             categoryId: p.categoryId,
-            mainImage:  (p as any).productImages?.[0]?.mediaImage?.url ? toDisplayUrl((p as any).productImages[0].mediaImage.url) : null,
+            mainImage:  (p as any).productImages?.[0]?.url ? toDisplayUrl((p as any).productImages[0].url) : null,
         }))
 
 

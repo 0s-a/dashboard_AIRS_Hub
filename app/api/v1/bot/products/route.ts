@@ -6,7 +6,7 @@ import { toDisplayUrl } from '@/lib/utils/image-paths'
 const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true, icon: true } },
     productImages: {
-        include: { mediaImage: { select: { url: true, alt: true } } },
+        select: { url: true, alt: true, isPrimary: true },
         orderBy: { order: 'asc' as const },
     },
     productPrices: {
@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
         if (search) {
             where.OR = [
                 { name:        { contains: search, mode: 'insensitive' } },
+                { productCode: { contains: search, mode: 'insensitive' } },
                 { itemNumber:  { contains: search, mode: 'insensitive' } },
                 { description: { contains: search, mode: 'insensitive' } },
                 { brandRef: { name: { contains: search, mode: 'insensitive' } } },
@@ -62,6 +63,7 @@ export async function GET(req: NextRequest) {
         // Flatten for easier bot consumption
         const data = products.map(p => ({
             id: p.id,
+            productCode: p.productCode,
             itemNumber: p.itemNumber,
             name: p.name,
             brandId:     p.brandId,
@@ -69,8 +71,8 @@ export async function GET(req: NextRequest) {
             isAvailable: p.isAvailable,
             category: p.category,
             images: p.productImages.map(pi => ({
-                url: toDisplayUrl(pi.mediaImage.url),
-                alt: pi.mediaImage.alt,
+                url: toDisplayUrl(pi.url),
+                alt: pi.alt,
                 isPrimary: pi.isPrimary,
             })),
             prices: p.productPrices.map(pp => ({

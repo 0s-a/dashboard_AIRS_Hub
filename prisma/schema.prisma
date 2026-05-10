@@ -18,7 +18,8 @@ enum PersonSource {
 
 model Product {
   id               String                   @id @default(uuid())
-  itemNumber       String                   @unique
+  productCode      String                   @unique    // Auto-generated: "ELC-AP-0001"
+  itemNumber       String?                  @unique    // Optional manual code
   name             String
   brandId          String?
   brandRef         Brand?                   @relation(fields: [brandId], references: [id], onDelete: SetNull)
@@ -108,33 +109,30 @@ model PersonTag {
   @@id([personId, tagId])
 }
 
-// Pure image storage — no product-specific data
-model MediaImage {
-  id            String         @id @default(uuid())
-  url           String         // Sub-path only, e.g. "products/001-bf-607/main.webp" — base path is in .env
-  filename      String
-  alt           String?
-  sizeBytes     Int?
-  width         Int?
-  height        Int?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  productImages ProductImage[]
-}
-
-// Junction table: links products to images
+// Product images — image metadata stored directly (no separate MediaImage table)
 model ProductImage {
-  id           String     @id @default(uuid())
-  productId    String
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  mediaImageId String
-  mediaImage   MediaImage @relation(fields: [mediaImageId], references: [id], onDelete: Cascade)
-  variants     Variant[]  @relation("VariantToProductImages")
-  isPrimary    Boolean    @default(false)
-  order        Int        @default(0)
-  createdAt    DateTime   @default(now())
+  id        String    @id @default(uuid())
+  productId String
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, mediaImageId])
+  // ── Image metadata (previously in MediaImage) ──
+  url       String    // Sub-path only, e.g. "products/001-bf-607/main.webp" — base path is in .env
+  filename  String
+  alt       String?
+  sizeBytes Int?
+  width     Int?
+  height    Int?
+
+  // ── Linking metadata ──
+  isPrimary Boolean   @default(false)
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // ── Variant association ──
+  variants  Variant[] @relation("VariantToProductImages")
+
+  @@unique([productId, url])
 }
 
 // Variants table: colors, sizes, custom variants
@@ -459,4 +457,17 @@ model AnnouncementMessage {
   @@index([personId])
   @@index([announcementId, messageIndex])
   @@index([status])
+}
+
+/// Tracks the last used sequence number per category+brand combo.
+/// Ensures product code numbers are never reused even after deletion.
+model ProductCodeSequence {
+  id             String   @id @default(uuid())
+  categoryCode   String   // e.g. "ELC" or "GEN"
+  brandCode      String   // e.g. "AP" or "XX"
+  lastSequence   Int      @default(0)  // Last used number (0001, 0002, ...)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([categoryCode, brandCode])
 }

@@ -15,7 +15,8 @@ export type GalleryImage = {
     isPrimary: boolean
     productId: string
     productName: string
-    itemNumber: string
+    productCode: string
+    itemNumber: string | null
     categoryName: string | null
 }
 
@@ -45,23 +46,19 @@ export async function getGalleryImages(cursor?: string): Promise<{
             orderBy: [{ createdAt: 'desc' }],
             select: {
                 id: true,
+                url: true,
+                filename: true,
+                alt: true,
+                width: true,
+                height: true,
                 isPrimary: true,
                 product: {
                     select: {
                         id: true,
                         name: true,
+                        productCode: true,
                         itemNumber: true,
                         category: { select: { name: true } },
-                    },
-                },
-                mediaImage: {
-                    select: {
-                        id: true,
-                        url: true,
-                        filename: true,
-                        alt: true,
-                        width: true,
-                        height: true,
                     },
                 },
             },
@@ -71,15 +68,16 @@ export async function getGalleryImages(cursor?: string): Promise<{
         const items = hasMore ? productImages.slice(0, PAGE_SIZE) : productImages
 
         const data: GalleryImage[] = items.map((pi) => ({
-            id: pi.mediaImage.id,
-            url: toDisplayUrl(pi.mediaImage.url),
-            filename: pi.mediaImage.filename,
-            alt: pi.mediaImage.alt,
-            width: pi.mediaImage.width,
-            height: pi.mediaImage.height,
+            id: pi.id,
+            url: toDisplayUrl(pi.url),
+            filename: pi.filename,
+            alt: pi.alt,
+            width: pi.width,
+            height: pi.height,
             isPrimary: pi.isPrimary,
             productId: pi.product.id,
             productName: pi.product.name,
+            productCode: pi.product.productCode,
             itemNumber: pi.product.itemNumber,
             categoryName: pi.product.category?.name ?? null,
         }))

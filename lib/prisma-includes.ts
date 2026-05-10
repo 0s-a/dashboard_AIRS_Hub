@@ -29,19 +29,14 @@ export const PERSON_INCLUDE = {
 
 // ─── Product ────────────────────────────────────────────────
 
-export const PRODUCT_IMAGES_INCLUDE = {
-    mediaImage: true,
-} as const
-
 export const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true, icon: true } },
     productImages: {
         orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }],
-        include: { mediaImage: true },
     },
     variants: {
         orderBy: { order: 'asc' as const },
-        include: { variantImages: { include: { mediaImage: true } } },
+        include: { variantImages: true },
     },
     productPrices: {
         include: {

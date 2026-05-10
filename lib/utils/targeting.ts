@@ -240,7 +240,7 @@ const PRODUCT_SELECT = {
         orderBy: { order: 'asc' } as const,
     },
     productImages: {
-        select:  { mediaImage: { select: { url: true } }, isPrimary: true },
+        select:  { url: true, isPrimary: true },
         orderBy: { order: 'asc' } as const,
     },
 }
@@ -258,8 +258,8 @@ function toAbsoluteUrl(subPath: string | undefined | null): string | null {
 }
 
 function toProductPayload(p: any): ProductPayload {
-    const primaryImage = p.productImages?.find((i: any) => i.isPrimary)?.mediaImage?.url
-        ?? p.productImages?.[0]?.mediaImage?.url
+    const primaryImage = p.productImages?.find((i: any) => i.isPrimary)?.url
+        ?? p.productImages?.[0]?.url
         ?? null
 
 
@@ -295,7 +295,7 @@ function toProductPayload(p: any): ProductPayload {
         })),
         imageUrl:  toAbsoluteUrl(primaryImage),
         allImages: (p.productImages ?? [])
-            .map((i: any) => toAbsoluteUrl(i.mediaImage?.url))
+            .map((i: any) => toAbsoluteUrl(i.url))
             .filter((u: string | null): u is string => !!u),
     }
 }

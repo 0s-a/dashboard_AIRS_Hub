@@ -163,20 +163,26 @@ export async function resolveProductPrice(productId: string, priceLabelId: strin
 }
 
 /**
- * Resolve a product by UUID or itemNumber.
- * Returns the product with its prices and person-relevant data, or null.
+ * Resolve a product by UUID, productCode, or itemNumber.
+ * Returns the product with its core identifiers, or null.
  */
-export async function resolveProduct(identifier: { productId?: string; productItemNumber?: string }) {
+export async function resolveProduct(identifier: { productId?: string; productCode?: string; productItemNumber?: string }) {
     if (identifier.productId) {
         return prisma.product.findUnique({
             where: { id: identifier.productId },
-            select: { id: true, name: true, itemNumber: true },
+            select: { id: true, name: true, productCode: true, itemNumber: true },
+        })
+    }
+    if (identifier.productCode) {
+        return prisma.product.findUnique({
+            where: { productCode: identifier.productCode },
+            select: { id: true, name: true, productCode: true, itemNumber: true },
         })
     }
     if (identifier.productItemNumber) {
-        return prisma.product.findUnique({
+        return prisma.product.findFirst({
             where: { itemNumber: identifier.productItemNumber },
-            select: { id: true, name: true, itemNumber: true },
+            select: { id: true, name: true, productCode: true, itemNumber: true },
         })
     }
     return null

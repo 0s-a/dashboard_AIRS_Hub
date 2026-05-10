@@ -57,22 +57,23 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     const [isDeleting, setIsDeleting] = useState(false)
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
-    const [copiedItemNumber, setCopiedItemNumber] = useState(false)
+    const [copiedProductCode, setCopiedProductCode] = useState(false)
 
-    const copyItemNumber = async () => {
+    const copyProductCode = async () => {
+        const code = (product as any).productCode || ''
         try {
-            await navigator.clipboard.writeText(product.itemNumber)
-            setCopiedItemNumber(true)
-            setTimeout(() => setCopiedItemNumber(false), 2000)
+            await navigator.clipboard.writeText(code)
+            setCopiedProductCode(true)
+            setTimeout(() => setCopiedProductCode(false), 2000)
         } catch {
             const el = document.createElement('textarea')
-            el.value = product.itemNumber
+            el.value = code
             document.body.appendChild(el)
             el.select()
             document.execCommand('copy')
             document.body.removeChild(el)
-            setCopiedItemNumber(true)
-            setTimeout(() => setCopiedItemNumber(false), 2000)
+            setCopiedProductCode(true)
+            setTimeout(() => setCopiedProductCode(false), 2000)
         }
     }
 
@@ -185,17 +186,22 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                 <Badge
                                     variant="outline"
                                     className="gap-1.5 hover:bg-primary/5 transition-colors cursor-pointer select-none"
-                                    onClick={copyItemNumber}
-                                    title="انقر لنسخ رقم الصنف"
+                                    onClick={copyProductCode}
+                                    title="انقر لنسخ الرقم المركب"
                                 >
                                     <Tag className="h-3 w-3" />
-                                    <span className="font-mono">{product.itemNumber}</span>
-                                    {copiedItemNumber ? (
+                                    <span className="font-mono">{(product as any).productCode}</span>
+                                    {copiedProductCode ? (
                                         <Check className="h-3 w-3 text-green-500" />
                                     ) : (
                                         <Copy className="h-3 w-3 text-muted-foreground/50" />
                                     )}
                                 </Badge>
+                                {product.itemNumber && (
+                                    <Badge variant="secondary" className="font-mono text-xs text-muted-foreground">
+                                        {product.itemNumber}
+                                    </Badge>
+                                )}
                                 {product.brandRef && (
                                     <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15">
                                         {product.brandRef.name}
@@ -415,7 +421,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             <ImageGalleryUpload
                                 images={galleryImages as any}
                                 productId={product.id}
-                                productItemNumber={product.itemNumber}
+                                productItemNumber={(product as any).productCode}
                                 variants={(product.variants || []) as any}
                                 maxImages={10}
                                 onImagesChange={handleImagesChange}
@@ -504,7 +510,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
             <div className="glass-panel rounded-2xl p-6 border border-border/50 hover:border-primary/20 transition-all duration-300">
                 <VariantManagement
                     productId={product.id}
-                    itemNumber={product.itemNumber}
+                    itemNumber={(product as any).productCode}
                     variants={(product.variants || []) as any}
                     productImages={(product.mediaImages || []).map(img => ({
                         id: img.id,

@@ -9,20 +9,65 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type { SerializedPrice, ProductUnitEntry, SerializedCategory } from '@/lib/types/product'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
+import { PRODUCT_CODE_CONFIG } from '@/lib/config/product-code.config'
 
 export { prisma, Prisma }
 
 // ── Item number format: 3 segments separated by dashes (e.g. 001-BF-483) ──
 export const ITEM_NUMBER_REGEX = /^\S+-\S+-\S+$/
 
+// ── Generate composite product code: CAT-BR-SEQN ─────────────────────────
+
+/**
+ * Generate a composite product code: CAT-BR-SEQN
+ * Example: ELC-AP-0001
+ *
+ * Uses ProductCodeSequence table for atomic counter management.
+ * Numbers are NEVER reused — even after product deletion.
+ */
+export async function generateProductCode(
+    categoryCode: string | null,
+    brandCode: string | null,
+    tx?: Prisma.TransactionClient
+): Promise<string> {
+    const db = tx ?? prisma
+    const config = PRODUCT_CODE_CONFIG
+
+    const catCode = categoryCode || config.category.fallbackCode
+    const brCode  = brandCode || config.brand.fallbackCode
+    const sep     = config.separator
+
+    // Atomic upsert: increment counter for this combo
+    const seq = await db.productCodeSequence.upsert({
+        where: {
+            categoryCode_brandCode: { categoryCode: catCode, brandCode: brCode }
+        },
+        update: { lastSequence: { increment: 1 } },
+        create: { categoryCode: catCode, brandCode: brCode, lastSequence: 1 },
+    })
+
+    const seqStr = String(seq.lastSequence)
+        .padStart(config.sequence.length, config.sequence.padChar)
+
+    // Safety check: ensure we haven't exceeded max
+    if (seq.lastSequence > config.maxPerCombo) {
+        throw new Error(
+            `تم استنفاذ جميع الأرقام المتاحة للتركيبة ${catCode}${sep}${brCode} ` +
+            `(الحد الأقصى: ${config.maxPerCombo})`
+        )
+    }
+
+    return `${catCode}${sep}${brCode}${sep}${seqStr}`
+}
+
 // ── Standard include for all product queries ──────────────────────────────
 export const PRODUCT_INCLUDE = {
     brandRef: true,
     category: true,
-    productImages: { include: { mediaImage: true, variants: { select: { id: true } } } },
+    productImages: { include: { variants: { select: { id: true } } } },
     variants: {
         orderBy: { order: 'asc' as const },
-        include: { variantImages: { include: { mediaImage: true } } },
+        include: { variantImages: true },
     },
     productPrices: {
         include: {
@@ -42,15 +87,14 @@ export const PRODUCT_INCLUDE = {
 export function serializeProduct(product: any) {
     const mediaImages = (product.productImages || []).map((pi: any) => ({
         id: pi.id,
-        mediaImageId: pi.mediaImageId,
-        url: toDisplayUrl(pi.mediaImage.url),
-        filename: pi.mediaImage.filename,
-        alt: pi.mediaImage.alt,
+        url: toDisplayUrl(pi.url),
+        filename: pi.filename,
+        alt: pi.alt,
         isPrimary: pi.isPrimary,
         order: pi.order,
-        width: pi.mediaImage.width,
-        height: pi.mediaImage.height,
-        sizeBytes: pi.mediaImage.sizeBytes,
+        width: pi.width,
+        height: pi.height,
+        sizeBytes: pi.sizeBytes,
         variantIds: (pi.variants || []).map((v: any) => v.id),
     }))
 
@@ -67,9 +111,9 @@ export function serializeProduct(product: any) {
         imageCount: (v.variantImages || []).length,
         images: (v.variantImages || []).map((vi: any) => ({
             id: vi.id,
-            url: toDisplayUrl(vi.mediaImage.url),
-            filename: vi.mediaImage.filename,
-            alt: vi.mediaImage.alt,
+            url: toDisplayUrl(vi.url),
+            filename: vi.filename,
+            alt: vi.alt,
         })),
     }))
 
@@ -120,7 +164,8 @@ export function serializeProduct(product: any) {
     // Build a clean plain object — never spread raw Prisma models
     return {
         id:               product.id,
-        itemNumber:       product.itemNumber,
+        productCode:      product.productCode,
+        itemNumber:       product.itemNumber ?? null,
         name:             product.name,
         brandId:          product.brandId ?? null,
         description:      product.description ?? null,

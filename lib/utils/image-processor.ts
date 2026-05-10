@@ -2,20 +2,23 @@
  * Image processing utilities using Sharp.
  * Converts any image format to WebP with optional resize + compression.
  * Sharp is bundled with Next.js (no extra install needed).
+ *
+ * All defaults are driven by IMAGE_STORAGE_CONFIG.processing
  */
 
 import sharp from 'sharp'
+import { IMAGE_STORAGE_CONFIG } from '@/lib/config/image-storage.config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ProcessOptions {
-    /** Maximum width in pixels. Larger images are scaled down. Default: 2400 */
+    /** Maximum width in pixels. Larger images are scaled down */
     maxWidth?: number
-    /** Maximum height in pixels. Larger images are scaled down. Default: 2400 */
+    /** Maximum height in pixels. Larger images are scaled down */
     maxHeight?: number
-    /** WebP quality (1–100). Default: 82 */
+    /** WebP quality (1–100) */
     quality?: number
-    /** Sharp effort level (0–6, higher = slower but smaller). Default: 4 */
+    /** Sharp effort level (0–6, higher = slower but smaller) */
     effort?: number
 }
 
@@ -29,13 +32,15 @@ export interface ProcessResult {
     savedPercent: number
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Config-driven defaults ───────────────────────────────────────────────────
+
+const PROC = IMAGE_STORAGE_CONFIG.processing
 
 const DEFAULTS: Required<ProcessOptions> = {
-    maxWidth: 2400,
-    maxHeight: 2400,
-    quality: 82,
-    effort: 4,
+    maxWidth:  PROC.maxWidth,
+    maxHeight: PROC.maxHeight,
+    quality:   PROC.quality,
+    effort:    PROC.effort,
 }
 
 // ─── Main function ────────────────────────────────────────────────────────────

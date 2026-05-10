@@ -150,13 +150,12 @@ export async function GET(req: NextRequest) {
                 (
                     SELECT COALESCE(jsonb_agg(
                         jsonb_build_object(
-                            'url', mi.url,
-                            'alt', mi.alt,
+                            'url', pi.url,
+                            'alt', pi.alt,
                             'isPrimary', pi."isPrimary"
                         ) ORDER BY pi."order" ASC
                     ), '[]'::jsonb)
                     FROM "ProductImage" pi
-                    JOIN "MediaImage" mi ON mi.id = pi."mediaImageId"
                     WHERE pi."productId" = p.id
                 ) AS images
 
@@ -268,9 +267,9 @@ export async function GET(req: NextRequest) {
                         ORDER BY v."order" ASC), '[]'::jsonb)
                      FROM "Variant" v WHERE v."productId" = p.id) AS variants,
                     (SELECT COALESCE(jsonb_agg(
-                        jsonb_build_object('url', mi.url, 'alt', mi.alt, 'isPrimary', pi."isPrimary")
+                        jsonb_build_object('url', pi.url, 'alt', pi.alt, 'isPrimary', pi."isPrimary")
                         ORDER BY pi."order" ASC), '[]'::jsonb)
-                     FROM "ProductImage" pi JOIN "MediaImage" mi ON mi.id = pi."mediaImageId"
+                     FROM "ProductImage" pi
                      WHERE pi."productId" = p.id) AS images
                 FROM "Product" p
                 WHERE ${fbWhere}

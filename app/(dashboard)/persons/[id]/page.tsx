@@ -58,11 +58,6 @@ export default async function PersonProfilePage({ params }: PersonPageProps) {
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <h1 className="text-2xl font-bold tracking-tight">{person.name ?? "بدون اسم"}</h1>
-                            {person.personType && (
-                                <Badge className="border-0 font-medium bg-muted text-muted-foreground">
-                                    {person.personType.name}
-                                </Badge>
-                            )}
                             <Badge className={person.isActive ? "bg-emerald-500/10 text-emerald-600 border-0" : "bg-muted text-muted-foreground border-0"}>
                                 {person.isActive ? <><CircleCheck className="h-3 w-3 ml-1" />نشط</> : <><CircleX className="h-3 w-3 ml-1" />غير نشط</>}
                             </Badge>

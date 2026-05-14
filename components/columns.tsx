@@ -166,44 +166,7 @@ export const columns: ColumnDef<Person>[] = [
         }
     },
 
-    {
-        accessorKey: "type",
-        header: "النوع",
-        size: 130,
-        minSize: 100,
-        maxSize: 180,
-        cell: ({ row }) => {
-            const person = row.original as any
-            const personType = person.personType
-            const typeName = personType?.name || 'عادي'
-            const color = personType?.color || "#64748b"
-            const iconName = personType?.icon || "User"
-            const TypeIcon = getIcon(iconName)
 
-            return (
-                <div className="flex justify-center">
-                    <div 
-                        className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all duration-300 hover:scale-105 cursor-default shadow-[0_0_15px_-3px_rgba(0,0,0,0.1)] hover:shadow-[0_0_20px_-3px_rgba(0,0,0,0.15)] backdrop-blur-md overflow-hidden group/type border"
-                        style={{ 
-                            backgroundColor: `${color}15`, 
-                            color: color,
-                            borderColor: `${color}40`
-                        }}
-                    >
-                         {/* Animated glow effect on hover */}
-                        <div className="absolute inset-0 opacity-0 group-hover/type:opacity-20 transition-opacity duration-500 bg-linear-to-r from-transparent via-white to-transparent -translate-x-full group-hover/type:translate-x-full blur-sm" />
-                        
-                        <div 
-                            className="h-1.5 w-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)] group-hover/type:scale-125 transition-transform" 
-                            style={{ backgroundColor: color }}
-                        />
-                        <TypeIcon className="h-3.5 w-3.5 opacity-80 group-hover/type:opacity-100 transition-opacity" />
-                        <span className="tracking-tight">{typeName}</span>
-                    </div>
-                </div>
-            )
-        }
-    },
 
     // ──────────────────────────────────────
     // Column 2.5: Price Labels

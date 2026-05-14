@@ -49,7 +49,7 @@ export async function createCurrency(data: {
                 await prisma.currency.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
             }
             const itemNumber = data.itemNumber?.trim() || await generateItemNumber('currency')
-            return prisma.currency.create({
+            const created = await prisma.currency.create({
                 data: {
                     name:         data.name.trim(),
                     code:         data.code.trim().toUpperCase(),
@@ -63,6 +63,7 @@ export async function createCurrency(data: {
                         : new Prisma.Decimal(data.exchangeRate),
                 },
             })
+            return { ...created, exchangeRate: created.exchangeRate?.toString() ?? null }
         },
         PATHS,
         'تعذّر إنشاء العملة'
@@ -94,7 +95,7 @@ export async function updateCurrency(id: string, data: {
                 ? null
                 : new Prisma.Decimal(data.exchangeRate)
 
-            return prisma.currency.update({
+            const updated = await prisma.currency.update({
                 where: { id },
                 data: {
                     ...(data.name       !== undefined && { name:        data.name.trim()               }),
@@ -106,6 +107,7 @@ export async function updateCurrency(id: string, data: {
                     exchangeRate: exchangeRateDecimal,
                 },
             })
+            return { ...updated, exchangeRate: updated.exchangeRate?.toString() ?? null }
         },
         PATHS,
         'تعذّر تحديث العملة'
@@ -134,7 +136,8 @@ export async function setDefaultCurrency(id: string) {
     return safeActionWithRevalidation(
         async () => {
             await prisma.currency.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
-            return prisma.currency.update({ where: { id }, data: { isDefault: true, isActive: true } })
+            const updated = await prisma.currency.update({ where: { id }, data: { isDefault: true, isActive: true } })
+            return { ...updated, exchangeRate: updated.exchangeRate?.toString() ?? null }
         },
         PATHS,
         'تعذّر تعيين العملة الافتراضية'
@@ -143,7 +146,10 @@ export async function setDefaultCurrency(id: string) {
 
 export async function toggleCurrencyActive(id: string, isActive: boolean) {
     return safeActionWithRevalidation(
-        () => prisma.currency.update({ where: { id }, data: { isActive } }),
+        async () => {
+            const updated = await prisma.currency.update({ where: { id }, data: { isActive } })
+            return { ...updated, exchangeRate: updated.exchangeRate?.toString() ?? null }
+        },
         PATHS,
         'تعذّر تغيير حالة العملة'
     )

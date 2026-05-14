@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Tag } from "lucide-react"
+import { Plus, Tag, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PriceLabelSheet } from "@/components/price-labels/price-label-sheet"
 import { PriceLabelTable } from "@/components/price-labels/price-label-table"
@@ -39,6 +39,8 @@ export default function PriceLabelsPage() {
         loadLabels()
     }
 
+    const defaultLabel = labels.find(l => l.isDefault)
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -73,6 +75,20 @@ export default function PriceLabelsPage() {
                         </div>
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
                             <Tag className="size-6 text-primary" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="glass-panel rounded-xl p-6 border border-border/50">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-muted-foreground">التسعيرة الافتراضية</p>
+                            <h3 className="text-xl font-bold mt-2 truncate">
+                                {defaultLabel ? defaultLabel.name : "لم تُحدد"}
+                            </h3>
+                        </div>
+                        <div className="size-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                            <Star className="size-6 text-amber-600" />
                         </div>
                     </div>
                 </div>

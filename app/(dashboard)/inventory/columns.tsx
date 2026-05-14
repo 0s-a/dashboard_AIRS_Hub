@@ -3,18 +3,14 @@
 import type { SerializedProduct } from "@/lib/actions/inventory"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import {
     Edit,
     Trash2,
-    Package,
     Loader2,
     ChevronRight,
     ChevronDown,
     SearchCheck,
-    Copy,
-    Check,
     Layers,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -25,13 +21,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AvailabilityToggle } from "@/components/inventory/availability-toggle"
 import { ProductSheet } from "@/components/inventory/product-sheet"
+import { CopyableBadge } from "@/components/inventory/table/copyable-badge"
+import { AltNameBadgeGroup } from "@/components/inventory/table/alt-name-badge-group"
+import { ProductImageCell } from "@/components/inventory/table/product-image-cell"
 import { deleteProduct } from "@/lib/actions/inventory"
-
-import {
-    Dialog,
-    DialogContent,
-    DialogTrigger,
-} from "@/components/ui/dialog"
 import {
     Tooltip,
     TooltipContent,
@@ -51,35 +44,8 @@ import {
 } from "@/components/ui/alert-dialog"
 
 // ─── Sub-components ──────────────────────────────────────────
-
-/** Copyable item number with animated check icon */
-function CopyableItemNumber({ itemNumber }: { itemNumber: string }) {
-    const [copied, setCopied] = useState(false)
-
-    const handleCopy = (e: React.MouseEvent) => {
-        e.preventDefault()
-        navigator.clipboard.writeText(itemNumber)
-        setCopied(true)
-        toast.success('تم نسخ رقم الصنف')
-        setTimeout(() => setCopied(false), 1500)
-    }
-
-    return (
-        <div
-            className="flex items-center gap-1 group/copy cursor-pointer bg-muted/40 hover:bg-muted/60 px-1.5 py-0.5 rounded transition-colors"
-            onClick={handleCopy}
-        >
-            <span className="text-muted-foreground font-mono">
-                {itemNumber}
-            </span>
-            {copied ? (
-                <Check className="h-2.5 w-2.5 text-emerald-600 transition-colors" />
-            ) : (
-                <Copy className="h-2.5 w-2.5 text-muted-foreground/50 group-hover/copy:text-primary transition-colors" />
-            )}
-        </div>
-    )
-}
+// Note: CopyableBadge, AltNameBadgeGroup and ProductImageCell are
+// imported from @/components/inventory/table/
 
 /** Color dot indicators for variants */
 function VariantColorDots({ product, onToggle }: { product: SerializedProduct; onToggle: () => void }) {
@@ -118,92 +84,12 @@ function VariantColorDots({ product, onToggle }: { product: SerializedProduct; o
     )
 }
 
-/** Alternative names badges with tooltip */
-function AlternativeNamesBadges({ names }: { names: string[] }) {
-    if (!names?.length) return null
-
-    return (
-        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div className="flex items-center gap-1 flex-wrap">
-                            {names.slice(0, 2).map((altName, idx) => (
-                                <Badge
-                                    key={idx}
-                                    variant="outline"
-                                    className="px-1.5 py-0 text-[10px] bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-default"
-                                >
-                                    {altName}
-                                </Badge>
-                            ))}
-                            {names.length > 2 && (
-                                <Badge
-                                    variant="outline"
-                                    className="px-1.5 py-0 text-[10px] bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 cursor-help"
-                                >
-                                    +{names.length - 2}
-                                </Badge>
-                            )}
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground mb-1">الأسماء البديلة:</span>
-                            {names.map((altName, idx) => (
-                                <span key={idx} className="text-xs">• {altName}</span>
-                            ))}
-                        </div>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        </div>
-    )
-}
-
-/** Product image thumbnail with zoom dialog */
-function ProductImageCell({ src, alt }: { src: string | undefined; alt: string }) {
-    if (!src) {
-        return (
-            <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/30 border border-dashed flex items-center justify-center">
-                <Package className="h-5 w-5 text-muted-foreground/30" />
-            </div>
-        )
-    }
-
-    return (
-        <Dialog>
-            <DialogTrigger asChild>
-                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border bg-muted/20 cursor-zoom-in group transition-all hover:ring-2 hover:ring-primary/40 shadow-sm">
-                    <Image
-                        src={src}
-                        alt={alt}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
-                </div>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
-                <div className="relative aspect-square w-full max-h-[80vh]">
-                    <Image
-                        src={src}
-                        alt={alt}
-                        fill
-                        className="object-contain"
-                        priority
-                    />
-                </div>
-            </DialogContent>
-        </Dialog>
-    )
-}
 
 // ─── ProductNameCell ─────────────────────────────────────────
 
 function ProductNameCell({ product, row }: { product: SerializedProduct; row: any }) {
     const primaryImage = product.mediaImages?.find(i => i.isPrimary)?.url ?? product.mediaImages?.[0]?.url
-    const altNames = Array.isArray(product.alternativeNames) ? product.alternativeNames : []
+    const altNames = product.alternativeNames
 
     return (
         <div className="flex items-center gap-3">
@@ -273,7 +159,7 @@ function ProductNameCell({ product, row }: { product: SerializedProduct; row: an
                         </TooltipProvider>
                     )}
                 </div>
-                <AlternativeNamesBadges names={altNames} />
+                <AltNameBadgeGroup names={altNames} />
                 <VariantColorDots product={product} onToggle={() => row.toggleExpanded()} />
             </div>
         </div>
@@ -426,7 +312,10 @@ export const columns: ColumnDef<SerializedProduct>[] = [
 
             return (
                 <div className="flex flex-col gap-1">
-                    <CopyableItemNumber itemNumber={code} />
+                    <CopyableBadge
+                        value={code}
+                        successMessage="تم نسخ الرقم المركب"
+                    />
                     {product.itemNumber && (
                         <span className="text-[9px] text-muted-foreground/60 font-mono px-1.5">
                             {product.itemNumber}

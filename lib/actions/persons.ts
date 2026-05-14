@@ -56,14 +56,12 @@ export async function getPersons(options?: {
     page?: number
     pageSize?: number
     search?: string
-    typeId?: string
 }) {
-    const { page = 1, pageSize = 100, search, typeId } = options ?? {}
+    const { page = 1, pageSize = 100, search } = options ?? {}
 
     return safeAction(async () => {
         const where: any = {
             isActive: true,
-            ...(typeId && { personTypeId: typeId }),
             ...(search && {
                 OR: [
                     { name: { contains: search, mode: 'insensitive' } },
@@ -90,8 +88,6 @@ export async function getPersons(options?: {
                     lastInteraction: true,
                     createdAt: true,
                     updatedAt: true,
-                    personTypeId: true,
-                    personType: true,
                     priceLabels: { include: { priceLabel: true } },
                 },
             }),
@@ -111,7 +107,6 @@ export async function getArchivedPersons() {
                 name: true,
                 source: true,
                 contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
-                personType: true,
                 updatedAt: true,
                 createdAt: true,
             },
@@ -126,7 +121,6 @@ export async function getPersonById(id: string) {
             where: { id },
             include: {
                 contacts: true,
-                personType: true,
                 priceLabels: { include: { priceLabel: true } },
                 orders: {
                     orderBy: { createdAt: 'desc' },
@@ -148,71 +142,7 @@ export async function getPersonById(id: string) {
     )
 }
 
-// ─── Create ──────────────────────────────────────────────────
-
-export interface CreatePersonData {
-    name: string
-    source?: 'bot' | 'manual' | 'import' | 'api' | null
-    contacts?: ContactInput[] | null
-    tags?: string[] | null
-    personTypeId?: string | null
-    priceLabelIds?: string[] | null
-    currencyIds?: string[] | null
-    groupName?: string | null
-    groupNumber?: string | null
-}
-
-export async function createPerson(data: CreatePersonData) {
-    return safeActionWithRevalidation(
-        async () => {
-            const finalPersonTypeId = data.personTypeId || null
-            try {
-                return await prisma.person.create({
-                    data: {
-                        name: data.name,
-                        personTypeId: finalPersonTypeId,
-                        source: data.source || null,
-                        contacts: data.contacts?.length ? {
-                            create: data.contacts.filter(c => c.value?.trim()).map(c => ({
-                                type: c.type,
-                                value: c.value.trim(),
-                                label: c.label || null,
-                                isPrimary: c.isPrimary || false,
-                            })),
-                        } : undefined,
-                        tags: data.tags?.length ? {
-                            create: data.tags.map(name => ({
-                                tag: {
-                                    connectOrCreate: {
-                                        where: { name },
-                                        create: { name },
-                                    },
-                                },
-                            })),
-                        } : undefined,
-                        personCurrencies: data.currencyIds?.length ? {
-                            create: data.currencyIds.map(currencyId => ({ currencyId })),
-                        } : undefined,
-                        groupName: data.groupName || null,
-                        groupNumber: data.groupNumber || null,
-                        lastInteraction: new Date(),
-                        priceLabels: data.priceLabelIds?.length ? {
-                            create: data.priceLabelIds.map(id => ({
-                                priceLabel: { connect: { id } },
-                            })),
-                        } : undefined,
-                    },
-                })
-            } catch (err: any) {
-                if (err?.code === 'P2002') throw new Error('رقم الهاتف أو البريد مسجل بالفعل لهذا الشخص')
-                throw err
-            }
-        },
-        PATHS,
-        'تعذّر إنشاء الشخص'
-    )
-}
-
+// --- Create Logic Removed ---
 // ─── Update ──────────────────────────────────────────────────
 
 export interface UpdatePersonData {
@@ -220,7 +150,6 @@ export interface UpdatePersonData {
     source?: 'bot' | 'manual' | 'import' | 'api' | null
     contacts?: ContactInput[] | null
     tags?: string[] | null
-    personTypeId?: string | null
     priceLabelIds?: string[] | null
     currencyIds?: string[] | null
     groupName?: string | null
@@ -235,7 +164,6 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                     where: { id },
                     data: {
                         name: data.name,
-                        personTypeId: data.personTypeId !== undefined ? data.personTypeId || null : undefined,
                         source: data.source !== undefined ? data.source || null : undefined,
                         ...(data.contacts !== undefined && {
                             contacts: {

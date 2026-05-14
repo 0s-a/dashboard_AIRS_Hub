@@ -1,5 +1,3 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, Phone, Mail, ArrowLeft, Clock } from "lucide-react"
@@ -11,7 +9,7 @@ interface Person {
     name: string | null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     contacts: any
-    personType?: { id: string; name: string; color: string | null; icon: string | null } | null
+
     isActive: boolean
     createdAt: Date
 }
@@ -60,14 +58,13 @@ function getAvatarColor(name: string | null): string {
 export function RecentPersons({ persons }: RecentPersonsProps) {
     if (!persons || persons.length === 0) {
         return (
-            <Card className="col-span-3 border border-border/40 bg-card/80 backdrop-blur-sm shadow-lg rounded-2xl overflow-hidden">
-                <div className="h-1 w-full bg-linear-to-r from-emerald-500 to-teal-500" />
+            <Card className="col-span-3 border border-border/40 bg-card/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-emerald-500/8">
-                            <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="p-2 rounded-lg bg-emerald-500/10">
+                            <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                         </div>
-                        أحدث الأشخاص
+                        <span className="text-base font-bold">أحدث الأشخاص</span>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -83,15 +80,12 @@ export function RecentPersons({ persons }: RecentPersonsProps) {
     const validPersons = persons.filter(c => c && c.id);
 
     return (
-        <Card className="col-span-3 border border-border/40 bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-500 rounded-2xl overflow-hidden">
-            {/* Accent bar */}
-            <div className="h-1 w-full bg-linear-to-r from-emerald-500 to-teal-500" />
-
-            <CardHeader className="pb-3">
+        <Card className="col-span-3 border border-border/40 bg-card/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="pb-3 pt-5">
                 <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-emerald-500/8">
-                            <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="p-2 rounded-lg bg-emerald-500/10">
+                            <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <span className="text-base font-bold">أحدث الأشخاص</span>
                     </CardTitle>
@@ -105,7 +99,7 @@ export function RecentPersons({ persons }: RecentPersonsProps) {
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-1">
                     {validPersons.slice(0, 5).map((person) => {
                         const phone = getPrimaryPhone(person.contacts)
                         const email = getPrimaryEmail(person.contacts)
@@ -114,37 +108,25 @@ export function RecentPersons({ persons }: RecentPersonsProps) {
                         return (
                             <div
                                 key={person.id}
-                                className="group flex items-center gap-4 p-3 rounded-xl bg-muted/20 hover:bg-muted/40 border border-transparent hover:border-primary/15 transition-all duration-300"
+                                className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/50 transition-all duration-300"
                             >
                                 {/* Avatar */}
                                 <div
-                                    className="relative h-11 w-11 shrink-0 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-lg group-hover:scale-105 transition-transform duration-300"
+                                    className="relative h-10 w-10 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm transition-transform duration-300"
                                     style={{ backgroundColor: avatarColor }}
                                 >
                                     {person.name ? person.name[0].toUpperCase() : "?"}
                                     {person.isActive && (
-                                        <div className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-500 border-2 border-card shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+                                        <div className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 border-2 border-card" />
                                     )}
                                 </div>
 
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
+                                    <div className="flex items-center gap-2 mb-0.5">
                                         <p className="font-bold text-sm truncate group-hover:text-primary transition-colors duration-300">
                                             {person.name || "شخص جديد"}
                                         </p>
-                                        {person.personType && (
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[9px] px-1.5 py-0 h-[18px] font-bold border-current/20"
-                                                style={{
-                                                    color: person.personType.color || undefined,
-                                                    backgroundColor: person.personType.color ? `${person.personType.color}15` : undefined,
-                                                }}
-                                            >
-                                                {person.personType.name}
-                                            </Badge>
-                                        )}
                                     </div>
                                     <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                                         {phone && (

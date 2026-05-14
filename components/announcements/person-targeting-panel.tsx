@@ -8,26 +8,24 @@ import { AudienceBuilder } from "@/components/announcements/audience-builder"
 import type { PersonFilters, FilterGroup } from "@/lib/types/announcements"
 
 interface Person     { id: string; name: string | null; groupName: string | null }
-interface PersonType { id: string; name: string }
 
 interface PersonTargetingPanelProps {
     value: { mode: "all" | "filter" | "manual" | "builder"; filters: PersonFilters; manualIds: string[] }
     onChange: (v: PersonTargetingPanelProps["value"]) => void
     persons:      Person[]
-    personTypes:  PersonType[]
     personTags?:  string[]
     previewCount?: number
 }
 
 const MODES = [
     { key: "all",     label: "الكل",    desc: "جميع الأشخاص" },
-    { key: "filter",  label: "تصفية",   desc: "نوع أو مجموعة" },
+    { key: "filter",  label: "تصفية",   desc: "المجموعة" },
     { key: "builder", label: "منطقي",   desc: "AND / OR مركب" },
     { key: "manual",  label: "يدوي",    desc: "اختيار بالاسم" },
 ] as const
 
 export function PersonTargetingPanel({
-    value, onChange, persons, personTypes, personTags = [], previewCount,
+    value, onChange, persons, personTags = [], previewCount,
 }: PersonTargetingPanelProps) {
     const [search,      setSearch]      = useState("")
     const [groupSearch, setGroupSearch] = useState("")
@@ -52,10 +50,6 @@ export function PersonTargetingPanel({
         onChange({ ...value, manualIds: next })
     }
 
-    const toggleTypeFilter = (typeId: string) => {
-        const cur = filters.typeIds || []
-        onChange({ ...value, filters: { ...filters, typeIds: cur.includes(typeId) ? cur.filter(x => x !== typeId) : [...cur, typeId] } })
-    }
 
     const toggleGroupFilter = (g: string) => {
         const cur = filters.groupNames || []
@@ -103,24 +97,6 @@ export function PersonTargetingPanel({
             {/* Mode: filter */}
             {mode === "filter" && (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-1.5">نوع الشخص</p>
-                        <div className="flex flex-wrap gap-1.5">
-                            {personTypes.map(pt => {
-                                const active = filters.typeIds?.includes(pt.id)
-                                return (
-                                    <button key={pt.id} type="button" onClick={() => toggleTypeFilter(pt.id)}
-                                        className={cn("flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all duration-150",
-                                            active ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 hover:border-border hover:bg-muted/30"
-                                        )}>
-                                        {active && <Check className="size-3" />}
-                                        {pt.name}
-                                    </button>
-                                )
-                            })}
-                            {personTypes.length === 0 && <p className="text-xs text-muted-foreground">لا توجد أنواع</p>}
-                        </div>
-                    </div>
 
                     {groups.length > 0 && (
                         <div>
@@ -152,7 +128,6 @@ export function PersonTargetingPanel({
                     <AudienceBuilder
                         groups={builderGroups}
                         onChange={handleBuilderChange}
-                        personTypes={personTypes}
                         personGroups={groups}
                         personTags={personTags}
                     />

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation"
 import { LayoutDashboard, Package, Users, Wand2, Layers, ChevronsLeft, ChevronsRight, UserSquare2, Images, Tag, UserCog, Coins, ArrowRight } from "lucide-react"
 import { Header } from "@/components/dashboard/header"
 import { Footer } from "@/components/dashboard/footer"
-import { navigationGroups } from "@/lib/navigation"
+import { navigationGroups, settingsNavigationItem } from "@/lib/navigation"
 import { useNotificationAlert } from "@/hooks/use-notification-alert"
 import { getStoreSettings } from "@/lib/actions/store-settings"
 import {
@@ -51,15 +51,14 @@ export default function DashboardLayout({
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-background relative overflow-hidden">
-            {/* Background decorative elements */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
-                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/3 dark:bg-primary/8 rounded-full blur-[120px]" />
-                <div className="absolute top-[40%] -right-[5%] w-[30%] h-[30%] bg-indigo-500/3 dark:bg-indigo-500/8 rounded-full blur-[100px]" />
-                <div className="absolute bottom-[10%] left-[20%] w-[25%] h-[25%] bg-purple-500/3 dark:bg-purple-500/6 rounded-full blur-[80px]" />
+            {/* Background decorative elements - Minimalist */}
+            <div className="fixed inset-0 pointer-events-none z-0 bg-background">
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:40px_40px]" />
+                <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/5 opacity-50 blur-[100px]" />
             </div>
 
             <div className="relative z-10 flex min-h-screen w-full flex-col">
-                <aside className={`fixed inset-y-0 right-0 z-20 hidden flex-col border-l border-border/20 bg-background/95 backdrop-blur-xl sm:flex transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+                <aside className={`fixed inset-y-0 right-0 z-20 hidden flex-col border-l border-border/40 bg-background sm:flex transition-all duration-300 will-change-[width] ${isCollapsed ? 'w-20' : 'w-64'}`}>
                     {/* Logo Section */}
                     <div className="p-6 pb-2">
                         <div className={`flex items-center gap-3 px-1 ${isCollapsed ? 'justify-center' : ''}`}>
@@ -76,79 +75,154 @@ export default function DashboardLayout({
                     {/* Navigation Links */}
                     <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-3 space-y-6">
                         <TooltipProvider delayDuration={0}>
-                            {navigationGroups.map((group, groupIdx) => (
-                                <div key={groupIdx} className="space-y-1.5">
-                                    {!isCollapsed && (
-                                        <h3 className="px-3 text-[11px] font-semibold text-muted-foreground/60 mb-2 mt-4">
-                                            {group.title}
-                                        </h3>
-                                    )}
+                            {navigationGroups.map((group, groupIdx) => {
+                                const visibleItems = group.items.filter(item => !item.hidden);
+                                if (visibleItems.length === 0) return null;
 
-                                    <div className="space-y-1">
-                                        {group.items.map((item) => {
-                                            const isActive = pathname === item.href
-                                            const Icon = item.icon
-                                            return (
-                                                <Tooltip key={item.href}>
-                                                    <TooltipTrigger asChild>
-                                                        <Link
-                                                            href={item.href}
-                                                            className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group ${
-                                                                isActive 
-                                                                    ? 'bg-primary/10 text-primary font-bold' 
-                                                                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                                                            } ${isCollapsed ? 'justify-center' : ''}`}
-                                                        >
-                                                            {/* Active Indicator Bar */}
-                                                            {isActive && !isCollapsed && (
-                                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-l-full bg-primary" />
-                                                            )}
-                                                            
-                                                            <Icon className={`h-5 w-5 transition-transform duration-200 ${
-                                                                isActive ? 'scale-100' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'
-                                                            } shrink-0`} />
-                                                            
-                                                            <span className={`text-[13px] transition-all duration-300 ${
-                                                                isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
-                                                            }`}>
-                                                                {item.label}
-                                                            </span>
+                                return (
+                                    <div key={groupIdx} className="space-y-1.5">
+                                        {!isCollapsed && (
+                                            <h3 className="px-3 text-[11px] font-semibold text-muted-foreground/60 mb-2 mt-4">
+                                                {group.title}
+                                            </h3>
+                                        )}
 
-                                                            {/* Notification unread badge */}
-                                                            {item.href === "/notifications" && unreadCount > 0 && (
-                                                                <span className={`flex items-center justify-center text-[10px] font-bold text-white bg-red-500 shadow-sm shadow-red-500/20 ${
-                                                                    isCollapsed
-                                                                        ? 'absolute top-0 right-0 size-4 rounded-full border-2 border-background'
-                                                                        : 'mr-auto min-w-[18px] h-[18px] px-1 rounded-full'
-                                                                }`}>
-                                                                    {unreadCount > 99 ? '99+' : unreadCount}
-                                                                </span>
-                                                            )}
-                                                        </Link>
-                                                    </TooltipTrigger>
-                                                    {isCollapsed && (
-                                                        <TooltipContent side="left" className="font-medium text-xs rounded-lg border-border/50">
+                                        <div className="space-y-1">
+                                            {visibleItems.map((item) => {
+                                                const isActive = pathname === item.href
+                                                const Icon = item.icon
+                                                const isDisabled = item.disabled;
+                                                const badgeText = item.badge || "قيد التطوير";
+
+                                                const content = (
+                                                    <div
+                                                        className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 group ${
+                                                            isActive && !isDisabled
+                                                                ? 'bg-linear-to-r from-primary/15 to-primary/5 text-primary font-bold shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] border border-primary/10' 
+                                                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:shadow-sm'
+                                                        } ${isCollapsed ? 'justify-center' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                                                    >
+                                                        {/* Active Indicator Bar */}
+                                                        {isActive && !isCollapsed && !isDisabled && (
+                                                            <div className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-l-full bg-primary shadow-[0_0_8px_0_rgba(var(--primary),0.5)]" />
+                                                        )}
+                                                        
+                                                        <Icon className={`h-5 w-5 transition-all duration-300 ${
+                                                            isActive && !isDisabled ? 'scale-100 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.3)]' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'
+                                                        } shrink-0`} />
+                                                        
+                                                        <span className={`text-[13px] transition-all duration-300 ${
+                                                            isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+                                                        }`}>
                                                             {item.label}
-                                                        </TooltipContent>
-                                                    )}
-                                                </Tooltip>
-                                            )
-                                        })}
+                                                        </span>
+
+                                                        {/* Disabled Badge */}
+                                                        {isDisabled && !isCollapsed && (
+                                                            <span className="mr-auto text-[9px] font-bold bg-linear-to-r from-amber-500/20 to-orange-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-md whitespace-nowrap shadow-sm">
+                                                                {badgeText}
+                                                            </span>
+                                                        )}
+
+                                                        {/* Notification unread badge */}
+                                                        {!isDisabled && item.href === "/notifications" && unreadCount > 0 && (
+                                                            <span className={`flex items-center justify-center text-[10px] font-bold text-white bg-red-500 shadow-sm shadow-red-500/20 ${
+                                                                isCollapsed
+                                                                    ? 'absolute top-0 right-0 size-4 rounded-full border-2 border-background'
+                                                                    : 'mr-auto min-w-[18px] h-[18px] px-1 rounded-full'
+                                                            }`}>
+                                                                {unreadCount > 99 ? '99+' : unreadCount}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )
+
+                                                return (
+                                                    <Tooltip key={item.href}>
+                                                        <TooltipTrigger asChild>
+                                                            {isDisabled ? content : <Link href={item.href}>{content}</Link>}
+                                                        </TooltipTrigger>
+                                                        {isCollapsed && (
+                                                            <TooltipContent side="left" className="font-medium text-xs rounded-lg border-border/50">
+                                                                {item.label} {isDisabled && `(${badgeText})`}
+                                                            </TooltipContent>
+                                                        )}
+                                                    </Tooltip>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </TooltipProvider>
                     </div>
 
-                    {/* Bottom Store Info */}
-                    <div className="p-4 mt-auto">
-                        <div className={`rounded-xl border border-transparent hover:border-border/40 bg-muted/20 hover:bg-muted/40 p-3 transition-all duration-300 cursor-pointer ${isCollapsed ? 'flex items-center justify-center p-2' : ''}`}>
+                    {/* Settings & Bottom Store Info */}
+                    <div className="p-4 mt-auto space-y-4">
+                        {!settingsNavigationItem.hidden && (
+                            <TooltipProvider delayDuration={0}>
+                                {(() => {
+                                    const item = settingsNavigationItem;
+                                    const isActive = pathname === item.href;
+                                    const Icon = item.icon;
+                                    const isDisabled = item.disabled;
+                                    const badgeText = item.badge || "قيد التطوير";
+
+                                    const content = (
+                                        <div
+                                            className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 group ${
+                                                isActive && !isDisabled
+                                                    ? 'bg-linear-to-r from-primary/15 to-primary/5 text-primary font-bold shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] border border-primary/10' 
+                                                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground hover:shadow-sm'
+                                            } ${isCollapsed ? 'justify-center' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                                        >
+                                            {/* Active Indicator Bar */}
+                                            {isActive && !isCollapsed && !isDisabled && (
+                                                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-l-full bg-primary shadow-[0_0_8px_0_rgba(var(--primary),0.5)]" />
+                                            )}
+                                            
+                                            <Icon className={`h-5 w-5 transition-all duration-300 ${
+                                                isActive && !isDisabled ? 'scale-100 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.3)]' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'
+                                            } shrink-0`} />
+                                            
+                                            <span className={`text-[13px] transition-all duration-300 ${
+                                                isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+                                            }`}>
+                                                {item.label}
+                                            </span>
+
+                                            {/* Disabled Badge */}
+                                            {isDisabled && !isCollapsed && (
+                                                <span className="mr-auto text-[9px] font-bold bg-linear-to-r from-amber-500/20 to-orange-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-md whitespace-nowrap shadow-sm">
+                                                    {badgeText}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )
+
+                                    return (
+                                        <Tooltip key={item.href}>
+                                            <TooltipTrigger asChild>
+                                                {isDisabled ? content : <Link href={item.href}>{content}</Link>}
+                                            </TooltipTrigger>
+                                            {isCollapsed && (
+                                                <TooltipContent side="left" className="font-medium text-xs rounded-lg border-border/50">
+                                                    {item.label} {isDisabled && `(${badgeText})`}
+                                                </TooltipContent>
+                                            )}
+                                        </Tooltip>
+                                    )
+                                })()}
+                            </TooltipProvider>
+                        )}
+
+                        <div className={`rounded-xl border border-border/20 bg-linear-to-b from-muted/10 to-muted/30 hover:border-border/40 hover:from-muted/20 hover:to-muted/40 shadow-sm p-3 transition-all duration-300 cursor-pointer ${isCollapsed ? 'flex items-center justify-center p-2' : ''}`}>
                             {isCollapsed ? (
-                                <div className="size-2 rounded-full bg-emerald-500" />
+                                <div className="size-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                             ) : (
                                 <div className="flex items-center gap-3">
                                     {storeInfo.logo ? (
-                                        <div className="relative size-9 rounded-lg overflow-hidden border border-border/50 shrink-0 bg-white">
+                                        <div className="relative size-9 rounded-lg overflow-hidden border border-border/50 shrink-0 bg-white shadow-sm">
                                             <Image
                                                 src={storeInfo.logo}
                                                 alt="شعار المتجر"
@@ -158,12 +232,12 @@ export default function DashboardLayout({
                                             />
                                         </div>
                                     ) : (
-                                        <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                        <div className="size-9 rounded-lg bg-linear-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center shrink-0 shadow-inner">
                                             <span className="text-primary font-bold text-sm tracking-tighter">N.</span>
                                         </div>
                                     )}
                                     <div className="flex flex-col flex-1 min-w-0">
-                                        <span className="text-[10px] font-medium text-muted-foreground/80">حالة النظام</span>
+                                        <span className="text-[10px] font-semibold text-emerald-500/90 dark:text-emerald-400">حالة النظام مستقرة</span>
                                         <span className="text-xs font-bold text-foreground truncate">{storeInfo.name}</span>
                                     </div>
                                     <div className="size-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px] shadow-emerald-500/50" />

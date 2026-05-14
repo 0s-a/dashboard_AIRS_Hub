@@ -25,9 +25,7 @@ export async function GET(
                         }
                     }
                 },
-                personType: {
-                    select: { id: true, name: true }
-                },
+
                 priceLabels: {
                     include: {
                         priceLabel: {
@@ -45,7 +43,7 @@ export async function GET(
         return apiSuccess({
             personId:    person.id,
             personName:  person.name,
-            personType:  person.personType,
+
             currencies,
             priceLabels: person.priceLabels.map((pl: any) => pl.priceLabel),
         })

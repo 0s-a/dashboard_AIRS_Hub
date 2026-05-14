@@ -7,14 +7,10 @@ import { toDisplayUrl } from '@/lib/utils/image-paths'
 /** Lightweight data needed to populate the announcement sheet */
 export async function getAnnouncementSheetData() {
     return safeAction(async () => {
-        const [persons, personTypes, products, categories, rawTags] = await Promise.all([
+        const [persons, products, categories, rawTags] = await Promise.all([
             prisma.person.findMany({
                 where: { isActive: true },
                 select: { id: true, name: true, groupName: true },
-                orderBy: { name: 'asc' },
-            }),
-            prisma.personType.findMany({
-                select: { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
             prisma.product.findMany({
@@ -58,7 +54,7 @@ export async function getAnnouncementSheetData() {
         }))
 
 
-        return { persons, personTypes, products: mappedProducts, categories, personTags }
+        return { persons, products: mappedProducts, categories, personTags }
     }, 'تعذّر جلب بيانات الإعلان')
 }
 

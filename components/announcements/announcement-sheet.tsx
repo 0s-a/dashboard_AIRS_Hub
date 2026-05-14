@@ -32,7 +32,7 @@ interface AnnouncementSheetProps {
     onOpenChange: (open: boolean) => void
     announcement?: AnnouncementRow
     persons:      { id: string; name: string | null; groupName: string | null }[]
-    personTypes:  { id: string; name: string }[]
+
     products:     { id: string; name: string; itemNumber: string; categoryId: string | null }[]
     categories:   { id: string; name: string }[]
 }
@@ -100,7 +100,7 @@ function SegmentedControl<T extends string | number>({
 
 export function AnnouncementSheet({
     open, onOpenChange, announcement,
-    persons, personTypes, products, categories,
+    persons, products, categories,
 }: AnnouncementSheetProps) {
     const isEditing = !!announcement
     const [isLoading,     setIsLoading]     = useState(false)
@@ -275,7 +275,7 @@ export function AnnouncementSheet({
                         </h3>
                         <PersonTargetingPanel
                             value={personTarget} onChange={setPersonTarget}
-                            persons={persons} personTypes={personTypes}
+                            persons={persons}
                             previewCount={preview?.personCount}
                         />
                     </div>

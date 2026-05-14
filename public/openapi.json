@@ -121,7 +121,6 @@
                 "name": "أحمد محمد",
                 "address": "الرياض، حي النزهة",
                 "notes": "عميل VIP",
-                "personTypeId": null,
                 "source": "whatsapp",
                 "contacts": [
                   { "type": "phone", "value": "0512345678", "label": "جوال", "isPrimary": true },
@@ -443,7 +442,6 @@
                       "properties": {
                         "personId": { "type": "string", "format": "uuid" },
                         "personName": { "type": "string", "example": "أحمد محمد" },
-                        "personType": { "$ref": "#/components/schemas/PersonType" },
                         "currencies": {
                           "type": "array",
                           "items": { "$ref": "#/components/schemas/CurrencyFull" }
@@ -1189,15 +1187,7 @@
           "isPrimary": { "type": "boolean", "default": false }
         }
       },
-      "PersonType": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "name": { "type": "string", "example": "عميل" },
-          "color": { "type": "string", "example": "#64748b" },
-          "icon": { "type": "string", "example": "User" }
-        }
-      },
+
       "Currency": {
         "type": "object",
         "description": "عملة مختصرة (كما تظهر في بيانات الشخص)",
@@ -1256,10 +1246,6 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/Contact" }
           },
-          "personType": {
-            "nullable": true,
-            "allOf": [{ "$ref": "#/components/schemas/PersonType" }]
-          },
           "currencies": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/Currency" }
@@ -1282,7 +1268,6 @@
           "name": { "type": "string", "minLength": 1, "description": "اسم الشخص (مطلوب)" },
           "address": { "type": "string", "nullable": true },
           "notes": { "type": "string", "nullable": true },
-          "personTypeId": { "type": "string", "format": "uuid", "nullable": true },
           "source": { "type": "string", "nullable": true },
           "contacts": {
             "type": "array",
@@ -1316,7 +1301,6 @@
           "name": { "type": "string", "minLength": 1 },
           "address": { "type": "string", "nullable": true },
           "notes": { "type": "string", "nullable": true },
-          "personTypeId": { "type": "string", "format": "uuid", "nullable": true },
           "source": { "type": "string", "nullable": true },
           "contacts": {
             "type": "array",

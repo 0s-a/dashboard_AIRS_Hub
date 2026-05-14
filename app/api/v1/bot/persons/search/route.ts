@@ -48,38 +48,34 @@ export async function GET(req: NextRequest) {
                 select: {
                     id: true,
                     name: true,
-                    username: true,
-                    role: true,
-                    color: true,
-                    isActive: true,
-                    lastLogin: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    contacts: {
-                        select: {
-                            id: true,
-                            type: true,
-                            value: true,
-                            label: true,
-                            isPrimary: true,
-                        }
-                    }
                 },
                 take: limit,
                 skip,
             })
         ])
 
-        const enrichedPersons = persons.map(p => ({ ...p, _type: 'person' }))
+        const enrichedPersons = persons.map(p => ({
+            _type: 'customer',
+            id: p.id,
+            name: p.name,
+            isActive: p.isActive,
+            contacts: p.contacts,
+            priceLabels: p.priceLabels.map(pl => pl.priceLabel),
+            currencies: p.personCurrencies.map(pc => pc.currency),
+        }))
 
-        const mappedUsers = users.map(u => ({ ...u, _type: 'user' }))
+        const mappedUsers = users.map(u => ({
+            _type: 'user',
+            id: u.id,
+            name: u.name,
+        }))
 
         // Combine and limit to requested size
         const combined = [...enrichedPersons, ...mappedUsers].slice(0, limit)
         const firstResult = combined[0]
 
         return apiSuccess(combined, 200, {
-            personId: firstResult?._type === 'person' ? firstResult.id : null,
+            personId: firstResult?._type === 'customer' ? firstResult.id : null,
             userId: firstResult?._type === 'user' ? firstResult.id : null,
             count: combined.length,
             pagination: paginationMeta(combined.length, page, limit),

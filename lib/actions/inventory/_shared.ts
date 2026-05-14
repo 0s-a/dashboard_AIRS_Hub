@@ -170,8 +170,10 @@ export function serializeProduct(product: any) {
         brandId:          product.brandId ?? null,
         description:      product.description ?? null,
         isAvailable:      product.isAvailable,
-        alternativeNames: product.alternativeNames ?? null,
-        tags:             product.tags ?? null,
+        // Normalize JSON fields: always return arrays, never null
+        // This prevents .map()/.length errors in client components
+        alternativeNames: Array.isArray(product.alternativeNames) ? product.alternativeNames : [],
+        tags:             Array.isArray(product.tags) ? product.tags : [],
         categoryId:       product.categoryId ?? null,
         createdAt:        product.createdAt instanceof Date
                               ? product.createdAt.toISOString()

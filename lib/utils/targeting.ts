@@ -36,7 +36,7 @@ export function buildPersonWhere(
             if (inclusions.length > 0) {
                 const OR: Prisma.PersonWhereInput[] = inclusions.map(c => {
                     switch (c.type) {
-                        case 'type':  return { personTypeId: c.value }
+
                         case 'group': return { groupName: c.value }
                         case 'tag':   return { tags: { some: { tag: { name: c.value } } } }
                         default:      return {}
@@ -61,8 +61,6 @@ export function buildPersonWhere(
     if (!filters.all) {
         const OR: Prisma.PersonWhereInput[] = []
 
-        if (filters.typeIds?.length)
-            OR.push({ personTypeId: { in: filters.typeIds } })
 
         if (filters.groupNames?.length)
             OR.push({ groupName: { in: filters.groupNames } })

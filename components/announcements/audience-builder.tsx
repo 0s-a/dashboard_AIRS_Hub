@@ -23,13 +23,13 @@ import type { FilterGroup, AudienceCondition, ConditionType } from "@/lib/types/
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PersonType { id: string; name: string }
+
 interface PersonData { groupName: string | null }
 
 interface AudienceBuilderProps {
     groups:       FilterGroup[]
     onChange:     (groups: FilterGroup[]) => void
-    personTypes:  PersonType[]
+
     personGroups: string[]
     personTags:   string[]
 }
@@ -43,21 +43,21 @@ function uid() {
 }
 
 const CONDITION_ICONS: Record<ConditionType, React.ComponentType<any>> = {
-    type:        Users,
+
     group:       Layers,
     tag:         Tag,
     exclude_tag: X,
 }
 
 const CONDITION_COLORS: Record<ConditionType, string> = {
-    type:        "bg-primary/10 border-primary/30 text-primary",
+
     group:       "bg-indigo-500/10 border-indigo-500/30 text-indigo-600",
     tag:         "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
     exclude_tag: "bg-destructive/10 border-destructive/30 text-destructive",
 }
 
 const CONDITION_LABELS: Record<ConditionType, string> = {
-    type:        "نوع",
+
     group:       "مجموعة",
     tag:         "تاغ",
     exclude_tag: "استثناء تاغ",
@@ -94,19 +94,19 @@ function ConditionChip({
 // ─── Add Condition Dropdown ───────────────────────────────────────────────────
 
 function AddConditionButton({
-    onAdd, personTypes, personGroups, personTags,
+    onAdd, personGroups, personTags,
 }: {
     onAdd:        (c: AudienceCondition) => void
-    personTypes:  PersonType[]
+
     personGroups: string[]
     personTags:   string[]
 }) {
     const [open,     setOpen]     = useState(false)
-    const [tab,      setTab]      = useState<ConditionType>("type")
+    const [tab,      setTab]      = useState<ConditionType>("group")
     const [search,   setSearch]   = useState("")
 
     const allOptions: Record<ConditionType, ConditionOption[]> = {
-        type:        personTypes.map(pt => ({ type: "type"        as const, value: pt.id,   label: pt.name })),
+
         group:       personGroups.map(g  => ({ type: "group"       as const, value: g,       label: g })),
         tag:         personTags.map(t    => ({ type: "tag"         as const, value: t,       label: t })),
         exclude_tag: personTags.map(t    => ({ type: "exclude_tag" as const, value: t,       label: t })),
@@ -123,7 +123,7 @@ function AddConditionButton({
     }
 
     const TABS: { key: ConditionType; label: string; icon: React.ComponentType<any> }[] = [
-        { key: "type",        label: "نوع",           icon: Users  },
+
         { key: "group",       label: "مجموعة",        icon: Layers },
         { key: "tag",         label: "تاغ",           icon: Tag    },
         { key: "exclude_tag", label: "استثناء",       icon: X      },
@@ -210,14 +210,14 @@ function AddConditionButton({
 function FilterGroupCard({
     group, index, isLast,
     onUpdate, onRemove,
-    personTypes, personGroups, personTags,
+    personGroups, personTags,
 }: {
     group:        FilterGroup
     index:        number
     isLast:       boolean
     onUpdate:     (g: FilterGroup) => void
     onRemove:     () => void
-    personTypes:  PersonType[]
+
     personGroups: string[]
     personTags:   string[]
 }) {
@@ -278,7 +278,7 @@ function FilterGroupCard({
                 {/* Add condition */}
                 <AddConditionButton
                     onAdd={addCondition}
-                    personTypes={personTypes}
+
                     personGroups={personGroups}
                     personTags={personTags}
                 />
@@ -290,7 +290,7 @@ function FilterGroupCard({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AudienceBuilder({
-    groups, onChange, personTypes, personGroups, personTags,
+    groups, onChange, personGroups, personTags,
 }: AudienceBuilderProps) {
     const addGroup = () => {
         onChange([...groups, { id: uid(), conditions: [] }])
@@ -335,7 +335,7 @@ export function AudienceBuilder({
                     isLast={i === groups.length - 1}
                     onUpdate={g2 => updateGroup(i, g2)}
                     onRemove={() => removeGroup(i)}
-                    personTypes={personTypes}
+
                     personGroups={personGroups}
                     personTags={personTags}
                 />

@@ -141,8 +141,8 @@ export type SerializedProduct = {
     } | null
     description: string | null
     isAvailable: boolean
-    alternativeNames: string[] | null
-    tags: string[] | null
+    alternativeNames: string[]  // always an array, never null
+    tags: string[]              // always an array, never null
     categoryId: string | null
     category: SerializedCategory | null
     createdAt: string
@@ -173,6 +173,19 @@ export type ProductVariantWithImages = {
         alt?: string | null
     }>
 }
+
+// ─── Action Result ───────────────────────────────────────────
+
+/**
+ * Standard response shape for all inventory Server Actions.
+ * Use `success` to branch logic; `error` is always a human-readable Arabic string.
+ */
+export type ActionResult<T = void> =
+    | { success: true;  data: T;     error?: never }
+    | { success: false; data?: never; error: string }
+
+/** Shorthand for actions that return a full serialized product */
+export type ProductActionResult = ActionResult<SerializedProduct>
 
 /** Media image record used in gallery and product detail */
 export type ProductMediaImage = {

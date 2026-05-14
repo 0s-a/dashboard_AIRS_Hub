@@ -11,7 +11,7 @@ import type { SerializedPrice, ProductUnitEntry } from '@/lib/types/product'
 
 type CurrencyOption = { id: string; name: string; symbol: string; exchangeRate?: number | null; isDefault?: boolean }
 type SysUnit = { id: string; name: string; pluralName?: string | null }
-type PriceLabel = { id: string; name: string }
+type PriceLabel = { id: string; name: string; isDefault?: boolean }
 
 interface UseProductPricingOptions {
     initialPrices: SerializedPrice[]

@@ -26,7 +26,7 @@ type CurrencyOption = { id: string; name: string; symbol: string; exchangeRate?:
 interface SmartPricingWizardProps {
     productId: string
     productUnits: ProductUnitEntry[]
-    priceLabels: { id: string; name: string }[]
+    priceLabels: { id: string; name: string; isDefault?: boolean }[]
     currencies: CurrencyOption[]
     onComplete: (newPrices: SerializedPrice[]) => void
     onCancel: () => void
@@ -39,7 +39,8 @@ export function SmartPricingWizard({
 
     // Local state managed by parent via controlled props pattern —
     // we use uncontrolled local state here for simplicity
-    const [labelId, setLabelId] = useState("")
+    const defaultLabel = priceLabels.find(pl => pl.isDefault)
+    const [labelId, setLabelId] = useState(defaultLabel?.id ?? "")
     const [basePrice, setBasePrice] = useState("")
     const [currencyIds, setCurrencyIds] = useState<string[]>(
         () => currencies.filter(c => c.exchangeRate != null || c.isDefault).map(c => c.id)

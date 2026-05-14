@@ -7,7 +7,7 @@ const PATHS = '/price-labels'
 
 export async function getPriceLabels() {
     return safeAction(
-        () => prisma.priceLabel.findMany({ orderBy: { name: 'asc' } }),
+        () => prisma.priceLabel.findMany({ orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] }),
         'تعذّر جلب مسميات التسعيرة'
     )
 }
@@ -23,15 +23,21 @@ export async function createPriceLabel(data: {
     name: string
     itemNumber?: string
     notes?: string | null
+    isDefault?: boolean
 }) {
     return safeActionWithRevalidation(
         async () => {
+            if (data.isDefault) {
+                // Clear all existing defaults first
+                await prisma.priceLabel.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
+            }
             const itemNumber = data.itemNumber?.trim() || await generateItemNumber('priceLabel')
             return prisma.priceLabel.create({
                 data: {
                     name: data.name,
                     itemNumber,
                     notes: data.notes,
+                    isDefault: data.isDefault ?? false,
                 },
             })
         },
@@ -44,16 +50,26 @@ export async function updatePriceLabel(id: string, data: {
     name?: string
     itemNumber?: string
     notes?: string | null
+    isDefault?: boolean
 }) {
     return safeActionWithRevalidation(
-        () => prisma.priceLabel.update({
-            where: { id },
-            data: {
-                name: data.name,
-                itemNumber: data.itemNumber,
-                notes: data.notes,
-            },
-        }),
+        async () => {
+            if (data.isDefault) {
+                // Clear all existing defaults, keep the one being updated
+                await prisma.priceLabel.updateMany(
+                    { where: { isDefault: true, id: { not: id } }, data: { isDefault: false } }
+                )
+            }
+            return prisma.priceLabel.update({
+                where: { id },
+                data: {
+                    ...(data.name       !== undefined && { name:       data.name       }),
+                    ...(data.itemNumber !== undefined && { itemNumber: data.itemNumber  }),
+                    ...(data.notes      !== undefined && { notes:      data.notes       }),
+                    ...(data.isDefault  !== undefined && { isDefault:  data.isDefault   }),
+                },
+            })
+        },
         PATHS,
         'تعذّر تعديل مسمى التسعيرة'
     )
@@ -73,6 +89,17 @@ export async function deletePriceLabel(id: string) {
         },
         PATHS,
         'تعذّر حذف مسمى التسعيرة'
+    )
+}
+
+export async function setDefaultPriceLabel(id: string) {
+    return safeActionWithRevalidation(
+        async () => {
+            await prisma.priceLabel.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
+            return prisma.priceLabel.update({ where: { id }, data: { isDefault: true } })
+        },
+        PATHS,
+        'تعذّر تعيين التسعيرة الافتراضية'
     )
 }
 

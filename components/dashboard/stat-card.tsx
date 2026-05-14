@@ -1,5 +1,3 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Package,
@@ -34,59 +32,34 @@ interface StatCardProps {
 
 const colorSchemes = {
     blue: {
-        iconBg: "bg-blue-500/8 group-hover:bg-blue-500/15",
-        iconColor: "text-blue-600 dark:text-blue-400",
-        accentBar: "from-blue-500 to-cyan-400",
-        gradientFrom: "from-blue-600",
-        gradientTo: "to-blue-400",
+        iconBg: "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400",
+        accentBar: "bg-blue-500",
         dotColor: "bg-blue-500",
-        dotShadow: "shadow-[0_0_10px_rgba(59,130,246,0.5)]",
         hoverBorder: "hover:border-blue-500/30",
-        bgGlow: "bg-blue-500/5 dark:bg-blue-500/10",
     },
     green: {
-        iconBg: "bg-emerald-500/8 group-hover:bg-emerald-500/15",
-        iconColor: "text-emerald-600 dark:text-emerald-400",
-        accentBar: "from-emerald-500 to-teal-400",
-        gradientFrom: "from-emerald-600",
-        gradientTo: "to-emerald-400",
+        iconBg: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
+        accentBar: "bg-emerald-500",
         dotColor: "bg-emerald-500",
-        dotShadow: "shadow-[0_0_10px_rgba(16,185,129,0.5)]",
         hoverBorder: "hover:border-emerald-500/30",
-        bgGlow: "bg-emerald-500/5 dark:bg-emerald-500/10",
     },
     purple: {
-        iconBg: "bg-purple-500/8 group-hover:bg-purple-500/15",
-        iconColor: "text-purple-600 dark:text-purple-400",
-        accentBar: "from-purple-500 to-pink-400",
-        gradientFrom: "from-purple-600",
-        gradientTo: "to-purple-400",
+        iconBg: "bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400",
+        accentBar: "bg-purple-500",
         dotColor: "bg-purple-500",
-        dotShadow: "shadow-[0_0_10px_rgba(168,85,247,0.5)]",
         hoverBorder: "hover:border-purple-500/30",
-        bgGlow: "bg-purple-500/5 dark:bg-purple-500/10",
     },
     orange: {
-        iconBg: "bg-orange-500/8 group-hover:bg-orange-500/15",
-        iconColor: "text-orange-600 dark:text-orange-400",
-        accentBar: "from-orange-500 to-amber-400",
-        gradientFrom: "from-orange-600",
-        gradientTo: "to-orange-400",
+        iconBg: "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400",
+        accentBar: "bg-orange-500",
         dotColor: "bg-orange-500",
-        dotShadow: "shadow-[0_0_10px_rgba(249,115,22,0.5)]",
         hoverBorder: "hover:border-orange-500/30",
-        bgGlow: "bg-orange-500/5 dark:bg-orange-500/10",
     },
     indigo: {
-        iconBg: "bg-indigo-500/8 group-hover:bg-indigo-500/15",
-        iconColor: "text-indigo-600 dark:text-indigo-400",
-        accentBar: "from-indigo-500 to-violet-400",
-        gradientFrom: "from-indigo-600",
-        gradientTo: "to-indigo-400",
+        iconBg: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400",
+        accentBar: "bg-indigo-500",
         dotColor: "bg-indigo-500",
-        dotShadow: "shadow-[0_0_10px_rgba(99,102,241,0.5)]",
         hoverBorder: "hover:border-indigo-500/30",
-        bgGlow: "bg-indigo-500/5 dark:bg-indigo-500/10",
     }
 }
 
@@ -109,36 +82,26 @@ export function StatCard({
 
     return (
         <Card className={cn(
-            "relative overflow-hidden group border border-border/40 bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 rounded-2xl",
+            "relative overflow-hidden group border border-border/40 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl",
             colors.hoverBorder
         )}>
             {/* Accent top bar */}
-            <div className={cn("h-1 w-full bg-linear-to-r", colors.accentBar)} />
+            <div className={cn("absolute top-0 left-0 right-0 h-[3px] w-full transition-opacity opacity-70 group-hover:opacity-100", colors.accentBar)} />
 
-            {/* Background glow on hover */}
-            <div className={cn(
-                "absolute -top-[50%] -right-[30%] w-[60%] h-[80%] rounded-full blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-700",
-                colors.bgGlow
-            )} />
-
-            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-3 pt-5 px-6">
-                <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.12em] group-hover:text-foreground/70 transition-colors duration-300">
+            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2 pt-5 px-6">
+                <CardTitle className="text-xs font-bold text-muted-foreground group-hover:text-foreground/80 transition-colors duration-300">
                     {title}
                 </CardTitle>
                 <div className={cn(
-                    "p-3 rounded-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-3",
+                    "p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-105",
                     colors.iconBg
                 )}>
-                    <Icon className={cn("h-5 w-5 transition-colors duration-300", colors.iconColor)} />
+                    <Icon className="h-4 w-4" />
                 </div>
             </CardHeader>
-            <CardContent className="relative px-6 pb-6">
+            <CardContent className="relative px-6 pb-5 pt-2">
                 <div className="flex items-baseline gap-2">
-                    <div className={cn(
-                        "text-4xl font-black tracking-tight text-transparent bg-clip-text bg-linear-to-br font-sans transition-all duration-300",
-                        colors.gradientFrom,
-                        colors.gradientTo
-                    )}>
+                    <div className="text-3xl font-bold tracking-tight text-foreground font-sans">
                         {formatNumber(value)}
                     </div>
                     {trend && (
@@ -154,11 +117,10 @@ export function StatCard({
                     )}
                 </div>
                 {description && (
-                    <p className="text-xs text-muted-foreground mt-3 flex items-center gap-2 font-medium">
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2 font-medium">
                         <span className={cn(
-                            "inline-flex size-2 rounded-full animate-pulse",
-                            colors.dotColor,
-                            colors.dotShadow
+                            "inline-flex size-1.5 rounded-full",
+                            colors.dotColor
                         )} />
                         {description}
                     </p>

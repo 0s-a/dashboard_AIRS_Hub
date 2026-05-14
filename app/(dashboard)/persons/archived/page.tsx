@@ -57,9 +57,7 @@ export default async function ArchivedPersonsPage() {
                                                     <Icon className="h-3 w-3" />{primary.value}
                                                 </span>
                                             )}
-                                            {person.personType && (
-                                                <Badge className="text-[10px] bg-muted border-0 text-muted-foreground">{person.personType.name}</Badge>
-                                            )}
+
                                         </div>
                                     </div>
                                 </div>

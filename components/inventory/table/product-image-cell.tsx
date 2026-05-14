@@ -1,0 +1,56 @@
+"use client"
+
+import Image from "next/image"
+import { Package } from "lucide-react"
+import {
+    Dialog,
+    DialogContent,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+
+interface ProductImageCellProps {
+    src: string | undefined
+    alt: string
+}
+
+/**
+ * Small product thumbnail for table cells.
+ * Shows a placeholder icon when no image is available.
+ * Clicking opens a zoom dialog with the full-size image.
+ */
+export function ProductImageCell({ src, alt }: ProductImageCellProps) {
+    if (!src) {
+        return (
+            <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/30 border border-dashed flex items-center justify-center">
+                <Package className="h-5 w-5 text-muted-foreground/30" />
+            </div>
+        )
+    }
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border bg-muted/20 cursor-zoom-in group transition-all hover:ring-2 hover:ring-primary/40 shadow-sm">
+                    <Image
+                        src={src}
+                        alt={alt}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                </div>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
+                <div className="relative aspect-square w-full max-h-[80vh]">
+                    <Image
+                        src={src}
+                        alt={alt}
+                        fill
+                        className="object-contain"
+                        priority
+                    />
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}

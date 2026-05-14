@@ -1,22 +1,8 @@
-"use client"
-
-import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Package, Users, TrendingUp, CalendarDays } from "lucide-react"
 import Link from "next/link"
-import { getCurrentUser } from "@/lib/actions/auth"
 
-export function WelcomeSection() {
-    const [userName, setUserName] = useState("")
-
-    useEffect(() => {
-        getCurrentUser().then(res => {
-            if (res.success && res.data) {
-                setUserName(res.data.name)
-            }
-        })
-    }, [])
-
+export function WelcomeSection({ userName }: { userName: string }) {
     const currentHour = new Date().getHours()
     let greeting = "مساء الخير"
     let emoji = "🌙"
@@ -37,7 +23,7 @@ export function WelcomeSection() {
     })
 
     return (
-        <div className="relative rounded-2xl border border-border/50 dark:border-white/6 bg-card/50 dark:bg-white/2 p-6 md:p-8">
+        <div className="relative rounded-2xl border border-border/50 dark:border-white/6 bg-card/50 dark:bg-white/2 p-6 md:p-8 backdrop-blur-sm shadow-sm">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                 {/* Text content */}
                 <div className="space-y-2">
@@ -47,7 +33,7 @@ export function WelcomeSection() {
                     </div>
 
                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
-                        {greeting}{userName && `، ${userName}`}
+                        {greeting}{userName ? `، ${userName}` : ''}
                         <span className="mr-2 inline-block">{emoji}</span>
                     </h1>
 
@@ -59,18 +45,18 @@ export function WelcomeSection() {
                 {/* Actions */}
                 <div className="flex items-center gap-2">
                     <Link href="/inventory">
-                        <Button size="sm" className="rounded-lg font-semibold gap-1.5">
+                        <Button size="sm" className="rounded-lg font-semibold gap-1.5 shadow-sm transition-all hover:-translate-y-0.5">
                             <Package className="size-4" />
                             إضافة منتج
                         </Button>
                     </Link>
                     <Link href="/persons">
-                        <Button variant="outline" size="sm" className="rounded-lg font-semibold gap-1.5">
+                        <Button variant="outline" size="sm" className="rounded-lg font-semibold gap-1.5 shadow-sm transition-all hover:-translate-y-0.5">
                             <Users className="size-4" />
                             إضافة شخص
                         </Button>
                     </Link>
-                    <Button variant="ghost" size="sm" className="rounded-lg font-semibold gap-1.5 text-muted-foreground">
+                    <Button variant="ghost" size="sm" className="rounded-lg font-semibold gap-1.5 text-muted-foreground hover:bg-muted/50 transition-colors">
                         <TrendingUp className="size-4" />
                         التقارير
                     </Button>

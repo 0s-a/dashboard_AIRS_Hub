@@ -1,7 +1,6 @@
 import { DataTable } from "@/components/ui/data-table"
 import { columns } from "../../../components/columns"
 import { getPersons } from "@/lib/actions/persons"
-import { PersonSheet } from "@/components/persons/person-sheet"
 import { Users, UserCheck, UserPlus, Archive } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -55,7 +54,6 @@ export default async function CRMPage({
                             الأرشيف
                         </Button>
                     </Link>
-                    <PersonSheet />
                 </div>
             </div>
 

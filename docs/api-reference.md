@@ -97,7 +97,6 @@ GET /api/v1/bot/persons?search=أحمد&active=true&limit=20
   ],
   "groupNumber": "966501234567@s.whatsapp.net",
   "groupName": "مجموعة السعودية",
-  "personTypeId": "uuid",
   "source": "whatsapp",
   "tags": {},
   "currencyIds": ["uuid"],
@@ -191,7 +190,6 @@ GET /api/v1/bot/persons/{uuid}/pricing
   "data": {
     "personId": "...",
     "personName": "...",
-    "personType": { "id": "...", "name": "...", "color": "...", "icon": "..." },
     "currencies": [{ "id": "...", "code": "SAR", "symbol": "ر.س", "name": "ريال سعودي" }],
     "priceLabels": [{ "id": "...", "name": "سعر الجملة" }]
   }

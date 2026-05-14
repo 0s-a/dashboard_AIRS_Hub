@@ -13,8 +13,7 @@ const contactSchema = z.object({
 
 const updatePersonSchema = z.object({
     name: z.string().min(1, 'الاسم مطلوب').optional(),
-    personTypeId: z.string().nullable().optional(),
-    source: z.enum(['bot', 'manual', 'import', 'api']).nullable().optional(),
+    source: z.preprocess((val) => val === '' ? undefined : val, z.enum(['bot', 'manual', 'import', 'api']).nullable().optional()),
     contacts: z.array(contactSchema).optional(),
     tags: z.array(z.string()).optional(),
     currencyIds: z.array(z.string()).optional(),
@@ -77,7 +76,6 @@ export async function PUT(
             data: {
                 ...(body.name         !== undefined && { name: body.name }),
                 ...(body.source       !== undefined && { source: body.source || null }),
-                ...(body.personTypeId !== undefined && { personTypeId: body.personTypeId || null }),
                 ...(body.isActive     !== undefined && { isActive: body.isActive }),
                 ...(body.contacts     !== undefined && {
                     contacts: {

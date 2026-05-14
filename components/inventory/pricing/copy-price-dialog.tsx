@@ -27,7 +27,7 @@ interface CopyPriceDialogProps {
     open: boolean
     fromLabelId: string
     fromLabelName: string
-    priceLabels: { id: string; name: string }[]
+    priceLabels: { id: string; name: string; isDefault?: boolean }[]
     isPending: boolean
     onClose: () => void
     onConfirm: (toLabelId: string, adjustmentPercent: number) => void

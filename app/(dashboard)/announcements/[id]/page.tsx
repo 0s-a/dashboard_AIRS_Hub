@@ -87,7 +87,7 @@ export default function AnnouncementDetailPage() {
     const [ann, setAnn] = useState<(AnnouncementRow & {
         queueingProgress?: number
     }) | null>(null)
-    const [sheetData,     setSheetData]     = useState<any>({ persons: [], personTypes: [], products: [], categories: [] })
+    const [sheetData,     setSheetData]     = useState<any>({ persons: [], products: [], categories: [] })
     const [personTarget,  setPersonTarget]  = useState<PersonTarget>({ mode: "all", filters: { all: true }, manualIds: [] })
     const [productTarget, setProductTarget] = useState<ProductTarget>({ mode: "all", filters: { all: true }, manualIds: [] })
     const [preview,       setPreview]       = useState<{ personCount: number; productCount: number } | null>(null)
@@ -397,7 +397,7 @@ export default function AnnouncementDetailPage() {
                                         </span>
                                     </div>
                                     <PersonTargetingPanel value={personTarget} onChange={setPersonTarget}
-                                        persons={sheetData.persons} personTypes={sheetData.personTypes}
+                                        persons={sheetData.persons}
                                         personTags={sheetData.personTags ?? []}
                                         previewCount={preview?.personCount} />
 

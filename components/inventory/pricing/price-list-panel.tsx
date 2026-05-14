@@ -55,7 +55,7 @@ interface PriceListPanelProps {
     productId: string
     prices: SerializedPrice[]
     productUnits: ProductUnitEntry[]
-    priceLabels: { id: string; name: string }[]
+    priceLabels: { id: string; name: string; isDefault?: boolean }[]
     currencies: CurrencyOption[]
     onPricesChange: (prices: SerializedPrice[]) => void
 }

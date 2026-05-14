@@ -24,7 +24,7 @@ type CurrencyOption = { id: string; name: string; symbol: string }
 interface SinglePriceFormProps {
     productId: string
     productUnits: ProductUnitEntry[]
-    priceLabels: { id: string; name: string }[]
+    priceLabels: { id: string; name: string; isDefault?: boolean }[]
     currencies: CurrencyOption[]
     existingPrices: SerializedPrice[]
     onComplete: (newPrices: SerializedPrice[]) => void
@@ -35,7 +35,8 @@ export function SinglePriceForm({
     productId, productUnits, priceLabels, currencies, existingPrices, onComplete, onCancel
 }: SinglePriceFormProps) {
     const [isPending, startTransition] = useTransition()
-    const [labelId, setLabelId] = useState("")
+    const defaultLabel = priceLabels.find(pl => pl.isDefault)
+    const [labelId, setLabelId] = useState(defaultLabel?.id ?? "")
     const [currencyId, setCurrencyId] = useState("")
     const [unitId, setUnitId] = useState("")
     const [value, setValue] = useState("")

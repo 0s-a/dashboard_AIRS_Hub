@@ -271,15 +271,11 @@ export async function dbGetMessageCounts(announcementId: string) {
 
 /** All reference data needed to populate the announcement creation form. */
 export async function dbGetAnnouncementFormData() {
-    const [persons, personTypes, rawProducts, categories, rawTags] =
+    const [persons, rawProducts, categories, rawTags] =
         await Promise.all([
             prisma.person.findMany({
                 where:   { isActive: true },
                 select:  { id: true, name: true, groupName: true },
-                orderBy: { name: 'asc' },
-            }),
-            prisma.personType.findMany({
-                select:  { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
             prisma.product.findMany({
@@ -317,5 +313,5 @@ export async function dbGetAnnouncementFormData() {
         mainImage:  (p as any).productImages?.[0]?.url ? toDisplayUrl((p as any).productImages[0].url) : null,
     }))
 
-    return { persons, personTypes, products, categories, personTags }
+    return { persons, products, categories, personTags }
 }

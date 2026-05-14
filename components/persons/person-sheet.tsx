@@ -16,7 +16,7 @@ import { Plus } from "lucide-react"
 import { Person } from "@prisma/client"
 
 interface PersonSheetProps {
-    person?: Person
+    person: Person
     trigger?: React.ReactNode
 }
 
@@ -27,18 +27,16 @@ export const PersonSheet = React.memo(function PersonSheet({ person, trigger }: 
         <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
                 {trigger || (
-                    <Button className="rounded-xl shadow-lg shadow-primary/20">
-                        <Plus className="ml-2 h-4 w-4" /> إضافة شخص
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <span className="sr-only">تعديل</span>
                     </Button>
                 )}
             </SheetTrigger>
             <SheetContent className="overflow-y-auto sm:max-w-md">
                 <SheetHeader>
-                    <SheetTitle>{person ? "تعديل بيانات الشخص" : "إضافة شخص جديد"}</SheetTitle>
+                    <SheetTitle>تعديل بيانات الشخص</SheetTitle>
                     <SheetDescription>
-                        {person
-                            ? "تحديث تفاصيل الشخص في قاعدة البيانات."
-                            : "أضف شخصاً جديداً لمتجرك لمتابعة نشاطه."}
+                        تحديث تفاصيل الشخص في قاعدة البيانات.
                     </SheetDescription>
                 </SheetHeader>
                 <div className="py-4">

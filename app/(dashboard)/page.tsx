@@ -6,6 +6,7 @@ import { RecentPersons } from "@/components/dashboard/recent-persons"
 import { prisma } from "@/lib/prisma"
 import { unstable_cache } from "next/cache"
 import { toDisplayUrl } from "@/lib/utils/image-paths"
+import { getCurrentUser } from "@/lib/actions/auth"
 
 // Cache dashboard data for 60 seconds to improve performance
 const getDashboardData = unstable_cache(
@@ -43,15 +44,13 @@ const getDashboardData = unstable_cache(
                     id: true,
                     name: true,
                     contacts: { select: { id: true, type: true, value: true, isPrimary: true } },
-                    personType: { select: { id: true, name: true } },
                     isActive: true,
                     createdAt: true,
                 }
             })
         ])
 
-
-        // Generate activity data for last 7 days (optimized)
+        // Generate activity data for last 7 days (optimized with parallel execution)
         const activityData = await generateActivityData()
 
         return {
@@ -69,7 +68,7 @@ const getDashboardData = unstable_cache(
                 })),
                 productPrices: (p.productPrices || []).map((pp: any) => ({
                     priceLabelName: pp.priceLabel.name,
-                    value: pp.value,
+                    value: Number(pp.value),
                     currencySymbol: pp.currency.symbol,
                 })),
             })),
@@ -84,93 +83,80 @@ const getDashboardData = unstable_cache(
     }
 )
 
-
-
 async function generateActivityData() {
     const days = 7
-    const data = []
-
-    for (let i = days - 1; i >= 0; i--) {
+    // Create an array of the last 7 days date ranges
+    const dateRanges = Array.from({ length: days }).map((_, i) => {
         const date = new Date()
-        date.setDate(date.getDate() - i)
+        date.setDate(date.getDate() - (days - 1 - i))
         date.setHours(0, 0, 0, 0)
-
+        
         const nextDate = new Date(date)
         nextDate.setDate(nextDate.getDate() + 1)
+        
+        return { date, nextDate }
+    })
 
-        const productsCount = await prisma.product.count({
-            where: {
-                createdAt: {
-                    gte: date,
-                    lt: nextDate
-                }
+    // Execute all count queries in parallel
+    const results = await Promise.all(
+        dateRanges.map(async ({ date, nextDate }) => {
+            const [products, persons] = await Promise.all([
+                prisma.product.count({
+                    where: { createdAt: { gte: date, lt: nextDate } }
+                }),
+                prisma.person.count({
+                    where: { createdAt: { gte: date, lt: nextDate } }
+                })
+            ])
+            return {
+                date: date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
+                products,
+                persons
             }
         })
+    )
 
-        const personsCount = await prisma.person.count({
-            where: {
-                createdAt: {
-                    gte: date,
-                    lt: nextDate
-                }
-            }
-        })
-
-        data.push({
-            date: date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
-            products: productsCount,
-            persons: personsCount
-        })
-    }
-
-    return data
+    return results
 }
 
 export default async function DashboardPage() {
-    const { stats, recentProducts, recentPersons, activityData } = await getDashboardData()
+    // Fetch user and dashboard data in parallel
+    const [userRes, dashboardData] = await Promise.all([
+        getCurrentUser(),
+        getDashboardData()
+    ])
+    
+    const userName = userRes.success && userRes.data ? userRes.data.name : ""
+    const { stats, recentProducts, recentPersons, activityData } = dashboardData
+
+    const statCardsData = [
+        { title: "عدد المنتجات", value: stats.productCount, iconName: "package" as const, desc: "منتج متوفر في المخزون", color: "indigo" as const },
+        { title: "إجمالي الأشخاص", value: stats.personCount, iconName: "users" as const, desc: "شخص مسجل حالياً", color: "blue" as const },
+        { title: "الأشخاص النشطون", value: stats.activePersonCount, iconName: "trending-up" as const, desc: "شخص نشط", color: "green" as const },
+        { title: "منتجات غير متوفرة", value: stats.unavailableProductCount, iconName: "alert-circle" as const, desc: "منتج غير متاح حالياً", color: "orange" as const },
+    ]
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
-            <WelcomeSection />
+            <WelcomeSection userName={userName} />
 
             {/* Stats Cards */}
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '0ms', animationFillMode: 'both' }}>
-                    <StatCard
-                        title="عدد المنتجات"
-                        value={stats.productCount}
-                        iconName="package"
-                        description="منتج متوفر في المخزون"
-                        colorScheme="indigo"
-                    />
-                </div>
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
-                    <StatCard
-                        title="إجمالي الأشخاص"
-                        value={stats.personCount}
-                        iconName="users"
-                        description="شخص مسجل حالياً"
-                        colorScheme="blue"
-                    />
-                </div>
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
-                    <StatCard
-                        title="الأشخاص النشطون"
-                        value={stats.activePersonCount}
-                        iconName="trending-up"
-                        description="شخص نشط"
-                        colorScheme="green"
-                    />
-                </div>
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '300ms', animationFillMode: 'both' }}>
-                    <StatCard
-                        title="منتجات غير متوفرة"
-                        value={stats.unavailableProductCount}
-                        iconName="alert-circle"
-                        description="منتج غير متاح حالياً"
-                        colorScheme="orange"
-                    />
-                </div>
+                {statCardsData.map((card, idx) => (
+                    <div 
+                        key={idx} 
+                        className="animate-in fade-in slide-in-from-bottom-4 duration-500" 
+                        style={{ animationDelay: `${idx * 100}ms`, animationFillMode: 'both' }}
+                    >
+                        <StatCard
+                            title={card.title}
+                            value={card.value}
+                            iconName={card.iconName}
+                            description={card.desc}
+                            colorScheme={card.color}
+                        />
+                    </div>
+                ))}
             </div>
 
             {/* Charts */}

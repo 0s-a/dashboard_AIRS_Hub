@@ -21,8 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { createPerson, updatePerson } from "@/lib/actions/persons"
-import { getPersonTypes } from "@/lib/actions/person-types"
+import { updatePerson } from "@/lib/actions/persons"
 import { getPriceLabels } from "@/lib/actions/price-labels"
 import { getActiveCurrencies } from "@/lib/actions/currencies"
 import { ContactInput } from "@/lib/person-types"
@@ -43,7 +42,6 @@ const contactSchema = z.object({
 
 const formSchema = z.object({
     name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
-    personTypeId: z.string().optional(),
     source: z.string().optional(),
     contacts: z.array(contactSchema),
     tags: z.array(z.string()).optional(),
@@ -56,7 +54,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 interface PersonFormProps {
-    person?: Person
+    person: Person
     onSuccess?: () => void
 }
 
@@ -69,20 +67,15 @@ const contactTypeLabels: Record<string, { label: string; icon: any; placeholder:
 export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: PersonFormProps) {
     const router = useRouter()
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [personTypes, setPersonTypes] = useState<{ id: string; name: string }[]>([])
     const [priceLabels, setPriceLabels] = useState<OptionType[]>([])
     const [currencyOptions, setCurrencyOptions] = useState<OptionType[]>([])
 
     useEffect(() => {
         const fetchAll = async () => {
-            const [personTypesRes, priceLabelsRes, currenciesRes] = await Promise.all([
-                getPersonTypes(),
+            const [priceLabelsRes, currenciesRes] = await Promise.all([
                 getPriceLabels(),
                 getActiveCurrencies(),
             ])
-            if (personTypesRes.success && personTypesRes.data) {
-                setPersonTypes(personTypesRes.data)
-            }
             if (priceLabelsRes.success && priceLabelsRes.data) {
                 setPriceLabels(priceLabelsRes.data.map(l => ({ label: l.name, value: l.id })))
             }
@@ -110,9 +103,8 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            name: person?.name || "",
-            personTypeId: person?.personTypeId || "",
-            source: (person?.source as string) || "",
+            name: person.name || "",
+            source: (person.source as string) || "",
             contacts: existingContacts.length > 0
                 ? existingContacts.map(c => ({ ...c, label: c.label || "" }))
                 : [{ type: "phone" as const, value: "", label: "", isPrimary: true }],
@@ -147,7 +139,6 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
 
             const dataToSubmit = {
                 name: values.name,
-                personTypeId: values.personTypeId || null,
                 source: (values.source || null) as 'bot' | 'manual' | 'import' | 'api' | null,
                 contacts: cleanContacts.length > 0 ? cleanContacts : null,
                 tags: parsedTags && parsedTags.length > 0 ? parsedTags : null,
@@ -157,18 +148,11 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
                 groupNumber: values.groupNumber || null,
             }
 
-            let res;
-            if (person) {
-                res = await updatePerson(person.id, dataToSubmit)
-            } else {
-                res = await createPerson(dataToSubmit)
-            }
+            const res = await updatePerson(person.id, dataToSubmit)
 
             if (res.success) {
-                toast.success(person ? 'تم تحديث الشخص' : 'تم إضافة الشخص', {
-                    description: person
-                        ? `تم تحديث بيانات "${values.name}" بنجاح`
-                        : `تم إضافة الشخص "${values.name}" إلى القائمة`
+                toast.success('تم تحديث الشخص', {
+                    description: `تم تحديث بيانات "${values.name}" بنجاح`
                 })
                 if (onSuccess) onSuccess()
                 router.refresh()
@@ -208,47 +192,7 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
                             )}
                         />
 
-                        <FormField
-                            control={form.control}
-                            name="personTypeId"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                                        نوع الشخص
-                                    </FormLabel>
-                                    <Select onValueChange={(val) => {
-                                        if (val === "__none__") {
-                                            field.onChange("")
-                                        } else {
-                                            field.onChange(val)
-                                        }
-                                    }} value={field.value || ""}>
-                                        <FormControl>
-                                            <SelectTrigger className="h-9">
-                                                <SelectValue placeholder="اختر نوع الشخص" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">
-                                                <span className="text-muted-foreground">بدون تصنيف</span>
-                                            </SelectItem>
-                                            {personTypes.length === 0 ? (
-                                                <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                                                    لا توجد أنواع. أضف من صفحة أنواع الأشخاص.
-                                                </div>
-                                            ) : (
-                                                personTypes.map((pt) => (
-                                                    <SelectItem key={pt.id} value={pt.id}>
-                                                        {pt.name}
-                                                    </SelectItem>
-                                                ))
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -495,16 +439,31 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
                     />
                 </div>
 
-                <Button type="submit" className="w-full h-11 text-base font-medium transition-all" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            جاري الحفظ...
-                        </>
-                    ) : (
-                        person ? "حفظ التعديلات" : "إضافة شخص جديد"
-                    )}
-                </Button>
+                <div className="pt-6 border-t mt-4 flex flex-col-reverse md:flex-row items-center justify-end gap-3">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => onSuccess?.()}
+                        disabled={isSubmitting}
+                        className="w-full md:w-auto rounded-xl h-11 px-6 text-base font-medium transition-all"
+                    >
+                        إلغاء
+                    </Button>
+                    <Button
+                        type="submit"
+                        className="w-full md:w-auto rounded-xl h-11 px-8 text-base font-medium transition-all shadow-md shadow-primary/20"
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                جاري الحفظ...
+                            </>
+                        ) : (
+                            "حفظ التعديلات"
+                        )}
+                    </Button>
+                </div>
             </form>
         </Form>
     )

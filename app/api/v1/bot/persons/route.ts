@@ -21,8 +21,11 @@ const contactSchema = z.object({
 
 const createPersonSchema = z.object({
     name: z.string().min(1, 'الاسم مطلوب'),
-    personTypeId: z.string().nullable().optional(),
-    source: z.enum(['bot', 'manual', 'import', 'api']).nullable().optional(),
+    source: z.preprocess((val) => {
+        if (!val || val === '') return undefined;
+        const s = String(val).toLowerCase();
+        return ['bot', 'manual', 'import', 'api'].includes(s) ? s : undefined;
+    }, z.enum(['bot', 'manual', 'import', 'api']).nullable().optional()),
     contacts: z.array(contactSchema).optional(),
     tags: z.array(z.string()).optional(),
     currencyIds: z.array(z.string()).optional(),
@@ -102,8 +105,19 @@ export async function POST(req: NextRequest) {
         
         const body = validationResult.data
 
-        // ── Resolve person type ──
-        const finalPersonTypeId = body.personTypeId || null
+        // ── Fetch Defaults ──
+        const [defaultCurrency, defaultPriceLabel] = await Promise.all([
+            prisma.currency.findFirst({ where: { isDefault: true } }),
+            prisma.priceLabel.findFirst({ where: { isDefault: true } })
+        ])
+
+        const finalCurrencyIds = body.currencyIds !== undefined 
+            ? body.currencyIds 
+            : (defaultCurrency ? [defaultCurrency.id] : [])
+
+        const finalPriceLabelIds = body.priceLabelIds !== undefined 
+            ? body.priceLabelIds 
+            : (defaultPriceLabel ? [defaultPriceLabel.id] : [])
 
         // ── Check for existing person (duplicate detection) ──
         let existingPerson: any = null
@@ -147,11 +161,16 @@ export async function POST(req: NextRequest) {
             const newContacts = (body.contacts || [])
                 .filter(c => c.value?.trim() && !existingContactValues.has(c.value.trim()))
 
+            const existingCurrencyIds = (existingPerson.personCurrencies || []).map((pc: any) => pc.currencyId)
+            const existingPriceLabelIds = (existingPerson.priceLabels || []).map((pl: any) => pl.priceLabelId)
+
+            const shouldUpdateCurrencies = body.currencyIds !== undefined || (existingCurrencyIds.length === 0 && finalCurrencyIds.length > 0)
+            const shouldUpdatePriceLabels = body.priceLabelIds !== undefined || (existingPriceLabelIds.length === 0 && finalPriceLabelIds.length > 0)
+
             const updatedPerson = await prisma.person.update({
                 where: { id: existingPerson.id },
                 data: {
                     name: existingPerson.name ? existingPerson.name : (body.name?.trim() || existingPerson.name),
-                    personTypeId: existingPerson.personTypeId || finalPersonTypeId,
                     source: body.source || existingPerson.source || null,
                     groupName: body.groupName || existingPerson.groupName,
                     groupNumber: body.groupNumber || existingPerson.groupNumber,
@@ -162,6 +181,16 @@ export async function POST(req: NextRequest) {
                             value: c.value.trim(),
                             label: c.label || null,
                             isPrimary: c.isPrimary || false,
+                        }))
+                    } : undefined,
+                    personCurrencies: shouldUpdateCurrencies ? {
+                        deleteMany: {},
+                        create: finalCurrencyIds.map((id: string) => ({ currencyId: id }))
+                    } : undefined,
+                    priceLabels: shouldUpdatePriceLabels ? {
+                        deleteMany: {},
+                        create: finalPriceLabelIds.map((id: string) => ({
+                            priceLabel: { connect: { id } }
                         }))
                     } : undefined,
                 },
@@ -175,7 +204,6 @@ export async function POST(req: NextRequest) {
         const person = await prisma.person.create({
             data: {
                 name: body.name.trim(),
-                personTypeId: finalPersonTypeId,
                 source: body.source || null,
                 contacts: body.contacts && body.contacts.length > 0 ? {
                     create: body.contacts
@@ -197,14 +225,14 @@ export async function POST(req: NextRequest) {
                         },
                     })),
                 } : undefined,
-                personCurrencies: body.currencyIds && body.currencyIds.length > 0 ? {
-                    create: body.currencyIds.map((currencyId: string) => ({ currencyId }))
+                personCurrencies: finalCurrencyIds.length > 0 ? {
+                    create: finalCurrencyIds.map((currencyId: string) => ({ currencyId }))
                 } : undefined,
                 groupName: body.groupName || null,
                 groupNumber: body.groupNumber || null,
                 lastInteraction: new Date(),
-                priceLabels: body.priceLabelIds && body.priceLabelIds.length > 0 ? {
-                    create: body.priceLabelIds.map((id: string) => ({
+                priceLabels: finalPriceLabelIds.length > 0 ? {
+                    create: finalPriceLabelIds.map((id: string) => ({
                         priceLabel: { connect: { id } }
                     }))
                 } : undefined,

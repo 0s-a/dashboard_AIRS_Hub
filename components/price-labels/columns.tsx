@@ -2,8 +2,9 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { PriceLabel } from "@prisma/client"
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, Star, StarOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,7 +23,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { deletePriceLabel } from "@/lib/actions/price-labels"
+import { deletePriceLabel, setDefaultPriceLabel } from "@/lib/actions/price-labels"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -43,9 +44,47 @@ export const columns: ColumnDef<PriceLabel>[] = [
         header: "اسم التسعيرة",
         cell: ({ row }) => {
             return (
-                <div className="font-medium">{row.original.name}</div>
+                <div className="flex items-center gap-2">
+                    <span className="font-medium">{row.original.name}</span>
+                    {row.original.isDefault && (
+                        <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/30 gap-1 text-[10px]">
+                            <Star className="h-2.5 w-2.5 fill-current" />
+                            افتراضية
+                        </Badge>
+                    )}
+                </div>
             )
         },
+    },
+    {
+        accessorKey: "isDefault",
+        header: "الافتراضية",
+        cell: ({ row }) => {
+            const label = row.original
+            if (label.isDefault) {
+                return (
+                    <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/30 gap-1">
+                        <Star className="h-3 w-3 fill-current" />
+                        افتراضية
+                    </Badge>
+                )
+            }
+            return (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-amber-600"
+                    onClick={async () => {
+                        const res = await setDefaultPriceLabel(label.id)
+                        if (res.success) toast.success("تم تعيينها كتسعيرة افتراضية")
+                        else toast.error(res.error)
+                    }}
+                >
+                    <StarOff className="h-3 w-3" />
+                    تعيين افتراضية
+                </Button>
+            )
+        }
     },
     {
         accessorKey: "notes",
@@ -110,6 +149,18 @@ export const columns: ColumnDef<PriceLabel>[] = [
                                 <Pencil className="ml-2 h-4 w-4" />
                                 تعديل
                             </DropdownMenuItem>
+                            {!label.isDefault && (
+                                <DropdownMenuItem
+                                    onClick={async () => {
+                                        const res = await setDefaultPriceLabel(label.id)
+                                        if (res.success) toast.success("تم تعيينها كتسعيرة افتراضية")
+                                        else toast.error(res.error)
+                                    }}
+                                >
+                                    <Star className="ml-2 h-4 w-4" />
+                                    تعيين كافتراضية
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 className="text-destructive"

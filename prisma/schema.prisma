@@ -65,8 +65,6 @@ model Category {
 model Person {
   id                   String                @id @default(uuid())
   name                 String?
-  personTypeId         String?
-  personType           PersonType?           @relation(fields: [personTypeId], references: [id], onDelete: SetNull)
   source               PersonSource?
   contacts             Contact[]
   tags                 PersonTag[]
@@ -82,7 +80,6 @@ model Person {
   notifications        AiNotification[]
   announcementMessages AnnouncementMessage[]
 
-  @@index([personTypeId])
   @@index([groupName])
   @@index([isActive])
   @@map("Person")
@@ -162,6 +159,7 @@ model PriceLabel {
   itemNumber    String             @unique
   name          String             @unique
   notes         String?
+  isDefault     Boolean            @default(false)
   persons       PersonPriceLabel[]
   productPrices ProductPrice[]
   orderItems    OrderItem[]
@@ -179,15 +177,6 @@ model PersonPriceLabel {
   assignedAt DateTime @default(now())
 
   @@id([personId, priceLabelId])
-}
-
-// Person type classifications
-model PersonType {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  persons   Person[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 // Contact information (phone, email, whatsapp) — normalized

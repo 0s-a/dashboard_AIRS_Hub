@@ -21,12 +21,12 @@ export const DEFAULT_THROTTLE: ThrottleConfig = {
 
 // ── Advanced audience builder types ──────────────────────────────────────────
 
-export type ConditionType = 'type' | 'group' | 'tag' | 'exclude_tag'
+export type ConditionType = 'group' | 'tag' | 'exclude_tag'
 
 export interface AudienceCondition {
     id:    string        // client-side UUID
     type:  ConditionType
-    value: string        // typeId | groupName | tagName
+    value: string        // groupName | tagName
     label: string        // human-readable
 }
 
@@ -38,11 +38,10 @@ export interface FilterGroup {
 
 /**
  * Logic: AND across groups, OR inside each group.
- * Example: (type=VIP OR type=موزع) AND (tag=عطور)
+ * Example: (group=VIP) AND (tag=عطور)
  */
 export interface PersonFilters {
     all?:          boolean
-    typeIds?:      string[]
     groupNames?:   string[]
     tags?:         string[]
     excludeTags?:  string[]

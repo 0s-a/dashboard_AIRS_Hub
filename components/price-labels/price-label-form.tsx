@@ -14,16 +14,19 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { createPriceLabel, updatePriceLabel, getNextPriceLabelItemNumber } from "@/lib/actions/price-labels"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { PriceLabel } from "@prisma/client"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
 
 const formSchema = z.object({
     itemNumber: z.string().min(1, { message: "الرقم مطلوب" }).max(4, { message: "الرقم يجب أن يكون 4 أرقام كحد أقصى" }),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     notes: z.string().nullable().optional(),
+    isDefault: z.boolean(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -35,13 +38,15 @@ interface PriceLabelFormProps {
 
 export function PriceLabelForm({ priceLabel, onSuccess }: PriceLabelFormProps) {
     const router = useRouter()
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
-    const form = useForm({
+    const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             itemNumber: priceLabel?.itemNumber || "",
             name: priceLabel?.name || "",
             notes: priceLabel?.notes || "",
+            isDefault: priceLabel?.isDefault || false,
         },
     })
 
@@ -53,14 +58,19 @@ export function PriceLabelForm({ priceLabel, onSuccess }: PriceLabelFormProps) {
         }
     }, [priceLabel, form])
 
-    async function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: FormValues) {
+        setIsSubmitting(true)
         try {
-            let res
-            if (priceLabel) {
-                res = await updatePriceLabel(priceLabel.id, values)
-            } else {
-                res = await createPriceLabel(values)
+            const payload = {
+                itemNumber: values.itemNumber,
+                name: values.name,
+                notes: values.notes,
+                isDefault: values.isDefault,
             }
+
+            const res = priceLabel
+                ? await updatePriceLabel(priceLabel.id, payload)
+                : await createPriceLabel(payload)
 
             if (res.success) {
                 toast.success(priceLabel ? "تم تحديث التسعيرة" : "تم إنشاء التسعيرة")
@@ -69,8 +79,10 @@ export function PriceLabelForm({ priceLabel, onSuccess }: PriceLabelFormProps) {
             } else {
                 toast.error(res.error || "حدث خطأ ما")
             }
-        } catch (error) {
+        } catch {
             toast.error("خطأ في الإرسال")
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -125,8 +137,24 @@ export function PriceLabelForm({ priceLabel, onSuccess }: PriceLabelFormProps) {
                     )}
                 />
 
-                <Button type="submit" className="w-full">
-                    {priceLabel ? "حفظ التعديلات" : "إضافة تسعيرة جديدة"}
+                <FormField control={form.control} name="isDefault" render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 rounded-lg border p-4">
+                        <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-0.5">
+                            <FormLabel className="text-sm font-medium cursor-pointer">التسعيرة الافتراضية</FormLabel>
+                            <p className="text-xs text-muted-foreground">يتم اختيارها تلقائياً عند إضافة سعر جديد</p>
+                        </div>
+                    </FormItem>
+                )} />
+
+                <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> جاري الحفظ...</>
+                    ) : (
+                        priceLabel ? "حفظ التعديلات" : "إضافة تسعيرة جديدة"
+                    )}
                 </Button>
             </form>
         </Form>

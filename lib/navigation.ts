@@ -15,9 +15,24 @@ import {
     Ruler,
     Sparkles,
     Bookmark,
+    LucideIcon
 } from "lucide-react"
 
-export const navigationGroups = [
+export interface NavigationItem {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+    disabled?: boolean;
+    hidden?: boolean;
+    badge?: string;
+}
+
+export interface NavigationGroup {
+    title: string;
+    items: NavigationItem[];
+}
+
+export const navigationGroups: NavigationGroup[] = [
     {
         title: "الرئيسية",
         items: [
@@ -25,17 +40,13 @@ export const navigationGroups = [
         ]
     },
     {
-        title: "إدارة المخزون",
+        title: "المبيعات والمخزون",
         items: [
+            { href: "/orders", label: "الطلبات", icon: ShoppingCart, disabled: true },
             { href: "/inventory",  label: "المخزون",     icon: Package  },
             { href: "/categories", label: "التصنيفات",  icon: Layers   },
             { href: "/brands",     label: "البراندات",   icon: Bookmark },
-        ]
-    },
-    {
-        title: "المبيعات",
-        items: [
-            { href: "/orders", label: "الطلبات", icon: ShoppingCart },
+            { href: "/gallery", label: "معرض الصور", icon: Images },
         ]
     },
     {
@@ -43,31 +54,29 @@ export const navigationGroups = [
         items: [
             { href: "/persons", label: "الأشخاص", icon: Users },
             { href: "/persons/archived", label: "الأرشيف", icon: UserCog },
-            { href: "/person-types", label: "أنواع الأشخاص", icon: UserCog },
         ]
     },
     {
-        title: "النظام والتسعير",
+        title: "الذكاء الاصطناعي والإشعارات",
         items: [
-            { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
-            { href: "/units", label: "وحدات القياس", icon: Ruler },
-            { href: "/currencies", label: "العملات", icon: Coins },
-            { href: "/users", label: "المستخدمين", icon: UsersRound },
-            { href: "/settings", label: "إعدادات المتجر", icon: Store },
-        ]
-    },
-    {
-        title: "الذكاء الاصطناعي",
-        items: [
-            { href: "/announcements",           label: "الإعلانات",   icon: Megaphone },
-            { href: "/announcements/templates",  label: "قوالب الرسائل", icon: Sparkles  },
+            { href: "/announcements",           label: "الإعلانات",   icon: Megaphone, disabled: true },
+            { href: "/announcements/templates",  label: "قوالب الرسائل", icon: Sparkles, disabled: true  },
             { href: "/notifications",            label: "الإشعارات",   icon: Bell      },
         ]
     },
     {
-        title: "الوسائط",
+        title: "النظام والمالية",
         items: [
-            { href: "/gallery", label: "معرض الصور", icon: Images },
+            { href: "/users", label: "المستخدمين", icon: UsersRound },
+            { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
+            { href: "/currencies", label: "العملات", icon: Coins },
+            { href: "/units", label: "وحدات القياس", icon: Ruler },
         ]
     }
 ]
+
+export const settingsNavigationItem: NavigationItem = {
+    href: "/settings",
+    label: "إعدادات المتجر",
+    icon: Store
+}

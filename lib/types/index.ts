@@ -55,12 +55,6 @@ export interface VariantSummary {
     suffix: string
 }
 
-export interface PersonTypeSummary {
-    id: string
-    name: string
-    color: string | null
-    icon: string | null
-}
 
 // ─── Full Entity Types (with relations) ─────────────────────
 
@@ -85,7 +79,6 @@ export interface PersonFull {
     createdAt: Date | string
     updatedAt: Date | string
     contacts: ContactFull[]
-    personType: PersonTypeSummary | null
     currencies: CurrencySummary[]
     priceLabels: { priceLabel: PriceLabelSummary }[]
 }

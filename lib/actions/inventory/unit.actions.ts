@@ -29,6 +29,12 @@ export async function setProductUnits(
                         order:            idx,
                     })),
                 })
+            } else {
+                // If no units exist, the product cannot be available
+                await tx.product.update({
+                    where: { id: productId },
+                    data: { isAvailable: false }
+                })
             }
         })
 

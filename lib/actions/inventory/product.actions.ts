@@ -37,6 +37,7 @@ export async function createProduct(data: ProductInput) {
                     productCode,
                     itemNumber: productData.itemNumber?.trim() || null,
                     name: productData.name.trim(),
+                    isAvailable: false, // Force false on creation
                     alternativeNames: alternativeNames?.length ? alternativeNames : Prisma.JsonNull,
                     tags: tags?.length ? tags : Prisma.JsonNull,
                 },
@@ -60,6 +61,15 @@ export async function updateProduct(id: string, data: Partial<ProductInput>) {
 
         // productCode is IMMUTABLE — strip if accidentally passed
         delete productData.productCode
+
+        // Validation: Cannot become available without prices and units
+        if (productData.isAvailable) {
+            const pricesCount = await prisma.productPrice.count({ where: { productId: id } })
+            const unitsCount = await prisma.productUnit.count({ where: { productId: id } })
+            if (pricesCount === 0 || unitsCount === 0) {
+                productData.isAvailable = false
+            }
+        }
 
         // ── Transaction: update product ──────────────────────────────
         const product = await prisma.$transaction(async (tx) => {
@@ -175,6 +185,23 @@ export async function duplicateProduct(id: string) {
 /** Toggle product availability (isAvailable field) */
 export async function toggleProductAvailability(id: string, currentStatus: boolean) {
     try {
+        // Validation: If trying to make available
+        if (!currentStatus) {
+            const productCheck = await prisma.product.findUnique({
+                where: { id },
+                include: {
+                    productPrices: { select: { id: true } },
+                    productUnits: { select: { id: true } }
+                }
+            })
+            
+            if (!productCheck) return { success: false, error: 'المنتج غير موجود' }
+            
+            if (productCheck.productPrices.length === 0 || productCheck.productUnits.length === 0) {
+                return { success: false, error: 'لا يمكن إتاحة المنتج: يجب إضافة وحدة قياس وتسعيرة أولاً' }
+            }
+        }
+
         await prisma.product.update({
             where: { id },
             data: { isAvailable: !currentStatus },

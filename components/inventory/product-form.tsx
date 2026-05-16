@@ -43,7 +43,7 @@ const formSchema = z.object({
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     brandId: z.string().optional().nullable(),
     description: z.string().optional().nullable(),
-    isAvailable: z.boolean().default(true),
+    isAvailable: z.boolean().default(false),
     categoryId: z.string().optional().nullable(),
     alternativeNames: z.array(z.string().min(1, "الاسم البديل لا يمكن أن يكون فارغاً")).optional(),
     tags: z.array(z.string().min(1, "التاغ لا يمكن أن يكون فارغاً")).optional(),
@@ -95,7 +95,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             brandId:          product?.brandId ?? null,
             description:      product?.description ?? "",
             categoryId:       product?.categoryId ?? "",
-            isAvailable:      product?.isAvailable ?? true,
+            isAvailable:      product?.isAvailable ?? false,
             alternativeNames: (product?.alternativeNames as string[]) ?? [],
             tags:             (product?.tags as string[]) ?? [],
         },
@@ -288,23 +288,34 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                     />
                                 </div>
 
-                                {/* Availability — placed in basic tab where users expect it */}
                                 <FormField
                                     control={form.control}
                                     name="isAvailable"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center gap-2 space-y-0 rounded-md border p-4 shadow-sm">
-                                            <FormControl>
-                                                <Checkbox
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                            <div className="space-y-1 leading-none">
-                                                <FormLabel>متاح في المخزون</FormLabel>
-                                            </div>
-                                        </FormItem>
-                                    )}
+                                    render={({ field }) => {
+                                        const hasPrices = product ? ((product as any).productPrices?.length ?? 0) > 0 : false;
+                                        const hasUnits = product ? ((product as any).productUnits?.length ?? 0) > 0 : false;
+                                        const canEnable = hasPrices && hasUnits;
+
+                                        return (
+                                            <FormItem className="flex flex-row items-center gap-2 space-y-0 rounded-md border p-4 shadow-sm">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                        disabled={!canEnable}
+                                                    />
+                                                </FormControl>
+                                                <div className="space-y-1 leading-none">
+                                                    <FormLabel>متاح في المخزون</FormLabel>
+                                                    {!canEnable && (
+                                                        <p className="text-[11px] text-muted-foreground mt-1.5">
+                                                            {product ? "يجب إضافة وحدة قياس وتسعيرة أولاً" : "يمكنك إتاحة المنتج بعد الحفظ وإضافة التسعيرة والوحدات"}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </FormItem>
+                                        )
+                                    }}
                                 />
                             </CardContent>
                         </Card>

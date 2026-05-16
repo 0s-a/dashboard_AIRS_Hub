@@ -86,6 +86,17 @@ export async function deleteProductPrice(priceId: string) {
 
         await prisma.productPrice.delete({ where: { id: priceId } })
 
+        // Auto-disable product if it has no prices or no units left
+        const remainingPricesCount = await prisma.productPrice.count({ where: { productId: existing.productId } })
+        const remainingUnitsCount = await prisma.productUnit.count({ where: { productId: existing.productId } })
+        
+        if (remainingPricesCount === 0 || remainingUnitsCount === 0) {
+            await prisma.product.update({
+                where: { id: existing.productId },
+                data: { isAvailable: false }
+            })
+        }
+
         const product = await requireProduct(existing.productId)
         revalidateProduct(existing.productId)
         return { success: true, data: serializeProduct(product) }

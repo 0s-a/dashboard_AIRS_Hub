@@ -1,6 +1,9 @@
 import { InventoryTable } from "./inventory-table"
 import { getProductsPaginated, getProductFilterOptions } from "@/lib/actions/inventory"
 import { ProductSheet } from "@/components/inventory/product-sheet"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Upload } from "lucide-react"
 
 export default async function InventoryPage() {
     // Run both queries in parallel
@@ -16,7 +19,15 @@ export default async function InventoryPage() {
                     <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-linear-to-l from-primary to-indigo-600">إدارة المخزون</h1>
                     <p className="text-muted-foreground text-sm mt-2 opacity-80">تتبع المنتجات والكميات المتاحة في متجرك بكل سهولة ويسر</p>
                 </div>
-                <ProductSheet />
+                <div className="flex items-center gap-2">
+                    <Link href="/inventory/import">
+                        <Button variant="outline" className="gap-2">
+                            <Upload className="h-4 w-4" />
+                            استيراد
+                        </Button>
+                    </Link>
+                    <ProductSheet />
+                </div>
             </div>
             <InventoryTable
                 initialProducts={result.data || []}

@@ -142,7 +142,7 @@ export function DataTable<TData, TValue>({
         getGroupedRowModel: groupedRowModel,
         getExpandedRowModel: expandedRowModel,
         getRowCanExpand: () => true,
-        globalFilterFn: globalFilterFn,
+        ...(globalFilterFn && { globalFilterFn }),
     })
 
     // Skeleton shown during hydration — after ALL hooks to respect Rules of Hooks
@@ -250,7 +250,7 @@ export function DataTable<TData, TValue>({
                                         <TableHead
                                             key={header.id}
                                             className={cn(
-                                                "h-9 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-right",
+                                                "h-9 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-start",
                                                 isSortable && "cursor-pointer select-none hover:text-foreground transition-colors"
                                             )}
                                             style={{
@@ -260,13 +260,15 @@ export function DataTable<TData, TValue>({
                                             }}
                                             onClick={header.column.getToggleSortingHandler()}
                                         >
-                                            <div className="flex items-center justify-end gap-2">
-                                                {header.isPlaceholder
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex-1 truncate">
+                                                    {header.isPlaceholder
                                                     ? null
                                                     : flexRender(
                                                         header.column.columnDef.header,
                                                         header.getContext()
                                                     )}
+                                                </div>
                                                 {isSortable && (
                                                     <span className="shrink-0">
                                                         {{
@@ -328,9 +330,9 @@ export function DataTable<TData, TValue>({
                                                                     <ChevronRight className="h-4 w-4 shrink-0 transition-transform rtl:rotate-180" />
                                                                 )}
                                                                 <LayoutGrid className="h-3.5 w-3.5 opacity-50" />
-                                                                <span className="truncate">
+                                                                <span className="truncate flex-1">
                                                                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                                                    <span className="mr-2 text-xs font-normal text-muted-foreground opacity-70">
+                                                                    <span className="ms-2 text-xs font-normal text-muted-foreground opacity-70">
                                                                         ({row.subRows.length})
                                                                     </span>
                                                                 </span>

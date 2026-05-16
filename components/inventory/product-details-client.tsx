@@ -180,6 +180,8 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                                 <AvailabilityToggle
                                     id={product.id}
                                     isAvailable={product.isAvailable}
+                                    hasPrices={(product.productPrices?.length ?? 0) > 0}
+                                    hasUnits={(product.productUnits?.length ?? 0) > 0}
                                 />
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">

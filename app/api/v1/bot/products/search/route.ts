@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
             paramIndex++
         }
         if (brand) {
-            conditions.push(`p.brand ILIKE $${paramIndex}`)
+            conditions.push(`b.name ILIKE $${paramIndex}`)
             params.push(`%${brand}%`)
             paramIndex++
         }
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
             SELECT
                 p.id,
                 p.name,
-                p.brand,
+                b.name AS brand,
                 p."itemNumber",
                 p.description,
                 p."isAvailable",
@@ -160,6 +160,7 @@ export async function GET(req: NextRequest) {
                 ) AS images
 
             FROM "Product" p
+            LEFT JOIN "Brand" b ON b.id = p."brandId"
             WHERE ${whereClause}
             ORDER BY rank DESC
             LIMIT ${limit} OFFSET ${offset}
@@ -169,6 +170,7 @@ export async function GET(req: NextRequest) {
         const countSQL = `
             SELECT count(*)::int AS total
             FROM "Product" p
+            LEFT JOIN "Brand" b ON b.id = p."brandId"
             WHERE ${whereClause}
         `
 
@@ -189,7 +191,7 @@ export async function GET(req: NextRequest) {
             fallbackConditions.push(`(
                 p.name ILIKE $${fbIdx} OR
                 p."itemNumber" ILIKE $${fbIdx} OR
-                p.brand ILIKE $${fbIdx} OR
+                b.name ILIKE $${fbIdx} OR
                 p.description ILIKE $${fbIdx} OR
                 p."alternativeNames"::text ILIKE $${fbIdx}
             )`)
@@ -255,7 +257,7 @@ export async function GET(req: NextRequest) {
 
             const fallbackSQL = `
                 SELECT
-                    p.id, p.name, p.brand, p."itemNumber", p.description,
+                    p.id, p.name, b.name AS brand, p."itemNumber", p.description,
                     p."isAvailable", p.tags, p."alternativeNames",
                     0::float AS rank,
                     (SELECT jsonb_build_object('id', cat.id, 'name', cat.name, 'icon', cat.icon)
@@ -272,11 +274,12 @@ export async function GET(req: NextRequest) {
                      FROM "ProductImage" pi
                      WHERE pi."productId" = p.id) AS images
                 FROM "Product" p
+                LEFT JOIN "Brand" b ON b.id = p."brandId"
                 WHERE ${fbWhere}
                 ORDER BY p.name ASC
                 LIMIT ${limit} OFFSET ${offset}
             `
-            const fbCountSQL = `SELECT count(*)::int AS total FROM "Product" p WHERE ${fbWhere}`
+            const fbCountSQL = `SELECT count(*)::int AS total FROM "Product" p LEFT JOIN "Brand" b ON b.id = p."brandId" WHERE ${fbWhere}`
 
             const [fbResults, fbCount] = await Promise.all([
                 prisma.$queryRawUnsafe(fallbackSQL, ...fallbackParams) as Promise<any[]>,

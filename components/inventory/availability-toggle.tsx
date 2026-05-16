@@ -8,10 +8,15 @@ import { useState } from "react"
 interface AvailabilityToggleProps {
     id: string
     isAvailable: boolean
+    hasPrices: boolean
+    hasUnits: boolean
 }
 
-export function AvailabilityToggle({ id, isAvailable: initialStatus }: AvailabilityToggleProps) {
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+export function AvailabilityToggle({ id, isAvailable: initialStatus, hasPrices, hasUnits }: AvailabilityToggleProps) {
     const [isAvailable, setIsAvailable] = useState(initialStatus)
+    const canEnable = hasPrices && hasUnits
 
     const handleToggle = async (checked: boolean) => {
         // Optimistic update
@@ -29,14 +34,26 @@ export function AvailabilityToggle({ id, isAvailable: initialStatus }: Availabil
     }
 
     return (
-        <div className="flex items-center gap-2">
-            <Switch
-                checked={isAvailable}
-                onCheckedChange={handleToggle}
-            />
-            <span className={`text-sm ${isAvailable ? "text-emerald-600 font-medium" : "text-muted-foreground"}`}>
-                {isAvailable ? "متاح" : "نفذت الكمية"}
-            </span>
-        </div>
+        <TooltipProvider>
+            <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 w-fit">
+                        <Switch
+                            checked={isAvailable}
+                            onCheckedChange={handleToggle}
+                            disabled={!canEnable}
+                        />
+                        <span className={`text-sm ${isAvailable ? "text-emerald-600 font-medium" : "text-muted-foreground"}`}>
+                            {isAvailable ? "متاح" : "نفذت الكمية"}
+                        </span>
+                    </div>
+                </TooltipTrigger>
+                {!canEnable && (
+                    <TooltipContent>
+                        <p>لا يمكن الإتاحة: يجب إضافة وحدة قياس وتسعيرة أولاً</p>
+                    </TooltipContent>
+                )}
+            </Tooltip>
+        </TooltipProvider>
     )
 }

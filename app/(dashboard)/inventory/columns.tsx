@@ -478,6 +478,8 @@ export const columns: ColumnDef<SerializedProduct>[] = [
             <AvailabilityToggle
                 id={row.original.id}
                 isAvailable={row.getValue("isAvailable")}
+                hasPrices={(row.original.productPrices?.length ?? 0) > 0}
+                hasUnits={(row.original.productUnits?.length ?? 0) > 0}
             />
         ),
     },

@@ -30,7 +30,7 @@ import { useState } from "react"
 export const columns: ColumnDef<Category>[] = [
     {
         accessorKey: "code",
-        header: "الكود",
+        header: () => <div className="text-start pe-0">الكود</div>,
         cell: ({ row }) => (
             <div className="font-mono text-sm font-bold tracking-widest bg-primary/10 text-primary rounded-md px-2 py-1 inline-block">
                 {row.original.code}
@@ -39,7 +39,7 @@ export const columns: ColumnDef<Category>[] = [
     },
     {
         accessorKey: "name",
-        header: "التصنيف",
+        header: () => <div className="text-start pe-0">التصنيف</div>,
         cell: ({ row }) => {
             const icon = row.original.icon
             const name = row.original.name
@@ -53,7 +53,7 @@ export const columns: ColumnDef<Category>[] = [
     },
     {
         accessorKey: "description",
-        header: "الوصف",
+        header: () => <div className="text-start pe-0">الوصف</div>,
         cell: ({ row }) => (
             <div className="max-w-[300px] truncate text-sm text-muted-foreground">
                 {row.original.description || "—"}
@@ -62,6 +62,7 @@ export const columns: ColumnDef<Category>[] = [
     },
     {
         id: "actions",
+        header: () => <div className="text-start pe-0">الإجراءات</div>,
         cell: function ActionsCell({ row }) {
             const router = useRouter()
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)

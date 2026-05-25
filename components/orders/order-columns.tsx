@@ -98,7 +98,12 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
     return [
         {
             accessorKey: "orderNumber",
+            enableColumnFilter: true,
+            meta: { filterType: 'text' as const, filterPlaceholder: 'رقم الطلب...' },
             header: "رقم الطلب",
+            size: 120,
+            minSize: 100,
+            maxSize: 150,
             cell: ({ row }) => (
                 <span className="font-mono font-bold text-primary text-sm">
                     #{row.original.orderNumber}
@@ -107,7 +112,15 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
         },
         {
             accessorKey: "person",
+            enableColumnFilter: true,
+            meta: { filterType: 'text' as const, filterPlaceholder: 'اسم الشخص...' },
+            filterFn: (row: any, _columnId: string, filterValue: string) => {
+                return row.original.person?.name?.toLowerCase().includes(filterValue.toLowerCase()) ?? false
+            },
             header: "الشخص",
+            size: 180,
+            minSize: 140,
+            maxSize: 230,
             cell: ({ row }) => (
                 <span className="text-sm font-medium">
                     {row.original.person?.name ?? <span className="text-muted-foreground">—</span>}
@@ -116,39 +129,71 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
         },
         {
             accessorKey: "items",
+            enableColumnFilter: true,
+            meta: { filterType: 'text' as const, filterPlaceholder: 'اسم المنتج...' },
+            filterFn: (row: any, _columnId: string, filterValue: string) => {
+                const items = row.original.items ?? []
+                const search = filterValue.toLowerCase()
+                return items.some((item: any) =>
+                    item.product?.name?.toLowerCase().includes(search) ||
+                    item.variant?.name?.toLowerCase().includes(search)
+                )
+            },
             header: "المنتجات",
+            size: 250,
+            minSize: 200,
+            maxSize: 320,
             cell: ({ row }) => {
                 const items = row.original.items ?? []
                 if (items.length === 0) return <span className="text-muted-foreground text-sm">—</span>
+
+                const visibleItems = items.slice(0, 2)
+                const extraCount = items.length - visibleItems.length
+
                 return (
-                    <div className="flex flex-col gap-1 text-xs">
-                        {items.slice(0, 2).map((item: any, i: number) => (
-                            <div key={i} className="flex items-center gap-1.5">
-                                {item.variant?.hex && (
-                                    <span
-                                        className="size-3 rounded-full border border-black/10 shrink-0"
-                                        style={{ backgroundColor: item.variant.hex }}
-                                    />
-                                )}
-                                <span className="text-muted-foreground">
-                                    {item.product?.name ?? "—"}
-                                    {item.variant?.name && (
-                                        <span className="text-[10px] text-muted-foreground/60 mr-1">({item.variant.name})</span>
+                    <div className="flex flex-col gap-0.5 text-xs">
+                        <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5">
+                            {visibleItems.map((item: any, i: number) => (
+                                <span key={i} className="flex items-center gap-1">
+                                    {i > 0 && <span className="text-muted-foreground/30">·</span>}
+                                    {item.variant?.hex && (
+                                        <span
+                                            className="size-2 rounded-full border border-black/10 shrink-0"
+                                            style={{ backgroundColor: item.variant.hex }}
+                                        />
                                     )}
+                                    <span className="text-foreground/80 truncate max-w-[130px]">
+                                        {item.product?.name ?? '—'}
+                                        {item.variant?.name && (
+                                            <span className="text-muted-foreground/60 text-[10px]"> ({item.variant.name})</span>
+                                        )}
+                                    </span>
+                                    <span className="text-foreground font-semibold shrink-0">×{item.quantity}</span>
                                 </span>
-                                <span className="text-foreground font-semibold">×{item.quantity}</span>
-                            </div>
-                        ))}
-                        {items.length > 2 && (
-                            <span className="text-primary font-semibold">+{items.length - 2} أخرى</span>
-                        )}
+                            ))}
+                            {extraCount > 0 && (
+                                <span className="text-primary font-semibold text-[10px]">+{extraCount}</span>
+                            )}
+                        </div>
                     </div>
                 )
             },
         },
         {
             accessorKey: "totalAmount",
+            enableColumnFilter: true,
+            meta: { filterType: 'number-range' as const },
+            filterFn: (row: any, _columnId: string, filterValue: any) => {
+                const amount = row.original.totalAmount
+                if (amount == null) return false
+                if (filterValue.min && amount < Number(filterValue.min)) return false
+                if (filterValue.max && amount > Number(filterValue.max)) return false
+                return true
+            },
             header: "الإجمالي",
+            size: 150,
+            minSize: 120,
+            maxSize: 180,
             cell: ({ row }) => {
                 const order = row.original
                 const amount = order.totalAmount
@@ -165,16 +210,35 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
         },
         {
             accessorKey: "status",
-            header: "الحالة",
-            cell: ({ row }) => <StatusBadge status={row.original.status} />,
-            filterFn: (row, _id, filterValue) => {
-                if (!filterValue || filterValue === "all") return true
+            enableColumnFilter: true,
+            meta: {
+                filterType: 'select' as const,
+                filterOptions: ORDER_STATUSES.map(s => ({ label: s.label, value: s.value })),
+            },
+            filterFn: (row: any, _columnId: string, filterValue: string) => {
                 return row.original.status === filterValue
             },
+            header: "الحالة",
+            size: 150,
+            minSize: 130,
+            maxSize: 180,
+            cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
         {
             accessorKey: "createdAt",
+            enableColumnFilter: true,
+            meta: { filterType: 'date-range' as const },
+            filterFn: (row: any, _columnId: string, filterValue: any) => {
+                const date = new Date(row.original.createdAt)
+                const d = date.toISOString().split('T')[0]
+                if (filterValue.from && d < filterValue.from) return false
+                if (filterValue.to && d > filterValue.to) return false
+                return true
+            },
             header: "التاريخ",
+            size: 140,
+            minSize: 120,
+            maxSize: 170,
             cell: ({ row }) => {
                 const d = new Date(row.original.createdAt)
                 return (
@@ -186,6 +250,7 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
         },
         {
             id: "actions",
+            enableColumnFilter: false,
             header: "",
             cell: ({ row }) => (
                 <ActionsCell row={row} persons={persons} products={products} />

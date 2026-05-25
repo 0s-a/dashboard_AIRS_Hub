@@ -24,7 +24,7 @@ import {
 import { updatePerson } from "@/lib/actions/persons"
 import { getPriceLabels } from "@/lib/actions/price-labels"
 import { getActiveCurrencies } from "@/lib/actions/currencies"
-import { ContactInput } from "@/lib/person-types"
+import { contactSchema, type ContactInput } from "@/lib/validations/person"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Person } from "@prisma/client"
@@ -33,17 +33,24 @@ import { useState, useEffect } from "react"
 import { MultiSelect, OptionType } from "@/components/ui/multi-select"
 import { TagInput } from "@/components/ui/tag-input"
 
-const contactSchema = z.object({
-    type: z.enum(["phone", "email", "whatsapp"]),
-    value: z.string().min(1, "القيمة مطلوبة"),
-    label: z.string(),
-    isPrimary: z.boolean(),
-})
-
 const formSchema = z.object({
     name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
     source: z.string().optional(),
-    contacts: z.array(contactSchema),
+    contacts: z.array(contactSchema).superRefine((contacts, ctx) => {
+        const seen = new Map<string, number>()
+        contacts.forEach((c, i) => {
+            const key = `${c.type}:${c.value.trim()}`
+            if (seen.has(key)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: [i, 'value'],
+                    message: 'هذا الرقم/البريد مكرر في القائمة',
+                })
+            } else {
+                seen.set(key, i)
+            }
+        })
+    }),
     tags: z.array(z.string()).optional(),
     priceLabelIds: z.array(z.string()).optional(),
     currencyIds: z.array(z.string()).optional(),
@@ -51,7 +58,7 @@ const formSchema = z.object({
     groupNumber: z.string().optional(),
 })
 
-type FormValues = z.infer<typeof formSchema>
+type FormValues = z.input<typeof formSchema>
 
 interface PersonFormProps {
     person: Person
@@ -134,7 +141,7 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
                     type: c.type,
                     value: c.value.trim(),
                     label: c.label || "",
-                    isPrimary: c.isPrimary,
+                    isPrimary: c.isPrimary ?? false,
                 }))
 
             const dataToSubmit = {
@@ -157,7 +164,10 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
                 if (onSuccess) onSuccess()
                 router.refresh()
             } else {
-                toast.error('فشل العملية', { description: res.error || 'حدث خطأ أثناء حفظ البيانات' })
+                toast.error('فشل الحفظ', {
+                    description: res.error || 'حدث خطأ أثناء حفظ البيانات',
+                    duration: 6000,
+                })
             }
         } catch (error) {
             toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم' })
@@ -380,6 +390,7 @@ export const PersonForm = React.memo(function PersonForm({ person, onSuccess }: 
                                                             <Input
                                                                 placeholder="التسمية (شخصي، عمل...)"
                                                                 {...field}
+                                                                value={field.value ?? ""}
                                                                 className="h-7 text-xs"
                                                             />
                                                         </FormControl>

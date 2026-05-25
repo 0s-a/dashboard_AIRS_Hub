@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 import { Eye, EyeOff, Loader2, Save, UserPlus, Phone, Mail, MessageCircle, Plus, X } from "lucide-react"
+import { contactSchema } from "@/lib/validations/person"
 import {
     Sheet,
     SheetContent,
@@ -32,25 +35,36 @@ interface UserSheetProps {
     onSaved?: (updated: UserRow[]) => void
 }
 
-interface FormValues {
-    name: string
-    username: string
-    password: string
-    role: string
-    color: string
-    contacts: {
-        type: 'phone' | 'email' | 'whatsapp'
-        value: string
-        label: string
-        isPrimary: boolean
-    }[]
-}
-
 const contactTypeLabels: Record<string, { label: string; placeholder: string }> = {
     phone:    { label: '📞 هاتف',           placeholder: '0501234567' },
     email:    { label: '📧 بريد إلكتروني',  placeholder: 'example@domain.com' },
     whatsapp: { label: '💬 واتساب',         placeholder: '0501234567' },
 }
+
+const userSheetSchema = z.object({
+    name: z.string().min(1, 'الاسم مطلوب'),
+    username: z.string().min(1, 'اسم المستخدم مطلوب'),
+    password: z.string(),
+    role: z.string(),
+    color: z.string(),
+    contacts: z.array(contactSchema).superRefine((contacts, ctx) => {
+        const seen = new Map<string, number>()
+        contacts.forEach((c, i) => {
+            const key = `${c.type}:${c.value.trim()}`
+            if (seen.has(key)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: [i, 'value'],
+                    message: 'هذا الرقم/البريد مكرر في القائمة',
+                })
+            } else {
+                seen.set(key, i)
+            }
+        })
+    }),
+})
+
+type FormValues = z.input<typeof userSheetSchema>
 
 const PRESET_COLORS = [
     "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
@@ -64,6 +78,7 @@ export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps)
     const [showPassword, setShowPassword] = useState(false)
 
     const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm<FormValues>({
+        resolver: zodResolver(userSheetSchema),
         defaultValues: {
             name: "", username: "", password: "", role: "user", color: "#6366f1",
             contacts: [{ type: "phone", value: "", label: "", isPrimary: true }],
@@ -103,7 +118,7 @@ export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps)
         try {
             const cleanContacts = (data.contacts || [])
                 .filter(c => c.value.trim() !== "")
-                .map(c => ({ type: c.type, value: c.value.trim(), label: c.label || undefined, isPrimary: c.isPrimary }))
+                .map(c => ({ type: c.type, value: c.value.trim(), label: c.label || undefined, isPrimary: c.isPrimary ?? false }))
 
             if (isEditing) {
                 const updateData: Record<string, string> = {
@@ -121,7 +136,7 @@ export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps)
                     toast.success("تم تحديث المستخدم بنجاح")
                     onOpenChange(false)
                 } else {
-                    toast.error((res as any).error || contactRes.error)
+                    toast.error((res as any).error || contactRes.error || 'حدث خطأ أثناء الحفظ', { duration: 6000 })
                 }
             } else {
                 if (!data.password.trim()) { toast.error("كلمة المرور مطلوبة للمستخدم الجديد"); setIsLoading(false); return }

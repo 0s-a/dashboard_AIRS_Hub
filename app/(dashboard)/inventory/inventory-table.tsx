@@ -1,30 +1,15 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition, useMemo } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import { columns } from "./columns"
 import { VariantsList } from "@/components/inventory/variants-list"
 import { ServerPagination } from "@/components/ui/server-pagination"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import {
     X,
-    SlidersHorizontal,
-    Tag,
-    Layers,
-    CheckCircle2,
-    CircleDotDashed,
     Search,
     Loader2,
-    RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getProductsPaginated } from "@/lib/actions/inventory"
@@ -69,20 +54,53 @@ export function InventoryTable({
 
     // ── Filter state ─────────────────────────────────────────
     const [search, setSearch]               = useState("")
-    const [filterCategory, setFilterCategory] = useState("all")
-    const [filterBrand, setFilterBrand]     = useState("all")
-    const [filterAvail, setFilterAvail]     = useState<"all" | "available" | "unavailable">("all")
-    const [filterPriced, setFilterPriced]   = useState<"all" | "yes" | "no">("all")
 
     // ── Pagination state ──────────────────────────────────────
     const [page, setPage]   = useState(1)
     const [limit, setLimit] = useState(initialPagination.limit)
 
+    // ── Inject dynamic filter options into columns ──────────────
+    const tableColumns = useMemo(() => {
+        return columns.map(col => {
+            if (col.id === "category") {
+                return {
+                    ...col,
+                    meta: {
+                        ...col.meta,
+                        filterOptions: (filterCategories || []).map(c => ({ label: c.name, value: c.id }))
+                    }
+                }
+            }
+            if (col.id === "brand") {
+                return {
+                    ...col,
+                    meta: {
+                        ...col.meta,
+                        filterOptions: (filterBrands || []).map(b => ({ label: b.name, value: b.id }))
+                    }
+                }
+            }
+            if ((col as any).accessorKey === "isAvailable" || col.id === "isAvailable") {
+                return {
+                    ...col,
+                    meta: {
+                        ...col.meta,
+                        filterOptions: [
+                            { label: "متوفر", value: "true" },
+                            { label: "غير متوفر", value: "false" }
+                        ]
+                    }
+                }
+            }
+            return col
+        })
+    }, [filterCategories, filterBrands])
+
     const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // ── Refs for latest filter values (avoids stale closures) ──
-    const filtersRef = useRef({ search, filterCategory, filterBrand, filterAvail, filterPriced, page, limit })
-    filtersRef.current = { search, filterCategory, filterBrand, filterAvail, filterPriced, page, limit }
+    const filtersRef = useRef({ search, page, limit })
+    filtersRef.current = { search, page, limit }
 
     useEffect(() => { setIsMounted(true) }, [])
 
@@ -122,19 +140,10 @@ export function InventoryTable({
         })
     }, [limit])
 
-    // ── Re-fetch after product deletion ───────────────────────
     const handleProductDeleted = useCallback(() => {
         const f = filtersRef.current
         fetchProducts({
-            search:      f.search || undefined,
-            categoryId:  f.filterCategory !== "all" ? f.filterCategory : undefined,
-            brandId:     f.filterBrand    !== "all" ? f.filterBrand    : undefined,
-            isAvailable: f.filterAvail    === "available"   ? true
-                       : f.filterAvail    === "unavailable" ? false
-                       : undefined,
-            hasPrices:   f.filterPriced   === "yes" ? true
-                       : f.filterPriced   === "no"  ? false
-                       : undefined,
+            search: f.search || undefined,
             limit: f.limit,
             page:  f.page,
         })
@@ -145,15 +154,7 @@ export function InventoryTable({
     const currentFilters = useCallback(() => {
         const f = filtersRef.current
         return {
-            search:      f.search || undefined,
-            categoryId:  f.filterCategory !== "all" ? f.filterCategory : undefined,
-            brandId:     f.filterBrand    !== "all" ? f.filterBrand    : undefined,
-            isAvailable: f.filterAvail    === "available"   ? true
-                       : f.filterAvail    === "unavailable" ? false
-                       : undefined,
-            hasPrices:   f.filterPriced   === "yes" ? true
-                       : f.filterPriced   === "no"  ? false
-                       : undefined,
+            search: f.search || undefined,
             limit: f.limit,
         }
     }, [])
@@ -168,39 +169,6 @@ export function InventoryTable({
         }, SEARCH_DEBOUNCE_MS)
     }
 
-    // ── Individual filter handlers (reset page to 1) ─────────
-    const handleCategoryChange = (value: string) => {
-        setFilterCategory(value)
-        setPage(1)
-        fetchProducts({ ...currentFilters(), categoryId: value !== "all" ? value : undefined, page: 1 })
-    }
-
-    const handleBrandChange = (value: string) => {
-        setFilterBrand(value)
-        setPage(1)
-        fetchProducts({ ...currentFilters(), brandId: value !== "all" ? value : undefined, page: 1 })
-    }
-
-    const handleAvailChange = (value: "all" | "available" | "unavailable") => {
-        setFilterAvail(value)
-        setPage(1)
-        fetchProducts({
-            ...currentFilters(),
-            isAvailable: value === "available" ? true : value === "unavailable" ? false : undefined,
-            page: 1,
-        })
-    }
-
-    const handlePricedChange = (value: "all" | "yes" | "no") => {
-        setFilterPriced(value)
-        setPage(1)
-        fetchProducts({
-            ...currentFilters(),
-            hasPrices: value === "yes" ? true : value === "no" ? false : undefined,
-            page: 1,
-        })
-    }
-
     // ── Pagination handlers ───────────────────────────────────
     const handlePageChange = (newPage: number) => {
         setPage(newPage)
@@ -213,24 +181,6 @@ export function InventoryTable({
         setPage(1)
         fetchProducts({ ...currentFilters(), limit: newLimit, page: 1 })
     }
-
-    // ── Reset all filters ─────────────────────────────────────
-    const resetFilters = () => {
-        setSearch("")
-        setFilterCategory("all")
-        setFilterBrand("all")
-        setFilterAvail("all")
-        setFilterPriced("all")
-        setPage(1)
-        fetchProducts({ page: 1, limit })
-    }
-
-    const hasActiveFilters =
-        search !== "" ||
-        filterCategory !== "all" ||
-        filterBrand    !== "all" ||
-        filterAvail    !== "all" ||
-        filterPriced   !== "all"
 
     if (!isMounted) {
         return (
@@ -273,158 +223,16 @@ export function InventoryTable({
                 )}
             </div>
 
-            {/* ── Filter bar ─────────────────────────────────── */}
-            <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-border/50 bg-muted/20 backdrop-blur-sm">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground shrink-0">
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                    فلاتر:
-                </div>
 
-                {/* Category filter */}
-                {filterCategories.length > 0 && (
-                    <Select value={filterCategory} onValueChange={handleCategoryChange}>
-                        <SelectTrigger className={cn(
-                            "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[120px] gap-1.5",
-                            filterCategory !== "all" && "border-primary/50 bg-primary/5 text-primary"
-                        )}>
-                            <Layers className="h-3 w-3 opacity-60 shrink-0" />
-                            <SelectValue placeholder="التصنيف" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value="all" className="text-xs rounded-lg">كل التصنيفات</SelectItem>
-                            {filterCategories.map(c => (
-                                <SelectItem key={c.id} value={c.id} className="text-xs rounded-lg">{c.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                )}
-
-                {/* Brand filter */}
-                {filterBrands.length > 0 && (
-                    <Select value={filterBrand} onValueChange={handleBrandChange}>
-                        <SelectTrigger className={cn(
-                            "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[120px] gap-1.5",
-                            filterBrand !== "all" && "border-primary/50 bg-primary/5 text-primary"
-                        )}>
-                            <Tag className="h-3 w-3 opacity-60 shrink-0" />
-                            <SelectValue placeholder="البراند" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                            <SelectItem value="all" className="text-xs rounded-lg">كل البراندات</SelectItem>
-                            {filterBrands.map(b => (
-                                <SelectItem key={b.id} value={b.id} className="text-xs rounded-lg">
-                                    {b.name}
-                                    {b.code && <span className="mr-1 text-muted-foreground font-mono"> · {b.code}</span>}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                )}
-
-                {/* Availability filter */}
-                <Select value={filterAvail} onValueChange={v => handleAvailChange(v as any)}>
-                    <SelectTrigger className={cn(
-                        "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[110px] gap-1.5",
-                        filterAvail !== "all" && "border-primary/50 bg-primary/5 text-primary"
-                    )}>
-                        <CheckCircle2 className="h-3 w-3 opacity-60 shrink-0" />
-                        <SelectValue placeholder="الحالة" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                        <SelectItem value="all"         className="text-xs rounded-lg">كل الحالات</SelectItem>
-                        <SelectItem value="available"   className="text-xs rounded-lg">متوفر</SelectItem>
-                        <SelectItem value="unavailable" className="text-xs rounded-lg">غير متوفر</SelectItem>
-                    </SelectContent>
-                </Select>
-
-                {/* Has prices filter */}
-                <Select value={filterPriced} onValueChange={v => handlePricedChange(v as any)}>
-                    <SelectTrigger className={cn(
-                        "h-8 text-xs rounded-lg border-border/50 bg-background w-auto min-w-[110px] gap-1.5",
-                        filterPriced !== "all" && "border-primary/50 bg-primary/5 text-primary"
-                    )}>
-                        <CircleDotDashed className="h-3 w-3 opacity-60 shrink-0" />
-                        <SelectValue placeholder="التسعير" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                        <SelectItem value="all" className="text-xs rounded-lg">كل المنتجات</SelectItem>
-                        <SelectItem value="yes" className="text-xs rounded-lg">لديه أسعار</SelectItem>
-                        <SelectItem value="no"  className="text-xs rounded-lg">بدون أسعار</SelectItem>
-                    </SelectContent>
-                </Select>
-
-                {/* Active filter badges + reset */}
-                <div className="flex items-center gap-1.5 flex-wrap mr-auto">
-                    {filterCategory !== "all" && (
-                        <Badge
-                            variant="secondary"
-                            className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => handleCategoryChange("all")}
-                        >
-                            {filterCategories.find(c => c.id === filterCategory)?.name}
-                            <X className="h-2.5 w-2.5" />
-                        </Badge>
-                    )}
-                    {filterBrand !== "all" && (
-                        <Badge
-                            variant="secondary"
-                            className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => handleBrandChange("all")}
-                        >
-                            {filterBrands.find(b => b.id === filterBrand)?.name ?? filterBrand}
-                            <X className="h-2.5 w-2.5" />
-                        </Badge>
-                    )}
-                    {filterAvail !== "all" && (
-                        <Badge
-                            variant="secondary"
-                            className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => handleAvailChange("all")}
-                        >
-                            {filterAvail === "available" ? "متوفر" : "غير متوفر"}
-                            <X className="h-2.5 w-2.5" />
-                        </Badge>
-                    )}
-                    {filterPriced !== "all" && (
-                        <Badge
-                            variant="secondary"
-                            className="text-[10px] h-6 pr-1 pl-2 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => handlePricedChange("all")}
-                        >
-                            {filterPriced === "yes" ? "لديه أسعار" : "بدون أسعار"}
-                            <X className="h-2.5 w-2.5" />
-                        </Badge>
-                    )}
-                    {hasActiveFilters && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={resetFilters}
-                            className="h-6 text-[10px] px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-                        >
-                            <RotateCcw className="h-3 w-3 ml-1" />
-                            مسح الكل
-                        </Button>
-                    )}
-                </div>
-
-                {/* Loading indicator in filter bar */}
-                {isPending && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
-                )}
-            </div>
 
             {/* ── Table ─────────────────────────────────────── */}
             <div className={cn("transition-opacity duration-200", isPending && "opacity-60 pointer-events-none")}>
                 <DataTable
-                    columns={columns}
+                    columns={tableColumns}
                     data={products}
                     showSearch={false}
                     showPagination={false}
                     totalCount={pagination.total}
-                    groupingOptions={[
-                        { id: "isAvailable", label: "الحالة" },
-                    ]}
                     renderSubComponent={({ row }) => {
                         const product = row.original as any
                         const primaryPrice  = product.productPrices?.[0]?.value || null
@@ -441,17 +249,17 @@ export function InventoryTable({
                         return <VariantsList variants={variantsWithDefaults} />
                     }}
                     onRefresh={handleProductDeleted}
+                    footerContent={
+                        <ServerPagination
+                            pagination={pagination}
+                            onPageChange={handlePageChange}
+                            onLimitChange={handleLimitChange}
+                            limitOptions={[10, 25, 50, 100, 200]}
+                            className="border-0 bg-transparent shadow-none rounded-none py-4 px-4"
+                        />
+                    }
                 />
             </div>
-
-            {/* ── Pagination ────────────────────────────────── */}
-            <ServerPagination
-                pagination={pagination}
-                onPageChange={handlePageChange}
-                onLimitChange={handleLimitChange}
-                limitOptions={[10, 25, 50, 100, 200]}
-                className="pt-1"
-            />
         </div>
     )
 }

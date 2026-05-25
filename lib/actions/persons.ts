@@ -209,7 +209,13 @@ export async function updatePerson(id: string, data: UpdatePersonData) {
                     },
                 })
             } catch (err: any) {
-                if (err?.code === 'P2002') throw new Error('رقم الهاتف أو البريد مسجل بالفعل لهذا الشخص')
+                if (err?.code === 'P2002') {
+                    const target = err?.meta?.target
+                    if (Array.isArray(target) && target.includes('value')) {
+                        throw new Error('هذا الرقم/البريد مسجّل بالفعل في النظام لشخص أو مستخدم آخر')
+                    }
+                    throw new Error('بيانات مكررة — تأكد من عدم تكرار المعلومات')
+                }
                 throw err
             }
         },

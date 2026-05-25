@@ -23,6 +23,8 @@ function dispatchEdit(currency: SerializedCurrency) {
 export const columns: ColumnDef<SerializedCurrency>[] = [
     {
         accessorKey: "itemNumber",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'الرقم...' },
         header: "الرقم",
         cell: ({ row }) => (
             <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded">
@@ -33,6 +35,8 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     },
     {
         accessorKey: "name",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم العملة...' },
         header: "العملة",
         cell: ({ row }) => {
             const c = row.original
@@ -51,6 +55,7 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     },
     {
         accessorKey: "exchangeRate",
+        enableColumnFilter: false,
         header: () => (
             <div className="flex items-center gap-1.5">
                 <ArrowLeftRight className="size-3.5 text-muted-foreground" />
@@ -114,6 +119,7 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     },
     {
         accessorKey: "isDefault",
+        enableColumnFilter: false,
         header: "الرئيسية",
         cell: ({ row }) => {
             const c = row.original
@@ -144,6 +150,11 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     },
     {
         accessorKey: "isActive",
+        enableColumnFilter: true,
+        meta: { filterType: 'boolean' as const },
+        filterFn: (row: any, _columnId: string, filterValue: string) => {
+            return String(row.original.isActive) === filterValue
+        },
         header: "الحالة",
         cell: ({ row }) => {
             const c = row.original
@@ -166,6 +177,7 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     },
     {
         id: "actions",
+        enableColumnFilter: false,
         header: "الإجراءات",
         cell: ({ row }) => {
             const c = row.original

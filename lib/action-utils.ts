@@ -88,7 +88,7 @@ export async function safeActionWithRevalidation<T>(
  * Usage: await generateItemNumber('currency')  → "0005"
  */
 export async function generateItemNumber(
-    model: 'currency' | 'priceLabel' | 'order'
+    model: 'currency' | 'priceLabel' | 'order' | 'unit'
 ): Promise<string> {
     let lastNumber: string | null = null
 
@@ -117,9 +117,17 @@ export async function generateItemNumber(
             lastNumber = last?.orderNumber ?? null
             break
         }
+        case 'unit': {
+            const rows = await prisma.$queryRawUnsafe<{ itemNumber: string }[]>(
+                `SELECT "itemNumber" FROM "Unit" ORDER BY "itemNumber" DESC LIMIT 1`
+            )
+            lastNumber = rows[0]?.itemNumber ?? null
+            break
+        }
     }
 
-    const next = lastNumber ? parseInt(lastNumber, 10) + 1 : 1
+    const numericPart = lastNumber ? lastNumber.replace(/\\D/g, '') : ''
+    const next = numericPart ? parseInt(numericPart, 10) + 1 : 1
     return String(next).padStart(4, '0')
 }
 

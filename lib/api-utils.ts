@@ -108,6 +108,18 @@ export function normalizePhonePatterns(input: string): string[] {
     return Array.from(patterns)
 }
 
+/**
+ * Validate that input looks like a phone number.
+ * Strips whitespace, dashes, plus signs, and parentheses, then checks
+ * that the remaining string is all digits and at least 7 characters long.
+ * Returns the cleaned digits string or null if invalid.
+ */
+export function validatePhoneInput(input: string): string | null {
+    const cleaned = input.replace(/[\s\-\+\(\)]/g, '')
+    if (cleaned.length < 7 || !/^\d+$/.test(cleaned)) return null
+    return cleaned
+}
+
 // ────────────────────────────────────────────────────────
 // Pagination Helper
 // ────────────────────────────────────────────────────────
@@ -151,16 +163,6 @@ export async function generateOrderNumber(): Promise<string> {
     return String(next).padStart(4, '0')
 }
 
-/**
- * Resolve unit price and currency from ProductPrice.
- * Optionally filter by unitId for unit-specific pricing.
- */
-export async function resolveProductPrice(productId: string, priceLabelId: string, unitId?: string) {
-    return prisma.productPrice.findFirst({
-        where: { productId, priceLabelId, ...(unitId ? { unitId } : {}) },
-        include: { currency: true, unit: true },
-    })
-}
 
 /**
  * Resolve a product by UUID, productCode, or itemNumber.

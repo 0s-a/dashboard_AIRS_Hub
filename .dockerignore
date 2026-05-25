@@ -1,0 +1,31 @@
+# تجاهل مجلدات النظام والحزم (دوكر سيبنيها بنفسه)
+node_modules
+npm-debug.log
+
+# تجاهل مجلدات البناء المحلية الخاصة بـ Next.js
+.next
+out
+build
+
+# تجاهل ملفات بيئة التطوير المحلية (حتى لا تتسرب للإنتاج)
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+
+# تجاهل ملفات Git
+.git
+.gitignore
+
+# تجاهل ملفات دوكر نفسها
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# تجاهل مجلدات التوثيق أو الإضافات غير الضرورية للتشغيل
+docs
+README.md
+scripts
+*.md
+!README.md

@@ -1,84 +1,145 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE, normalizePhonePatterns, parsePagination, paginationMeta } from '@/lib/api-utils'
+import {
+    validateApiKey,
+    apiError,
+    apiSuccess,
+    normalizePhonePatterns,
+    validatePhoneInput,
+} from '@/lib/api-utils'
 
-// GET /api/v1/bot/persons/search?q=xxx or ?value=xxx or ?phone=xxx
+// GET /api/v1/bot/persons/search?phone=xxx
+// Aliases accepted: q, value (for backward-compatibility with existing bots)
 export async function GET(req: NextRequest) {
     const authError = validateApiKey(req)
     if (authError) return authError
 
     try {
         const { searchParams } = new URL(req.url)
-        const q = searchParams.get('q') || searchParams.get('value') || searchParams.get('phone') || searchParams.get('email')
-        const { page, limit, skip } = parsePagination(searchParams)
 
-        if (!q) {
-            return apiError('يجب تمرير q أو value كمعلمة بحث', 400, { code: 'MISSING_PARAM' })
+        // Accept phone as primary param; q and value are aliases for backward-compatibility
+        const raw = searchParams.get('phone')
+            || searchParams.get('q')
+            || searchParams.get('value')
+
+        if (!raw || !raw.trim()) {
+            return apiError('يجب تمرير رقم الهاتف عبر المعامل phone', 400, { code: 'MISSING_PHONE' })
         }
 
-        // Build search patterns using shared normalizer
-        const patterns = normalizePhonePatterns(q)
+        // Validate that the input looks like a phone number
+        const cleaned = validatePhoneInput(raw.trim())
+        if (!cleaned) {
+            return apiError(
+                'رقم الهاتف غير صالح — يجب أن يحتوي على أرقام فقط ولا يقل عن 7 خانات',
+                400,
+                { code: 'INVALID_PHONE' }
+            )
+        }
 
-        // Universal Search across all contact types
-        const [persons, users] = await Promise.all([
-            prisma.person.findMany({
-                where: {
-                    contacts: {
-                        some: {
-                            OR: patterns.map(p => ({
-                                value: { contains: p, mode: 'insensitive' }
-                            }))
-                        }
-                    }
+        // Generate all format variants (Saudi 05/966/5, Yemeni 967, etc.)
+        const patterns = normalizePhonePatterns(raw.trim())
+
+        // Single query — exact match on any contact value variant
+        const person = await prisma.person.findFirst({
+            where: {
+                contacts: {
+                    some: {
+                        value: { in: patterns },
+                    },
                 },
-                include: PERSON_INCLUDE,
-                take: limit,
-                skip,
-            }),
-            prisma.user.findMany({
-                where: {
-                    contacts: {
-                        some: {
-                            OR: patterns.map(p => ({
-                                value: { contains: p, mode: 'insensitive' }
-                            }))
-                        }
-                    }
+            },
+            select: {
+                id: true,
+                name: true,
+                isActive: true,
+                source: true,
+                groupName: true,
+                groupNumber: true,
+                lastInteraction: true,
+                createdAt: true,
+
+                contacts: {
+                    select: {
+                        id: true,
+                        type: true,
+                        value: true,
+                        label: true,
+                        isPrimary: true,
+                    },
+                    orderBy: { isPrimary: 'desc' },
                 },
-                select: {
-                    id: true,
-                    name: true,
+
+                priceLabels: {
+                    include: {
+                        priceLabel: { select: { id: true, name: true } },
+                    },
                 },
-                take: limit,
-                skip,
+
+                personCurrencies: {
+                    include: {
+                        currency: {
+                            select: { id: true, name: true, code: true, symbol: true },
+                        },
+                    },
+                },
+
+                tags: {
+                    include: {
+                        tag: { select: { id: true, name: true } },
+                    },
+                },
+
+                _count: {
+                    select: { orders: true },
+                },
+
+                orders: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                    select: {
+                        createdAt: true,
+                        status: true,
+                    },
+                },
+            },
+        })
+
+        if (!person) {
+            return apiSuccess(null, 200, {
+                found: false,
+                meta: { phone: raw.trim(), patterns },
             })
-        ])
+        }
 
-        const enrichedPersons = persons.map(p => ({
-            _type: 'customer',
-            id: p.id,
-            name: p.name,
-            isActive: p.isActive,
-            contacts: p.contacts,
-            priceLabels: p.priceLabels.map(pl => pl.priceLabel),
-            currencies: p.personCurrencies.map(pc => pc.currency),
-        }))
+        // Shape the response — flatten junction tables
+        const data = {
+            id: person.id,
+            name: person.name,
+            isActive: person.isActive,
+            source: person.source,
+            groupName: person.groupName,
+            groupNumber: person.groupNumber,
+            lastInteraction: person.lastInteraction,
+            createdAt: person.createdAt,
 
-        const mappedUsers = users.map(u => ({
-            _type: 'user',
-            id: u.id,
-            name: u.name,
-        }))
+            contacts: person.contacts,
 
-        // Combine and limit to requested size
-        const combined = [...enrichedPersons, ...mappedUsers].slice(0, limit)
-        const firstResult = combined[0]
+            priceLabels: person.priceLabels.map(pl => pl.priceLabel),
 
-        return apiSuccess(combined, 200, {
-            personId: firstResult?._type === 'customer' ? firstResult.id : null,
-            userId: firstResult?._type === 'user' ? firstResult.id : null,
-            count: combined.length,
-            pagination: paginationMeta(combined.length, page, limit),
+            currencies: person.personCurrencies.map(pc => pc.currency),
+
+            tags: person.tags.map(t => t.tag),
+
+            stats: {
+                totalOrders: person._count.orders,
+                lastOrderAt: person.orders[0]?.createdAt ?? null,
+                lastOrderStatus: person.orders[0]?.status ?? null,
+            },
+        }
+
+        return apiSuccess(data, 200, {
+            found: true,
+            meta: { phone: raw.trim(), patterns },
         })
     } catch (error: any) {
         console.error('API Error [GET /persons/search]:', error?.message || error)

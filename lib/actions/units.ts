@@ -3,7 +3,6 @@
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation } from '@/lib/action-utils'
 import { revalidatePath } from 'next/cache'
-import { randomUUID } from 'crypto'
 
 const PATHS = '/units'
 
@@ -37,25 +36,23 @@ export async function createUnit(data: {
     isActive?: boolean
 }) {
     try {
-        const id = randomUUID()
-        const itemNumber = await generateUnitItemNumber()
-        const now = new Date()
-
-        await prisma.$executeRawUnsafe(
+        // Atomic item number generation — safely ignores non-numeric characters in existing data
+        const rows = await prisma.$queryRawUnsafe<{ id: string; itemNumber: string }[]>(
             `INSERT INTO "Unit" (id, "itemNumber", name, "pluralName", notes, "isActive", "createdAt", "updatedAt")
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            id,
-            itemNumber,
+             VALUES (
+                 gen_random_uuid(),
+                 LPAD((COALESCE((SELECT MAX(NULLIF(REGEXP_REPLACE("itemNumber", '\\D', '', 'g'), '')::int) FROM "Unit"), 0) + 1)::text, 4, '0'),
+                 $1, $2, $3, $4, NOW(), NOW()
+             )
+             RETURNING id, "itemNumber"`,
             data.name.trim(),
             data.pluralName || null,
             data.notes || null,
-            data.isActive ?? true,
-            now,
-            now
+            data.isActive ?? true
         )
 
         revalidatePath(PATHS)
-        return { success: true, data: { id, itemNumber, name: data.name } }
+        return { success: true, data: { id: rows[0].id, itemNumber: rows[0].itemNumber, name: data.name } }
     } catch (error: any) {
         if (error?.code === 'P2002' || error?.message?.includes('unique')) {
             return { success: false, error: 'اسم الوحدة موجود بالفعل' }
@@ -73,24 +70,44 @@ export async function updateUnit(id: string, data: {
 }) {
     try {
         const now = new Date()
+
+        // Build SET clauses dynamically — only update provided fields
+        const setClauses: string[] = ['"updatedAt" = $2']
+        const params: any[] = [id, now]
+        let paramIndex = 3
+
+        if (data.name !== undefined) {
+            setClauses.push(`name = $${paramIndex}`)
+            params.push(data.name.trim())
+            paramIndex++
+        }
+        if (data.pluralName !== undefined) {
+            setClauses.push(`"pluralName" = $${paramIndex}`)
+            params.push(data.pluralName)
+            paramIndex++
+        }
+        if (data.notes !== undefined) {
+            setClauses.push(`notes = $${paramIndex}`)
+            params.push(data.notes)
+            paramIndex++
+        }
+        if (data.isActive !== undefined) {
+            setClauses.push(`"isActive" = $${paramIndex}`)
+            params.push(data.isActive)
+            paramIndex++
+        }
+
         await prisma.$executeRawUnsafe(
-            `UPDATE "Unit" SET
-                name = COALESCE($2, name),
-                "pluralName" = $3,
-                notes = $4,
-                "isActive" = COALESCE($5, "isActive"),
-                "updatedAt" = $6
-             WHERE id = $1`,
-            id,
-            data.name?.trim() ?? null,
-            data.pluralName ?? null,
-            data.notes ?? null,
-            data.isActive ?? null,
-            now
+            `UPDATE "Unit" SET ${setClauses.join(', ')} WHERE id = $1`,
+            ...params
         )
+
         revalidatePath(PATHS)
         return { success: true }
     } catch (error: any) {
+        if (error?.code === 'P2002' || error?.message?.includes('unique')) {
+            return { success: false, error: 'اسم الوحدة موجود بالفعل' }
+        }
         console.error('[updateUnit]', error?.message)
         return { success: false, error: 'تعذّر تعديل الوحدة' }
     }
@@ -99,12 +116,22 @@ export async function updateUnit(id: string, data: {
 export async function deleteUnit(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            // Check both ProductPrice AND ProductUnit references
             const rows = await prisma.$queryRawUnsafe<any[]>(
-                `SELECT (SELECT count(*)::int FROM "ProductPrice" WHERE "unitId" = $1) AS price_count`, id
+                `SELECT
+                    (SELECT count(*)::int FROM "ProductPrice" WHERE "unitId" = $1) AS price_count,
+                    (SELECT count(*)::int FROM "ProductUnit"  WHERE "unitId" = $1) AS unit_count`,
+                id
             )
             if (rows[0]?.price_count > 0) {
                 throw Object.assign(
                     new Error('لا يمكن حذف الوحدة لأنها مستخدمة في أسعار المنتجات'),
+                    { code: 'P2003' }
+                )
+            }
+            if (rows[0]?.unit_count > 0) {
+                throw Object.assign(
+                    new Error('لا يمكن حذف الوحدة لأنها مرتبطة بمنتجات'),
                     { code: 'P2003' }
                 )
             }
@@ -114,13 +141,4 @@ export async function deleteUnit(id: string) {
         PATHS,
         'تعذّر حذف الوحدة'
     )
-}
-
-export async function generateUnitItemNumber(): Promise<string> {
-    const rows = await prisma.$queryRawUnsafe<{ itemNumber: string }[]>(
-        `SELECT "itemNumber" FROM "Unit" ORDER BY "itemNumber" DESC LIMIT 1`
-    )
-    const last = rows[0]?.itemNumber ?? null
-    const next = last ? parseInt(last, 10) + 1 : 1
-    return String(next).padStart(4, '0')
 }

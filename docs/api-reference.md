@@ -136,18 +136,71 @@ DELETE /api/v1/bot/persons/{uuid}
 
 ---
 
-### `GET /persons/search` — بحث بجهة الاتصال
+### `GET /persons/search` — بحث برقم الهاتف
 
 ```
-GET /api/v1/bot/persons/search?q=0501234567
+GET /api/v1/bot/persons/search?phone=0501234567
 ```
 
 | Param | Alias | Description |
 |-------|-------|-------------|
-| `q` | `value`, `phone`, `email` | قيمة الاتصال للبحث |
-| `page` / `limit` | — | pagination |
+| `phone` | `q`, `value` | **مطلوب** — رقم الهاتف للبحث |
 
-يدعم تطبيع أرقام الهواتف السعودية تلقائياً (05... = 966...).
+- يدعم تطبيع أرقام الهواتف السعودية (05 / 966 / 5) واليمنية (967) تلقائياً.
+- يقبل `q` و `value` كـ alias للتوافق مع البوتات القديمة.
+- **لا** يقبل إيميلات أو نصوصاً عشوائية (يُرجع `400 INVALID_PHONE`).
+
+**استجابة — شخص موجود:**
+```json
+{
+  "success": true,
+  "found": true,
+  "data": {
+    "id": "uuid",
+    "name": "محمد علي",
+    "isActive": true,
+    "source": "bot",
+    "groupName": "مجموعة العروض",
+    "groupNumber": "120363...@g.us",
+    "lastInteraction": "2026-05-23T04:00:00Z",
+    "createdAt": "2026-01-01T00:00:00Z",
+    "contacts": [
+      { "id": "uuid", "type": "phone", "value": "0512345678", "label": "جوال", "isPrimary": true }
+    ],
+    "priceLabels": [{ "id": "uuid", "name": "تاجر" }],
+    "currencies": [{ "id": "uuid", "name": "ريال سعودي", "code": "SAR", "symbol": "ر.س" }],
+    "tags": [{ "id": "uuid", "name": "VIP" }],
+    "stats": {
+      "totalOrders": 12,
+      "lastOrderAt": "2026-05-20T10:00:00Z",
+      "lastOrderStatus": "delivered"
+    }
+  },
+  "meta": {
+    "phone": "0512345678",
+    "patterns": ["0512345678", "512345678", "966512345678"]
+  }
+}
+```
+
+**استجابة — شخص غير موجود:**
+```json
+{
+  "success": true,
+  "found": false,
+  "data": null,
+  "meta": { "phone": "0599000000", "patterns": ["0599000000", "599000000", "966599000000"] }
+}
+```
+
+**رموز الخطأ الخاصة بهذا الـ endpoint:**
+
+| Code | HTTP | المعنى |
+|------|------|--------|
+| `MISSING_PHONE` | 400 | لم يُمرَّر رقم الهاتف |
+| `INVALID_PHONE` | 400 | الإدخال ليس رقم هاتف صالحاً |
+
+
 
 ---
 

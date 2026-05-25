@@ -23,7 +23,11 @@ export default function UnitsPage() {
         }
 
         window.addEventListener("edit-unit", handleEdit)
-        return () => window.removeEventListener("edit-unit", handleEdit)
+        window.addEventListener("refresh-units", loadUnits)
+        return () => {
+            window.removeEventListener("edit-unit", handleEdit)
+            window.removeEventListener("refresh-units", loadUnits)
+        }
     }, [])
 
     const loadUnits = async () => {

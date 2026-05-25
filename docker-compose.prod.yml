@@ -1,0 +1,71 @@
+
+services:
+
+  nextjs:
+    build:
+      context: .
+      target: production
+    container_name: nawaat_nextjs_prod
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    ports:
+      - "3000:3000"
+    volumes:
+      - next_public_uploads:/app/public/uploads
+    env_file:
+      - .env.production
+    networks:
+      - nawaat_net
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && node server.js"
+
+  postgres:
+    image: postgres:15
+    container_name: nawaat_postgres_prod
+    restart: always
+    env_file:
+      - .env.production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nawaat_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d evo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    container_name: nawaat_rabbitmq_prod
+    restart: always
+    env_file:
+      - .env.production
+    networks:
+      - nawaat_net
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    name: nawaat_postgres_data_prod
+  next_public_uploads:
+    name: nawaat_uploads_prod
+
+
+networks:
+  nawaat_net:
+    name: nawaat_network_prod

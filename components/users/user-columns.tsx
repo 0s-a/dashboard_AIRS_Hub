@@ -81,15 +81,20 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
     return [
     {
         accessorKey: "name",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'ابحث بالاسم...' },
         header: "المستخدم",
+        size: 220,
+        minSize: 180,
+        maxSize: 280,
         cell: ({ row }) => (
             <div className="flex items-center gap-3">
                 <UserAvatar name={row.original.name} color={row.original.color} size="sm" />
                 <div className="flex flex-col">
                     <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm">{row.original.name}</span>
+                        <span className="font-bold text-sm truncate max-w-[160px]">{row.original.name}</span>
                         {row.original.role === "admin" && (
-                            <ShieldCheck className="size-3.5 text-primary" />
+                            <ShieldCheck className="size-3.5 text-primary shrink-0" />
                         )}
                     </div>
                     <span className="text-[11px] text-muted-foreground font-mono">@{row.original.username}</span>
@@ -99,7 +104,21 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
     },
     {
         accessorKey: "role",
+        enableColumnFilter: true,
+        meta: {
+            filterType: 'select' as const,
+            filterOptions: [
+                { label: 'مدير', value: 'admin' },
+                { label: 'مستخدم', value: 'user' },
+            ],
+        },
+        filterFn: (row: any, _columnId: string, filterValue: string) => {
+            return row.original.role === filterValue
+        },
         header: "الدور",
+        size: 120,
+        minSize: 100,
+        maxSize: 150,
         cell: ({ row }) => (
             row.original.role === "admin" ? (
                 <Badge className="bg-primary/10 text-primary border-0 gap-1 font-semibold">
@@ -114,135 +133,124 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
             )
         ),
     },
-    // ── عمود معلومات الاتصال ─────────────────────────────────
+    // ── هاتف ────────────────────────────────────────────────
     {
-        id: "contacts",
-        header: "معلومات الاتصال",
+        id: "phone",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'رقم الهاتف...' },
+        filterFn: (row: any, _: string, filterValue: string) => {
+            const phones = (row.original.contacts || []).filter((c: any) => c.type === 'phone')
+            return phones.some((p: any) => p.value.includes(filterValue))
+        },
+        header: "الهاتف",
+        size: 190,
+        minSize: 160,
+        maxSize: 220,
         cell: ({ row }) => {
-            const contacts = row.original.contacts || []
-
-            if (contacts.length === 0) {
-                return (
-                    <div className="flex items-center gap-2 py-1">
-                        <div className="h-7 w-7 rounded-lg bg-muted/50 flex items-center justify-center">
-                            <Phone className="h-3.5 w-3.5 text-muted-foreground/40" />
-                        </div>
-                        <span className="text-xs text-muted-foreground/60 italic">لا توجد بيانات اتصال</span>
-                    </div>
-                )
-            }
-
-            const phones    = contacts.filter(c => c.type === 'phone')
-            const whatsapps = contacts.filter(c => c.type === 'whatsapp')
-            const emails    = contacts.filter(c => c.type === 'email')
-
+            const phones = (row.original.contacts || []).filter((c: any) => c.type === 'phone')
+            if (phones.length === 0) return <span className="text-muted-foreground/40 text-xs">—</span>
+            const p = phones[0]
             return (
-                <TooltipProvider>
-                    <div className="flex flex-col gap-1.5 py-1 max-w-[260px]">
-                        {/* هواتف */}
-                        {phones.map((c, i) => {
-                            const style = contactTypeStyles.phone
-                            const Icon  = style.icon
-                            return (
-                                <div key={`ph-${i}`} className="group flex items-center gap-2">
-                                    <div className={`h-7 w-7 rounded-lg ${style.bgColor} flex items-center justify-center shrink-0 transition-colors ${style.hoverBg}`}>
-                                        <Icon className={`h-3.5 w-3.5 ${style.color}`} />
-                                    </div>
-                                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                                        <a href={`tel:${c.value}`} className="font-mono text-xs font-medium hover:text-blue-600 transition-colors truncate" dir="ltr">
-                                            {formatPhoneNumber(c.value)}
-                                        </a>
-                                        {c.isPrimary && <span className="text-[9px] px-1 py-px rounded bg-blue-500/10 text-blue-600 font-medium shrink-0">أساسي</span>}
-                                        {c.label    && <span className="text-[9px] text-muted-foreground shrink-0">({c.label})</span>}
-                                    </div>
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                        <Tooltip delayDuration={300}>
-                                            <TooltipTrigger asChild>
-                                                <button onClick={() => copyToClipboard(c.value)} className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted transition-colors">
-                                                    <Copy className="h-3 w-3 text-muted-foreground" />
-                                                </button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="text-xs">نسخ</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip delayDuration={300}>
-                                            <TooltipTrigger asChild>
-                                                <a href={`https://wa.me/${c.value.replace(/\D/g, '').replace(/^0/, '966')}`} target="_blank" rel="noopener noreferrer" className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors">
-                                                    <MessageCircle className="h-3 w-3 text-emerald-600" />
-                                                </a>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="text-xs">واتساب</TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                        {/* واتساب */}
-                        {whatsapps.map((c, i) => {
-                            const style = contactTypeStyles.whatsapp
-                            const Icon  = style.icon
-                            return (
-                                <div key={`wa-${i}`} className="group flex items-center gap-2">
-                                    <div className={`h-7 w-7 rounded-lg ${style.bgColor} flex items-center justify-center shrink-0 transition-colors ${style.hoverBg}`}>
-                                        <Icon className={`h-3.5 w-3.5 ${style.color}`} />
-                                    </div>
-                                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                                        <a href={`https://wa.me/${c.value.replace(/\D/g, '').replace(/^0/, '966')}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium hover:text-emerald-600 transition-colors truncate" dir="ltr">
-                                            {formatPhoneNumber(c.value)}
-                                        </a>
-                                        {c.isPrimary && <span className="text-[9px] px-1 py-px rounded bg-emerald-500/10 text-emerald-600 font-medium shrink-0">أساسي</span>}
-                                        {c.label    && <span className="text-[9px] text-muted-foreground shrink-0">({c.label})</span>}
-                                    </div>
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                        <Tooltip delayDuration={300}>
-                                            <TooltipTrigger asChild>
-                                                <button onClick={() => copyToClipboard(c.value)} className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted transition-colors">
-                                                    <Copy className="h-3 w-3 text-muted-foreground" />
-                                                </button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="text-xs">نسخ</TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                        {/* بريد إلكتروني */}
-                        {emails.map((c, i) => {
-                            const style = contactTypeStyles.email
-                            const Icon  = style.icon
-                            return (
-                                <div key={`em-${i}`} className="group flex items-center gap-2">
-                                    <div className={`h-7 w-7 rounded-lg ${style.bgColor} flex items-center justify-center shrink-0 transition-colors ${style.hoverBg}`}>
-                                        <Icon className={`h-3.5 w-3.5 ${style.color}`} />
-                                    </div>
-                                    <div className="flex items-center gap-1 min-w-0 flex-1">
-                                        <a href={`mailto:${c.value}`} className="text-xs hover:text-rose-600 transition-colors truncate">
-                                            {c.value}
-                                        </a>
-                                        {c.isPrimary && <span className="text-[9px] px-1 py-px rounded bg-rose-500/10 text-rose-600 font-medium shrink-0">أساسي</span>}
-                                        {c.label    && <span className="text-[9px] text-muted-foreground shrink-0">({c.label})</span>}
-                                    </div>
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                        <Tooltip delayDuration={300}>
-                                            <TooltipTrigger asChild>
-                                                <button onClick={() => copyToClipboard(c.value)} className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-muted transition-colors">
-                                                    <Copy className="h-3 w-3 text-muted-foreground" />
-                                                </button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="text-xs">نسخ</TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </div>
-                            )
-                        })}
+                <div className="flex items-center gap-1 group/ph">
+                    <div className="h-5 w-5 rounded-md bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+                        <Phone className="h-3 w-3 text-blue-600" />
                     </div>
-                </TooltipProvider>
+                    <a href={`tel:${p.value}`} className="font-mono text-xs font-medium hover:text-blue-600 transition-colors" dir="ltr" onClick={e => e.stopPropagation()}>
+                        {formatPhoneNumber(p.value)}
+                    </a>
+                    {phones.length > 1 && <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded">+{phones.length - 1}</span>}
+                    <button onClick={e => { e.stopPropagation(); copyToClipboard(p.value) }} className="opacity-0 group-hover/ph:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
+                        <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+                    </button>
+                </div>
+            )
+        },
+    },
+    // ── واتساب ──────────────────────────────────────────────
+    {
+        id: "whatsapp",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'رقم واتساب...' },
+        filterFn: (row: any, _: string, filterValue: string) => {
+            const wa = (row.original.contacts || []).filter((c: any) => c.type === 'whatsapp')
+            return wa.some((p: any) => p.value.includes(filterValue))
+        },
+        header: "واتساب",
+        size: 170,
+        minSize: 145,
+        maxSize: 210,
+        cell: ({ row }) => {
+            const wa = (row.original.contacts || []).filter((c: any) => c.type === 'whatsapp')
+            if (wa.length === 0) return <span className="text-muted-foreground/40 text-xs">—</span>
+            const p = wa[0]
+            const href = `https://wa.me/${p.value.replace(/\D/g, '').replace(/^0/, '966')}`
+            return (
+                <div className="flex items-center gap-1 group/wa">
+                    <div className="h-5 w-5 rounded-md bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center shrink-0">
+                        <MessageCircle className="h-3 w-3 text-emerald-600" />
+                    </div>
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium hover:text-emerald-600 transition-colors" dir="ltr" onClick={e => e.stopPropagation()}>
+                        {formatPhoneNumber(p.value)}
+                    </a>
+                    {wa.length > 1 && <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded">+{wa.length - 1}</span>}
+                    <button onClick={e => { e.stopPropagation(); copyToClipboard(p.value) }} className="opacity-0 group-hover/wa:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
+                        <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+                    </button>
+                </div>
+            )
+        },
+    },
+    // ── بريد إلكتروني ────────────────────────────────────────
+    {
+        id: "email",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'البريد الإلكتروني...' },
+        filterFn: (row: any, _: string, filterValue: string) => {
+            const emails = (row.original.contacts || []).filter((c: any) => c.type === 'email')
+            return emails.some((e: any) => e.value.toLowerCase().includes(filterValue.toLowerCase()))
+        },
+        header: "البريد",
+        size: 220,
+        minSize: 180,
+        maxSize: 270,
+        cell: ({ row }) => {
+            const emails = (row.original.contacts || []).filter((c: any) => c.type === 'email')
+            if (emails.length === 0) return <span className="text-muted-foreground/40 text-xs">—</span>
+            const e = emails[0]
+            return (
+                <div className="flex items-center gap-1 group/em">
+                    <div className="h-5 w-5 rounded-md bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
+                        <Mail className="h-3 w-3 text-rose-600" />
+                    </div>
+                    <a href={`mailto:${e.value}`} className="text-xs hover:text-rose-600 transition-colors truncate max-w-[170px]" onClick={ev => ev.stopPropagation()}>
+                        {e.value}
+                    </a>
+                    {emails.length > 1 && <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded">+{emails.length - 1}</span>}
+                    <button onClick={ev => { ev.stopPropagation(); copyToClipboard(e.value) }} className="opacity-0 group-hover/em:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
+                        <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+                    </button>
+                </div>
             )
         },
     },
     // ── الحالة ───────────────────────────────────────────────
     {
         accessorKey: "isActive",
+        enableColumnFilter: true,
+        meta: { 
+            filterType: 'select' as const,
+            filterOptions: [
+                { label: "نشط", value: "true" },
+                { label: "معطّل", value: "false" }
+            ]
+        },
+        filterFn: (row: any, _columnId: string, filterValue: string) => {
+            return String(row.original.isActive) === filterValue
+        },
         header: "الحالة",
+        size: 110,
+        minSize: 90,
+        maxSize: 130,
         cell: ({ row }) => (
             <Badge
                 className={row.original.isActive
@@ -254,9 +262,26 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
             </Badge>
         ),
     },
+
+
+
+
     {
         accessorKey: "lastLogin",
+        enableColumnFilter: true,
+        meta: { filterType: 'date-range' as const },
+        filterFn: (row: any, _columnId: string, filterValue: any) => {
+            const date = row.original.lastLogin ? new Date(row.original.lastLogin) : null
+            if (!date) return false
+            const d = date.toISOString().split('T')[0]
+            if (filterValue.from && d < filterValue.from) return false
+            if (filterValue.to && d > filterValue.to) return false
+            return true
+        },
         header: "آخر دخول",
+        size: 140,
+        minSize: 120,
+        maxSize: 170,
         cell: ({ row }) => (
             <span className="text-xs text-muted-foreground">
                 {formatDate(row.original.lastLogin)}
@@ -265,7 +290,19 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
     },
     {
         accessorKey: "createdAt",
+        enableColumnFilter: true,
+        meta: { filterType: 'date-range' as const },
+        filterFn: (row: any, _columnId: string, filterValue: any) => {
+            const date = new Date(row.original.createdAt)
+            const d = date.toISOString().split('T')[0]
+            if (filterValue.from && d < filterValue.from) return false
+            if (filterValue.to && d > filterValue.to) return false
+            return true
+        },
         header: "تاريخ الإنشاء",
+        size: 150,
+        minSize: 130,
+        maxSize: 180,
         cell: ({ row }) => (
             <span className="text-xs text-muted-foreground">
                 {formatDate(row.original.createdAt)}
@@ -275,6 +312,7 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
     // ── عمود الإجراءات ───────────────────────────────────────
     {
         id: "actions",
+        enableColumnFilter: false,
         header: "",
         cell: ({ row }) => {
             const user = row.original

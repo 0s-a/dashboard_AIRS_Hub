@@ -31,6 +31,8 @@ import { useState } from "react"
 export const columns: ColumnDef<PriceLabel>[] = [
     {
         accessorKey: "itemNumber",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const },
         header: "الرقم",
         cell: ({ row }) => (
             <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded">
@@ -41,6 +43,8 @@ export const columns: ColumnDef<PriceLabel>[] = [
     },
     {
         accessorKey: "name",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم التسعيرة...' },
         header: "اسم التسعيرة",
         cell: ({ row }) => {
             return (
@@ -58,6 +62,7 @@ export const columns: ColumnDef<PriceLabel>[] = [
     },
     {
         accessorKey: "isDefault",
+        enableColumnFilter: false,
         header: "الافتراضية",
         cell: ({ row }) => {
             const label = row.original
@@ -88,6 +93,8 @@ export const columns: ColumnDef<PriceLabel>[] = [
     },
     {
         accessorKey: "notes",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const },
         header: "ملاحظات",
         cell: ({ row }) => {
             const notes = row.original.notes
@@ -100,6 +107,15 @@ export const columns: ColumnDef<PriceLabel>[] = [
     },
     {
         accessorKey: "createdAt",
+        enableColumnFilter: true,
+        meta: { filterType: 'date-range' as const },
+        filterFn: (row: any, _columnId: string, filterValue: any) => {
+            const date = new Date(row.original.createdAt)
+            const d = date.toISOString().split('T')[0]
+            if (filterValue.from && d < filterValue.from) return false
+            if (filterValue.to && d > filterValue.to) return false
+            return true
+        },
         header: "تاريخ الإنشاء",
         cell: ({ row }) => {
             return (
@@ -111,6 +127,7 @@ export const columns: ColumnDef<PriceLabel>[] = [
     },
     {
         id: "actions",
+        enableColumnFilter: false,
         cell: function ActionsCell({ row }) {
             const router = useRouter()
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)

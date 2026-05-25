@@ -30,6 +30,8 @@ import { useState } from "react"
 export const columns: ColumnDef<Category>[] = [
     {
         accessorKey: "code",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'الكود...' },
         header: () => <div className="text-start pe-0">الكود</div>,
         cell: ({ row }) => (
             <div className="font-mono text-sm font-bold tracking-widest bg-primary/10 text-primary rounded-md px-2 py-1 inline-block">
@@ -39,6 +41,8 @@ export const columns: ColumnDef<Category>[] = [
     },
     {
         accessorKey: "name",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم التصنيف...' },
         header: () => <div className="text-start pe-0">التصنيف</div>,
         cell: ({ row }) => {
             const icon = row.original.icon
@@ -53,6 +57,8 @@ export const columns: ColumnDef<Category>[] = [
     },
     {
         accessorKey: "description",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const },
         header: () => <div className="text-start pe-0">الوصف</div>,
         cell: ({ row }) => (
             <div className="max-w-[300px] truncate text-sm text-muted-foreground">
@@ -62,6 +68,7 @@ export const columns: ColumnDef<Category>[] = [
     },
     {
         id: "actions",
+        enableColumnFilter: false,
         header: () => <div className="text-start pe-0">الإجراءات</div>,
         cell: function ActionsCell({ row }) {
             const router = useRouter()

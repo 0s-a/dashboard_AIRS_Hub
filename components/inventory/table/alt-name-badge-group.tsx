@@ -38,7 +38,7 @@ export function AltNameBadgeGroup({
                                 <Badge
                                     key={idx}
                                     variant="outline"
-                                    className="px-1.5 py-0 text-[10px] bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-default"
+                                    className="px-1.5 py-0.5 text-[11px] bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-default"
                                 >
                                     {name}
                                 </Badge>
@@ -46,7 +46,7 @@ export function AltNameBadgeGroup({
                             {overflow > 0 && (
                                 <Badge
                                     variant="outline"
-                                    className="px-1.5 py-0 text-[10px] bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 cursor-help"
+                                    className="px-1.5 py-0.5 text-[11px] bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 cursor-help"
                                 >
                                     +{overflow}
                                 </Badge>

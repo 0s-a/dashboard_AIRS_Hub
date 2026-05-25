@@ -1,0 +1,76 @@
+
+services:
+ 
+  nextjs:
+    build:
+      context: .
+      target: development
+    restart: unless-stopped
+      
+    container_name: nawaat_nextjs_dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules 
+      - ./public/uploads:/app/public/uploads
+   
+    environment:
+      - WATCHPACK_POLLING=true 
+    env_file:
+      - .env.development
+    networks:
+      - nawaat_net
+    depends_on:
+      postgres:
+        condition: service_healthy 
+      # rabbitmq:
+      #   condition: service_healthy 
+    command: sh -c "npx prisma generate && npx prisma db push && npm run dev"
+
+  postgres:
+    image: postgres:15
+    container_name: nawaat_postgres_dev
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    ports:
+      - "5430:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nawaat_net
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d evo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  # rabbitmq:
+  #   image: rabbitmq:3-management
+  #   container_name: nawaat_rabbitmq_dev
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env.development
+  #   ports:
+  #     - "5672:5672"
+  #     - "15672:15672"
+  #   networks:
+  #     - nawaat_net
+
+  #   healthcheck:
+  #     test: rabbitmq-diagnostics -q ping
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  postgres_data:
+    name: nawaat_postgres_data_dev
+
+
+networks:
+  nawaat_net:
+    name: nawaat_network_dev

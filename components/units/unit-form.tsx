@@ -17,23 +17,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { createUnit, updateUnit } from "@/lib/actions/units"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
-
-// Unit shape (raw from DB since Prisma type may be stale)
-interface UnitData {
-    id: string
-    itemNumber: string
-    name: string
-    pluralName?: string | null
-    quantity?: number | null
-    notes?: string | null
-    isActive: boolean
-}
+import { UnitRow } from "./columns"
 
 const formSchema = z.object({
     name: z.string().min(1, { message: "اسم الوحدة مطلوب" }),
     pluralName: z.string().nullable().optional(),
-    quantity: z.number().int().positive().nullable().optional(),
     notes: z.string().nullable().optional(),
     isActive: z.boolean(),
 })
@@ -41,19 +29,16 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 interface UnitFormProps {
-    unit?: UnitData
+    unit?: UnitRow
     onSuccess?: () => void
 }
 
 export function UnitForm({ unit, onSuccess }: UnitFormProps) {
-    const router = useRouter()
-
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: unit?.name || "",
             pluralName: unit?.pluralName || "",
-            quantity: unit?.quantity ?? null,
             notes: unit?.notes || "",
             isActive: unit?.isActive ?? true,
         },
@@ -68,7 +53,6 @@ export function UnitForm({ unit, onSuccess }: UnitFormProps) {
             if (res.success) {
                 toast.success(unit ? "تم تحديث الوحدة" : "تم إنشاء الوحدة")
                 onSuccess?.()
-                router.refresh()
             } else {
                 toast.error(res.error || "حدث خطأ ما")
             }
@@ -114,33 +98,6 @@ export function UnitForm({ unit, onSuccess }: UnitFormProps) {
                                     value={field.value || ""}
                                 />
                             </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                {/* Quantity */}
-                <FormField
-                    control={form.control}
-                    name="quantity"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>الكمية الافتراضية للوحدة</FormLabel>
-                            <FormControl>
-                                <Input
-                                    type="number"
-                                    min={1}
-                                    placeholder="مثال: 12 للدرزن، 24 للكرتون..."
-                                    dir="ltr"
-                                    value={field.value ?? ""}
-                                    onChange={(e) =>
-                                        field.onChange(e.target.value ? parseInt(e.target.value) : null)
-                                    }
-                                />
-                            </FormControl>
-                            <p className="text-xs text-muted-foreground">
-                                الكمية الافتراضية تُستخدم عند اختيار هذه الوحدة في التسعير
-                            </p>
                             <FormMessage />
                         </FormItem>
                     )}

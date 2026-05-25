@@ -76,11 +76,6 @@ export default async function CRMPage({
                     columns={columns}
                     data={persons}
                     searchPlaceholder="ابحث عن اسم الشخص، رقم الهاتف أو البريد..."
-                    groupingOptions={[
-                        { id: "type", label: "نوع الشخص" },
-                        { id: "isActive", label: "الحالة (نشط/غير نشط)" },
-                        { id: "source", label: "المصدر" },
-                    ]}
                 />
             </main>
         </div>

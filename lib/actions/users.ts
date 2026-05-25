@@ -199,7 +199,7 @@ export async function addUserContact(userId: string, contact: UserContactInput) 
         return { success: true, data: result }
     } catch (error: any) {
         if (error?.code === 'P2002') {
-            return { success: false, error: 'هذا الرقم/البريد مسجّل بالفعل لهذا المستخدم' }
+            return { success: false, error: 'هذا الرقم/البريد مسجّل بالفعل في النظام لشخص أو مستخدم آخر' }
         }
         return { success: false, error: 'تعذّر إضافة جهة الاتصال' }
     }
@@ -241,7 +241,7 @@ export async function replaceUserContacts(userId: string, contacts: UserContactI
         return { success: true }
     } catch (error: any) {
         if (error?.code === 'P2002') {
-            return { success: false, error: 'يوجد رقم أو بريد مكرر في قائمة الاتصال' }
+            return { success: false, error: 'أحد الأرقام أو العناوين مسجّل بالفعل في النظام لشخص أو مستخدم آخر' }
         }
         return { success: false, error: 'تعذّر تحديث جهات الاتصال' }
     }

@@ -32,15 +32,15 @@ export function CopyableBadge({
     return (
         <div
             className={[
-                "flex items-center gap-1 group/copy cursor-pointer",
-                "bg-muted/40 hover:bg-muted/60 px-1.5 py-0.5 rounded transition-colors",
+                "flex items-center gap-1.5 group/copy cursor-pointer w-fit",
+                "bg-muted/30 border border-border/50 hover:bg-muted/60 hover:border-border/80 px-2 py-0.5 rounded-md transition-all shadow-sm",
                 className,
             ]
                 .filter(Boolean)
                 .join(" ")}
             onClick={handleCopy}
         >
-            <span className="text-muted-foreground font-mono">{value}</span>
+            <span className="text-foreground text-xs font-mono">{value}</span>
             {copied ? (
                 <Check className="h-2.5 w-2.5 text-emerald-600 transition-colors" />
             ) : (

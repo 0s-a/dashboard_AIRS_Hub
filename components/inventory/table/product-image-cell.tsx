@@ -21,8 +21,8 @@ interface ProductImageCellProps {
 export function ProductImageCell({ src, alt }: ProductImageCellProps) {
     if (!src) {
         return (
-            <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/30 border border-dashed flex items-center justify-center">
-                <Package className="h-5 w-5 text-muted-foreground/30" />
+            <div className="h-12 w-12 shrink-0 rounded-lg bg-muted/30 border border-dashed flex items-center justify-center">
+                <Package className="h-5 w-5 text-muted-foreground/40" />
             </div>
         )
     }
@@ -30,7 +30,7 @@ export function ProductImageCell({ src, alt }: ProductImageCellProps) {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border bg-muted/20 cursor-zoom-in group transition-all hover:ring-2 hover:ring-primary/40 shadow-sm">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border bg-muted/20 cursor-zoom-in group transition-all hover:ring-2 hover:ring-primary/40 shadow-sm">
                     <Image
                         src={src}
                         alt={alt}

@@ -1,12 +1,7 @@
 // Shared types and helpers for CRM module (non-server-action)
 
-// Input type (for forms and API — no id)
-export interface ContactInput {
-    type: 'phone' | 'email' | 'whatsapp'
-    value: string
-    label: string
-    isPrimary: boolean
-}
+// Input type — derived from Zod schema to stay in sync automatically
+export type { ContactInput } from '@/lib/validations/person'
 
 // Record type (from DB — has id)
 export interface ContactRecord {
@@ -17,11 +12,11 @@ export interface ContactRecord {
     isPrimary: boolean
 }
 
-// Keep backward compatibility
-export type ContactItem = ContactInput
-
 // Helper: extract primary contact of a given type from contacts array
-export function getPrimaryContact(contacts: ContactRecord[] | ContactInput[] | null | undefined, type: 'phone' | 'email' | 'whatsapp'): string | null {
+export function getPrimaryContact(
+    contacts: ContactRecord[] | { type: string; value: string; isPrimary: boolean }[] | null | undefined,
+    type: 'phone' | 'email' | 'whatsapp'
+): string | null {
     if (!contacts || !Array.isArray(contacts)) return null
     const primary = contacts.find(c => c.type === type && c.isPrimary)
     if (primary) return primary.value

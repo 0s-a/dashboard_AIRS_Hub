@@ -1,90 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
+import { createPersonSchema } from '@/lib/validations/person'
 import {
     validateApiKey,
     apiError,
     apiSuccess,
     PERSON_INCLUDE,
     normalizePhonePatterns,
-    parsePagination,
-    paginationMeta
 } from '@/lib/api-utils'
-
-// Zod Schemas for Validation
-const contactSchema = z.object({
-    type: z.string().min(1, 'نوع التواصل مطلوب'),
-    value: z.string().min(1, 'قيمة التواصل مطلوبة'),
-    label: z.string().nullable().optional(),
-    isPrimary: z.boolean().default(false),
-})
-
-const createPersonSchema = z.object({
-    name: z.string().min(1, 'الاسم مطلوب'),
-    source: z.preprocess((val) => {
-        if (!val || val === '') return undefined;
-        const s = String(val).toLowerCase();
-        return ['bot', 'manual', 'import', 'api'].includes(s) ? s : undefined;
-    }, z.enum(['bot', 'manual', 'import', 'api']).nullable().optional()),
-    contacts: z.array(contactSchema).optional(),
-    tags: z.array(z.string()).optional(),
-    currencyIds: z.array(z.string()).optional(),
-    groupName: z.string().nullable().optional(),
-    groupNumber: z.string().nullable().optional(),
-    priceLabelIds: z.array(z.string()).optional(),
-})
-
-// GET /api/v1/bot/persons — List persons (with search, pagination & active filter)
-export async function GET(req: NextRequest) {
-    const authError = validateApiKey(req)
-    if (authError) return authError
-
-    try {
-        const { searchParams } = new URL(req.url)
-        const search = searchParams.get('search') || searchParams.get('q')
-        const active = searchParams.get('active')
-        const { page, limit, skip } = parsePagination(searchParams)
-
-        const where: any = {}
-        
-        if (search) {
-            const patterns = normalizePhonePatterns(search)
-            where.OR = [
-                { name: { contains: search, mode: 'insensitive' } },
-                {
-                    contacts: {
-                        some: {
-                            OR: patterns.map(p => ({
-                                value: { contains: p, mode: 'insensitive' }
-                            }))
-                        }
-                    }
-                },
-            ]
-        }
-        
-        if (active === 'true') where.isActive = true
-        if (active === 'false') where.isActive = false
-
-        const [totalCount, persons] = await Promise.all([
-            prisma.person.count({ where }),
-            prisma.person.findMany({
-                where,
-                include: PERSON_INCLUDE,
-                orderBy: { lastInteraction: 'desc' },
-                skip,
-                take: limit,
-            })
-        ])
-
-        return apiSuccess(persons, 200, {
-            pagination: paginationMeta(totalCount, page, limit),
-        })
-    } catch (error) {
-        console.error('API Error [GET /persons]:', error)
-        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
-    }
-}
 
 // POST /api/v1/bot/persons — Create or Update (Upsert) a person
 export async function POST(req: NextRequest) {
@@ -119,39 +42,29 @@ export async function POST(req: NextRequest) {
             ? body.priceLabelIds 
             : (defaultPriceLabel ? [defaultPriceLabel.id] : [])
 
-        // ── Check for existing person (duplicate detection) ──
-        let existingPerson: any = null
+        // ── Check for existing person (single OR query) ──────────────────────
+        // Priority: contact match takes precedence over groupNumber match.
+        // Both criteria are evaluated in one DB round-trip.
 
-        // 1. Search by contact value (phone/email/whatsapp)
         const contactValues = (body.contacts || [])
             .map(c => c.value?.trim())
             .filter(Boolean) as string[]
 
-        if (contactValues.length > 0) {
-            const allPatterns = new Set<string>()
-            for (const val of contactValues) {
-                normalizePhonePatterns(val).forEach(p => allPatterns.add(p))
-            }
+        const allPatterns: string[] = contactValues.length > 0
+            ? Array.from(new Set(contactValues.flatMap(normalizePhonePatterns)))
+            : []
 
-            existingPerson = await prisma.person.findFirst({
-                where: {
-                    contacts: {
-                        some: {
-                            value: { in: Array.from(allPatterns) }
-                        }
-                    }
-                },
-                include: PERSON_INCLUDE,
-            })
+        const orClauses: object[] = []
+        if (allPatterns.length > 0) {
+            orClauses.push({ contacts: { some: { value: { in: allPatterns } } } })
+        }
+        if (body.groupNumber?.trim()) {
+            orClauses.push({ groupNumber: body.groupNumber.trim() })
         }
 
-        // 2. If not found by contact, search by groupNumber
-        if (!existingPerson && body.groupNumber?.trim()) {
-            existingPerson = await prisma.person.findFirst({
-                where: { groupNumber: body.groupNumber.trim() },
-                include: PERSON_INCLUDE,
-            })
-        }
+        const existingPerson = orClauses.length > 0
+            ? await prisma.person.findFirst({ where: { OR: orClauses }, include: PERSON_INCLUDE })
+            : null
 
         // ── UPDATE existing person ──
         if (existingPerson) {
@@ -160,6 +73,25 @@ export async function POST(req: NextRequest) {
             )
             const newContacts = (body.contacts || [])
                 .filter(c => c.value?.trim() && !existingContactValues.has(c.value.trim()))
+
+            // Check if any new contacts already exist globally (for another person/user)
+            if (newContacts.length > 0) {
+                const newValues = newContacts.map(c => c.value.trim())
+                const conflicting = await prisma.contact.findFirst({
+                    where: {
+                        value: { in: newValues },
+                        personId: { not: existingPerson.id },
+                    },
+                    select: { value: true, type: true },
+                })
+                if (conflicting) {
+                    return apiError(
+                        `الرقم/البريد "${conflicting.value}" مسجّل بالفعل في النظام لشخص أو مستخدم آخر`,
+                        409,
+                        { code: 'DUPLICATE_CONTACT', details: `${conflicting.type}:${conflicting.value}` }
+                    )
+                }
+            }
 
             const existingCurrencyIds = (existingPerson.personCurrencies || []).map((pc: any) => pc.currencyId)
             const existingPriceLabelIds = (existingPerson.priceLabels || []).map((pl: any) => pl.priceLabelId)
@@ -170,7 +102,10 @@ export async function POST(req: NextRequest) {
             const updatedPerson = await prisma.person.update({
                 where: { id: existingPerson.id },
                 data: {
-                    name: existingPerson.name ? existingPerson.name : (body.name?.trim() || existingPerson.name),
+                    // Name write-once policy: preserve existing name if already set.
+                    // The bot cannot overwrite a name entered via the dashboard.
+                    // To update the name explicitly, use PUT /persons/[id].
+                    name: existingPerson.name ?? body.name?.trim() ?? existingPerson.name,
                     source: body.source || existingPerson.source || null,
                     groupName: body.groupName || existingPerson.groupName,
                     groupNumber: body.groupNumber || existingPerson.groupNumber,
@@ -243,6 +178,12 @@ export async function POST(req: NextRequest) {
         return apiSuccess(person, 201, { action: 'created' })
     } catch (error: any) {
         console.error('API Error [POST /persons]:', error)
+        if (error instanceof SyntaxError && error.message.includes('JSON')) {
+            return apiError('تنسيق بيانات JSON غير صالح', 400, {
+                code: 'INVALID_JSON',
+                details: error.message
+            })
+        }
         if (error?.code === 'P2002') {
             const target = error?.meta?.target
             if (target?.includes('value')) {

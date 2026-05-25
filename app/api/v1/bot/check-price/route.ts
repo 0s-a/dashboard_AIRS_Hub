@@ -47,11 +47,9 @@ export async function POST(req: NextRequest) {
             where: {
                 contacts: {
                     some: {
-                        OR: patterns.map(p => ({
-                            value: { contains: p, mode: 'insensitive' }
-                        }))
-                    }
-                }
+                        value: { in: patterns },
+                    },
+                },
             },
             include: {
                 priceLabels: {

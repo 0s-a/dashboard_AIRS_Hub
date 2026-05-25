@@ -1,27 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
+import { updatePersonSchema } from '@/lib/validations/person'
 import { validateApiKey, apiError, apiSuccess, PERSON_INCLUDE } from '@/lib/api-utils'
-
-// Zod Schemas for Validation
-const contactSchema = z.object({
-    type: z.string().min(1, 'نوع التواصل مطلوب'),
-    value: z.string().min(1, 'قيمة التواصل مطلوبة'),
-    label: z.string().nullable().optional(),
-    isPrimary: z.boolean().default(false),
-})
-
-const updatePersonSchema = z.object({
-    name: z.string().min(1, 'الاسم مطلوب').optional(),
-    source: z.preprocess((val) => val === '' ? undefined : val, z.enum(['bot', 'manual', 'import', 'api']).nullable().optional()),
-    contacts: z.array(contactSchema).optional(),
-    tags: z.array(z.string()).optional(),
-    currencyIds: z.array(z.string()).optional(),
-    groupName: z.string().nullable().optional(),
-    groupNumber: z.string().nullable().optional(),
-    priceLabelIds: z.array(z.string()).optional(),
-    isActive: z.boolean().optional(),
-})
 
 // GET /api/v1/bot/persons/[id] — Get single person
 export async function GET(
@@ -76,7 +56,7 @@ export async function PUT(
             data: {
                 ...(body.name         !== undefined && { name: body.name }),
                 ...(body.source       !== undefined && { source: body.source || null }),
-                ...(body.isActive     !== undefined && { isActive: body.isActive }),
+                // NOTE: isActive is intentionally excluded — use PATCH /activate or /deactivate
                 ...(body.contacts     !== undefined && {
                     contacts: {
                         deleteMany: {},
@@ -129,7 +109,7 @@ export async function PUT(
     }
 }
 
-// DELETE /api/v1/bot/persons/[id] — Delete person
+// DELETE /api/v1/bot/persons/[id] — Hard delete person (guards against linked orders)
 export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -142,6 +122,16 @@ export async function DELETE(
 
         const existing = await prisma.person.findUnique({ where: { id } })
         if (!existing) return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
+
+        // Guard: prevent deletion if the person has linked orders
+        const ordersCount = await prisma.order.count({ where: { personId: id } })
+        if (ordersCount > 0) {
+            return apiError(
+                `لا يمكن حذف الشخص — لديه ${ordersCount} طلب مرتبط`,
+                409,
+                { code: 'HAS_ORDERS', details: { ordersCount } }
+            )
+        }
 
         await prisma.person.delete({ where: { id } })
         return apiSuccess(null, 200, { message: 'تم حذف الشخص بنجاح' })

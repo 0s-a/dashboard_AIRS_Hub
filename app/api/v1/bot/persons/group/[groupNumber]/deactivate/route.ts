@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
 
-// PATCH /api/v1/bot/persons/group/[groupNumber]/toggle — Toggle active/inactive by groupNumber
+// PATCH /api/v1/bot/persons/group/[groupNumber]/deactivate — Set inactive by groupNumber
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ groupNumber: string }> }
@@ -22,17 +22,23 @@ export async function PATCH(
 
         if (!existing) return apiError('لم يتم العثور على الشخص بهذا الرقم', 404, { code: 'NOT_FOUND' })
 
+        if (!existing.isActive) {
+            return apiSuccess(existing, 200, {
+                message: 'الشخص غير مفعل مسبقاً',
+            })
+        }
+
         const person = await prisma.person.update({
             where: { id: existing.id },
-            data: { isActive: !existing.isActive },
+            data: { isActive: false },
             select: { id: true, name: true, isActive: true, groupNumber: true },
         })
 
         return apiSuccess(person, 200, {
-            message: person.isActive ? 'تم تفعيل الشخص' : 'تم إلغاء تفعيل الشخص',
+            message: 'تم إلغاء تفعيل الشخص بنجاح',
         })
     } catch (error) {
-        console.error('API Error [PATCH /persons/group/[groupNumber]/toggle]:', error)
+        console.error('API Error [PATCH /persons/group/[groupNumber]/deactivate]:', error)
         return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
     }
 }

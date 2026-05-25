@@ -194,9 +194,8 @@ model Contact {
   isPrimary Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  // Per-owner uniqueness — same number allowed for different persons/users
-  @@unique([personId, type, value], name: "person_contact_unique")
-  @@unique([userId, type, value], name: "user_contact_unique")
+  // Global uniqueness — same contact value cannot exist twice in the system
+  @@unique([type, value], name: "contact_global_unique")
 }
 
 // Junction table: Person <-> Currency (replaces currencies Json field)

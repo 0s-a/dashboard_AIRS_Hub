@@ -24,7 +24,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { deleteUnit } from "@/lib/actions/units"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 // Plain type (not from Prisma) to handle stale client
@@ -41,6 +40,8 @@ export interface UnitRow {
 export const columns: ColumnDef<UnitRow>[] = [
     {
         accessorKey: "name",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم الوحدة...' },
         header: "الوحدة",
         cell: ({ row }) => (
             <div className="flex items-center gap-2">
@@ -58,6 +59,11 @@ export const columns: ColumnDef<UnitRow>[] = [
     },
     {
         accessorKey: "isActive",
+        enableColumnFilter: true,
+        meta: { filterType: 'boolean' as const },
+        filterFn: (row: any, _columnId: string, filterValue: string) => {
+            return String(row.original.isActive) === filterValue
+        },
         header: "الحالة",
         cell: ({ row }) => {
             const isActive = row.original.isActive
@@ -70,6 +76,8 @@ export const columns: ColumnDef<UnitRow>[] = [
     },
     {
         accessorKey: "notes",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const },
         header: "ملاحظات",
         cell: ({ row }) => (
             <div className="max-w-[250px] truncate text-sm text-muted-foreground">
@@ -79,6 +87,8 @@ export const columns: ColumnDef<UnitRow>[] = [
     },
     {
         accessorKey: "itemNumber",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const },
         header: "الرقم",
         cell: ({ row }) => (
             <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded">
@@ -89,8 +99,8 @@ export const columns: ColumnDef<UnitRow>[] = [
     },
     {
         id: "actions",
+        enableColumnFilter: false,
         cell: function ActionsCell({ row }) {
-            const router = useRouter()
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
             const unit = row.original
 
@@ -98,7 +108,7 @@ export const columns: ColumnDef<UnitRow>[] = [
                 const res = await deleteUnit(unit.id)
                 if (res.success) {
                     toast.success("تم حذف الوحدة")
-                    router.refresh()
+                    window.dispatchEvent(new Event("refresh-units"))
                 } else {
                     toast.error(res.error || "حدث خطأ ما")
                 }

@@ -166,6 +166,11 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
         {
             id: "brand",
             header: () => <div className="text-start pe-0">البراند</div>,
+            enableColumnFilter: true,
+            meta: { filterType: 'text' as const, filterPlaceholder: 'اسم البراند...' },
+            filterFn: (row: any, _columnId: string, filterValue: string) => {
+                return row.original.name?.toLowerCase().includes(filterValue.toLowerCase())
+            },
             size: 280,
             cell: ({ row }) => {
                 const { name, logo } = row.original
@@ -179,6 +184,8 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
         },
         {
             accessorKey: "code",
+            enableColumnFilter: true,
+            meta: { filterType: 'text' as const, filterPlaceholder: 'الكود...' },
             header: () => <div className="text-start pe-0">الكود</div>,
             size: 80,
             cell: ({ row }) => (
@@ -192,6 +199,7 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
         },
         {
             id: "products",
+            enableColumnFilter: false,
             header: () => <div className="text-start pe-0">المنتجات</div>,
             size: 90,
             cell: ({ row }) => {
@@ -211,6 +219,7 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
         },
         {
             id: "actions",
+            enableColumnFilter: false,
             header: () => <div className="text-start pe-0">الإجراءات</div>,
             size: 90,
             cell: ({ row }) => <ActionCell brand={row.original} onRefresh={onRefresh} />,

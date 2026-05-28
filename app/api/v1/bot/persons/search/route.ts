@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
                 contacts: {
                     some: {
                         value: { in: patterns },
+                        type: { in: ['phone', 'whatsapp'] },
                     },
                 },
             },

@@ -13,7 +13,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules 
-      - ./public/uploads:/app/public/uploads
+      - /home/husam/Pictures/nawaat-uploads:/app/public/uploads:rw
    
     environment:
       - WATCHPACK_POLLING=true 
@@ -24,8 +24,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy 
-      # rabbitmq:
-      #   condition: service_healthy 
+      rabbitmq:
+        condition: service_healthy 
     command: sh -c "npx prisma generate && npx prisma db push && npm run dev"
 
   postgres:
@@ -48,27 +48,31 @@ services:
       retries: 5
 
 
-  # rabbitmq:
-  #   image: rabbitmq:3-management
-  #   container_name: nawaat_rabbitmq_dev
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env.development
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   networks:
-  #     - nawaat_net
-
-  #   healthcheck:
-  #     test: rabbitmq-diagnostics -q ping
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: nawaat_rabbitmq_dev
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - nawaat_net
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
     name: nawaat_postgres_data_dev
+  rabbitmq_data:
+    name: nawaat_rabbitmq_data_dev
+
 
 
 networks:

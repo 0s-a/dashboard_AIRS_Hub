@@ -3,20 +3,20 @@
 import { getCurrentUser } from '@/lib/actions/auth'
 
 /**
- * Returns true if the current user is an admin.
+ * Throws an error if the user is not authenticated.
+ * Use inside safeAction / safeActionWithRevalidation callbacks.
  */
-export async function isCurrentUserAdmin(): Promise<boolean> {
+export async function requireAuth(): Promise<void> {
     const res = await getCurrentUser()
-    return res.success && res.data?.role === 'admin'
+    if (!res.success || !res.data?.userId) {
+        throw new Error('يجب تسجيل الدخول للقيام بهذه العملية')
+    }
 }
 
 /**
- * Throws an error if the current user is NOT an admin.
- * Use inside safeAction / safeActionWithRevalidation callbacks.
+ * Returns true if the current user is authenticated.
  */
-export async function requireAdmin(): Promise<void> {
-    const ok = await isCurrentUserAdmin()
-    if (!ok) {
-        throw new Error('صلاحية مرفوضة — هذه العملية للمدير فقط')
-    }
+export async function isAuthenticated(): Promise<boolean> {
+    const res = await getCurrentUser()
+    return res.success && !!res.data?.userId
 }

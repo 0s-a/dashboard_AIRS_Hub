@@ -4,9 +4,8 @@ import { ColumnDef } from "@tanstack/react-table"
 import type { SerializedCurrency } from "@/app/(dashboard)/currencies/page"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import { Edit, Trash2, Star, StarOff, ArrowLeftRight, TrendingDown } from "lucide-react"
-import { deleteCurrency, setDefaultCurrency, toggleCurrencyActive } from "@/lib/actions/currencies"
+import { deleteCurrency, setDefaultCurrency } from "@/lib/actions/currencies"
 import { toast } from "sonner"
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -31,27 +30,39 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
                 {row.original.itemNumber}
             </span>
         ),
-        size: 80,
+        size: 120,
     },
     {
         accessorKey: "name",
         enableColumnFilter: true,
         meta: { filterType: 'text' as const, filterPlaceholder: 'اسم العملة...' },
         header: "العملة",
-        cell: ({ row }) => {
-            const c = row.original
-            return (
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-                        <span className="text-sm font-bold text-primary">{c.symbol}</span>
-                    </div>
-                    <div>
-                        <p className="font-semibold text-sm">{c.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{c.code}</p>
-                    </div>
-                </div>
-            )
-        }
+        cell: ({ row }) => (
+            <span className="font-medium text-sm">{row.original.name}</span>
+        ),
+        size: 200,
+    },
+    {
+        accessorKey: "code",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'الكود...' },
+        header: "الكود (ISO)",
+        cell: ({ row }) => (
+            <span className="font-mono text-sm text-muted-foreground">
+                {row.original.code}
+            </span>
+        ),
+        size: 140,
+    },
+    {
+        accessorKey: "symbol",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'الرمز...' },
+        header: "الرمز",
+        cell: ({ row }) => (
+            <span className="font-semibold text-sm text-primary/80">{row.original.symbol}</span>
+        ),
+        size: 100,
     },
     {
         accessorKey: "exchangeRate",
@@ -115,65 +126,8 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
                     </div>
                 </div>
             )
-        }
-    },
-    {
-        accessorKey: "isDefault",
-        enableColumnFilter: false,
-        header: "الرئيسية",
-        cell: ({ row }) => {
-            const c = row.original
-            if (c.isDefault) {
-                return (
-                    <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/30 gap-1">
-                        <Star className="h-3 w-3 fill-current" />
-                        رئيسية
-                    </Badge>
-                )
-            }
-            return (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-amber-600"
-                    onClick={async () => {
-                        const res = await setDefaultCurrency(c.id)
-                        if (res.success) toast.success("تم تعيينها كعملة رئيسية")
-                        else toast.error(res.error)
-                    }}
-                >
-                    <StarOff className="h-3 w-3" />
-                    تعيين رئيسية
-                </Button>
-            )
-        }
-    },
-    {
-        accessorKey: "isActive",
-        enableColumnFilter: true,
-        meta: { filterType: 'boolean' as const },
-        filterFn: (row: any, _columnId: string, filterValue: string) => {
-            return String(row.original.isActive) === filterValue
         },
-        header: "الحالة",
-        cell: ({ row }) => {
-            const c = row.original
-            return (
-                <div className="flex items-center gap-2">
-                    <Switch
-                        checked={c.isActive}
-                        onCheckedChange={async (checked) => {
-                            const res = await toggleCurrencyActive(c.id, checked)
-                            if (res.success) toast.success(checked ? "تم تفعيل العملة" : "تم إيقاف العملة")
-                            else toast.error(res.error)
-                        }}
-                    />
-                    <span className={`text-xs font-medium ${c.isActive ? "text-emerald-600" : "text-muted-foreground"}`}>
-                        {c.isActive ? "مفعّل" : "موقوف"}
-                    </span>
-                </div>
-            )
-        }
+        size: 250,
     },
     {
         id: "actions",
@@ -214,8 +168,30 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
+                    {!c.isDefault && (
+                        <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-amber-600"
+                                        onClick={async () => {
+                                            const res = await setDefaultCurrency(c.id)
+                                            if (res.success) toast.success("تم تعيينها كعملة رئيسية")
+                                            else toast.error(res.error)
+                                        }}
+                                    >
+                                        <StarOff className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs">تعيين كعملة رئيسية</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
                 </div>
             )
-        }
+        },
+        size: 150,
     }
 ]

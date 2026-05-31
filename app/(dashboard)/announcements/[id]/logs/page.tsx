@@ -25,8 +25,8 @@ import { getAnnouncementMessages, getAnnouncementProgress, getAnnouncement } fro
 
 interface LogEntry {
     id:           string
-    personId:     string | null
-    personName:   string | null
+    customerId:     string | null
+    customerName:   string | null
     whatsapp:     string | null
     status:       string
     failReason:   string | null
@@ -50,7 +50,7 @@ function exportCSV(items: LogEntry[], title: string) {
     const header = "الاسم,رقم الواتساب,الحالة,سبب الفشل,الوقت,رقم الرسالة"
     const rows = items.map(r =>
         [
-            r.personName ?? "—",
+            r.customerName ?? "—",
             r.whatsapp   ?? "—",
             r.status === "sent" ? "نجح" : "فشل",
             r.failReason ?? "",
@@ -93,8 +93,8 @@ export default function AnnouncementLogsPage() {
             const d = logsRes.data as any
             setItems((d.messages ?? []).map((m: any) => ({
                 id:           m.id,
-                personId:     m.personId,
-                personName:   m.personName,
+                customerId:     m.customerId,
+                customerName:   m.customerName,
                 whatsapp:     m.whatsappNumber,
                 status:       m.status,
                 failReason:   m.errorReason,
@@ -125,7 +125,7 @@ export default function AnnouncementLogsPage() {
     // Client-side search filter
     const displayed = search
         ? items.filter(r =>
-            (r.personName ?? "").toLowerCase().includes(search.toLowerCase()) ||
+            (r.customerName ?? "").toLowerCase().includes(search.toLowerCase()) ||
             (r.whatsapp   ?? "").includes(search)
         )
         : items
@@ -251,7 +251,7 @@ export default function AnnouncementLogsPage() {
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
                                             <User className="size-3.5 text-muted-foreground shrink-0" />
-                                            <span className="font-semibold truncate max-w-32">{r.personName ?? "—"}</span>
+                                            <span className="font-semibold truncate max-w-32">{r.customerName ?? "—"}</span>
                                         </div>
                                     </td>
                                     <td className="px-4 py-3">

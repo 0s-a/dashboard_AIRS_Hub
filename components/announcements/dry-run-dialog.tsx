@@ -3,7 +3,7 @@
 /**
  * components/announcements/dry-run-dialog.tsx
  *
- * Preview Dialog — renders real messages for the first N persons in the audience.
+ * Preview Dialog — renders real messages for the first N customers in the audience.
  * Shows WhatsApp-style message bubbles so admins verify the content before launching.
  */
 
@@ -25,7 +25,7 @@ import { dryRunAnnouncement } from "@/lib/actions/announcements"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DryRunSample {
-    personName:  string | null
+    customerName:  string | null
     whatsapp:    string | null
     messageBody: string
     imageUrls:   string[]
@@ -46,15 +46,15 @@ function WhatsAppBubble({ sample, index }: { sample: DryRunSample; index: number
 
     return (
         <div className="space-y-2">
-            {/* Person header */}
+            {/* Customer header */}
             <div className="flex items-center gap-2">
                 <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <span className="text-xs font-black text-primary">
-                        {(sample.personName ?? "?")[0]}
+                        {(sample.customerName ?? "?")[0]}
                     </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold truncate">{sample.personName ?? "—"}</p>
+                    <p className="text-sm font-bold truncate">{sample.customerName ?? "—"}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Phone className="size-3" />
                         {sample.whatsapp ?? (
@@ -150,7 +150,7 @@ export function DryRunDialog({ announcementId, disabled }: DryRunDialogProps) {
 
         const raw = res.data as any
         const mappedSamples: DryRunSample[] = (raw.renderedMessages ?? []).map((m: any) => ({
-            personName:  m.personName,
+            customerName:  m.customerName,
             whatsapp:    null,
             messageBody: m.messageBody,
             imageUrls:   [] as string[],
@@ -159,7 +159,7 @@ export function DryRunDialog({ announcementId, disabled }: DryRunDialogProps) {
         setNoWhatsapp(0)
 
         if (mappedSamples.length === 0) {
-            toast.warning("لا يوجد أشخاص في الجمهور للمعاينة")
+            toast.warning("لا يوجد عملاء في الجمهور للمعاينة")
             setOpen(false)
         }
     }
@@ -186,7 +186,7 @@ export function DryRunDialog({ announcementId, disabled }: DryRunDialogProps) {
                             معاينة رسائل حقيقية
                         </DialogTitle>
                         <DialogDescription className="text-xs">
-                            هذه رسائل فعلية ستُرسل لأول {samples.length || 5} أشخاص في الجمهور — لا يتم إرسال أي شيء الآن
+                            هذه رسائل فعلية ستُرسل لأول {samples.length || 5} عملاء في الجمهور — لا يتم إرسال أي شيء الآن
                         </DialogDescription>
                     </DialogHeader>
 
@@ -195,7 +195,7 @@ export function DryRunDialog({ announcementId, disabled }: DryRunDialogProps) {
                         <div className="mx-6 mt-4 flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5">
                             <AlertTriangle className="size-4 text-amber-600 shrink-0" />
                             <p className="text-xs text-amber-700 font-semibold">
-                                {noWhatsapp} {noWhatsapp === 1 ? "شخص" : "أشخاص"} بلا رقم واتساب — سيُتجاهلون عند الإرسال
+                                {noWhatsapp} {noWhatsapp === 1 ? "عميل" : "عملاء"} بلا رقم واتساب — سيُتجاهلون عند الإرسال
                             </p>
                         </div>
                     )}

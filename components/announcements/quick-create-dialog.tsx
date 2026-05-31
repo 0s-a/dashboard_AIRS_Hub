@@ -53,7 +53,7 @@ export function QuickCreateDialog({ open, onOpenChange, onCreated }: QuickCreate
                 title:       data.title.trim(),
                 description: data.description.trim() || undefined,
                 scheduledAt: new Date(data.scheduledAt).toISOString(),
-                personFilters:  { all: true },
+                customerFilters:  { all: true },
                 productFilters: { all: true },
             })
             if (res.success) {

@@ -24,14 +24,11 @@ import type { FilterGroup, AudienceCondition, ConditionType } from "@/lib/types/
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 
-interface PersonData { groupName: string | null }
-
 interface AudienceBuilderProps {
     groups:       FilterGroup[]
     onChange:     (groups: FilterGroup[]) => void
 
-    personGroups: string[]
-    personTags:   string[]
+    customerTags:   string[]
 }
 
 type ConditionOption = { type: ConditionType; value: string; label: string }
@@ -43,22 +40,16 @@ function uid() {
 }
 
 const CONDITION_ICONS: Record<ConditionType, React.ComponentType<any>> = {
-
-    group:       Layers,
     tag:         Tag,
     exclude_tag: X,
 }
 
 const CONDITION_COLORS: Record<ConditionType, string> = {
-
-    group:       "bg-indigo-500/10 border-indigo-500/30 text-indigo-600",
     tag:         "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
     exclude_tag: "bg-destructive/10 border-destructive/30 text-destructive",
 }
 
 const CONDITION_LABELS: Record<ConditionType, string> = {
-
-    group:       "مجموعة",
     tag:         "تاغ",
     exclude_tag: "استثناء تاغ",
 }
@@ -94,22 +85,19 @@ function ConditionChip({
 // ─── Add Condition Dropdown ───────────────────────────────────────────────────
 
 function AddConditionButton({
-    onAdd, personGroups, personTags,
+    onAdd, customerGroups, customerTags,
 }: {
     onAdd:        (c: AudienceCondition) => void
 
-    personGroups: string[]
-    personTags:   string[]
+    customerTags:   string[]
 }) {
     const [open,     setOpen]     = useState(false)
     const [tab,      setTab]      = useState<ConditionType>("group")
     const [search,   setSearch]   = useState("")
 
     const allOptions: Record<ConditionType, ConditionOption[]> = {
-
-        group:       personGroups.map(g  => ({ type: "group"       as const, value: g,       label: g })),
-        tag:         personTags.map(t    => ({ type: "tag"         as const, value: t,       label: t })),
-        exclude_tag: personTags.map(t    => ({ type: "exclude_tag" as const, value: t,       label: t })),
+        tag:         customerTags.map(t    => ({ type: "tag"         as const, value: t,       label: t })),
+        exclude_tag: customerTags.map(t    => ({ type: "exclude_tag" as const, value: t,       label: t })),
     }
 
     const filtered = (allOptions[tab] ?? []).filter(o =>
@@ -123,8 +111,6 @@ function AddConditionButton({
     }
 
     const TABS: { key: ConditionType; label: string; icon: React.ComponentType<any> }[] = [
-
-        { key: "group",       label: "مجموعة",        icon: Layers },
         { key: "tag",         label: "تاغ",           icon: Tag    },
         { key: "exclude_tag", label: "استثناء",       icon: X      },
     ]
@@ -210,7 +196,7 @@ function AddConditionButton({
 function FilterGroupCard({
     group, index, isLast,
     onUpdate, onRemove,
-    personGroups, personTags,
+    customerGroups, customerTags,
 }: {
     group:        FilterGroup
     index:        number
@@ -218,8 +204,7 @@ function FilterGroupCard({
     onUpdate:     (g: FilterGroup) => void
     onRemove:     () => void
 
-    personGroups: string[]
-    personTags:   string[]
+    customerTags:   string[]
 }) {
     const addCondition = (c: AudienceCondition) => {
         onUpdate({ ...group, conditions: [...group.conditions, c] })
@@ -279,8 +264,7 @@ function FilterGroupCard({
                 <AddConditionButton
                     onAdd={addCondition}
 
-                    personGroups={personGroups}
-                    personTags={personTags}
+                    customerTags={customerTags}
                 />
             </div>
         </div>
@@ -290,7 +274,7 @@ function FilterGroupCard({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AudienceBuilder({
-    groups, onChange, personGroups, personTags,
+    groups, onChange, customerTags,
 }: AudienceBuilderProps) {
     const addGroup = () => {
         onChange([...groups, { id: uid(), conditions: [] }])
@@ -336,8 +320,7 @@ export function AudienceBuilder({
                     onUpdate={g2 => updateGroup(i, g2)}
                     onRemove={() => removeGroup(i)}
 
-                    personGroups={personGroups}
-                    personTags={personTags}
+                    customerTags={customerTags}
                 />
             ))}
 

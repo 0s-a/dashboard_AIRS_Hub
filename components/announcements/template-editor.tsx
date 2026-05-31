@@ -43,7 +43,7 @@ const STARTER_TEMPLATES = [
         description: "رسالة مباشرة مع قائمة المنتجات",
         type:        "text" as const,
         sendMode:    "combined" as const,
-        bodyTemplate: `مرحباً {{person.name}} 👋
+        bodyTemplate: `مرحباً {{customer.name}} 👋
 
 لدينا عروض جديدة خصيصاً لك:
 
@@ -62,13 +62,13 @@ const STARTER_TEMPLATES = [
         description: "رسالة مميزة لعملاء المجموعات",
         type:        "text" as const,
         sendMode:    "combined" as const,
-        bodyTemplate: `أهلاً وسهلاً {{person.name}} 🌟
+        bodyTemplate: `أهلاً وسهلاً {{customer.name}} 🌟
 
-بصفتك عضواً مميزاً في مجموعة *{{person.group}}*، نسعد بتقديم أحدث مجموعتنا الحصرية:
+بصفتك عضواً مميزاً، نسعد بتقديم أحدث مجموعتنا الحصرية:
 
 {{products}}
 
-🎁 خصم خاص متاح لمجموعتك — تواصل معنا الآن!`,
+🎁 خصم خاص متاح لك — تواصل معنا الآن!`,
         productBlock: `✨ *{{product.name}}*
 │ رقم المنتج: \`{{product.itemNumber}}\`
 │ متوفر بـ: {{product.variants}}`,
@@ -81,7 +81,7 @@ const STARTER_TEMPLATES = [
         description: "كتالوج منتجات مع صور",
         type:        "text_image" as const,
         sendMode:    "combined" as const,
-        bodyTemplate: `السلام عليكم {{person.name}} 👋
+        bodyTemplate: `السلام عليكم {{customer.name}} 👋
 
 🛍️ *كتالوج المنتجات الجديد*
 
@@ -105,7 +105,7 @@ const STARTER_TEMPLATES = [
         sendMode:    "combined" as const,
         bodyTemplate: `⚡ عرض لفترة محدودة!
 
-{{person.name}}، لقد اخترنا لك هذه المنتجات بعناية:
+{{customer.name}}، لقد اخترنا لك هذه المنتجات بعناية:
 
 {{products}}
 
@@ -553,7 +553,7 @@ export function TemplateEditor({
                                         "rounded-xl resize-none min-h-36 font-mono text-sm leading-relaxed transition-all",
                                         activeField === 'body' && !disabled && "ring-1 ring-primary/30 border-primary/30"
                                     )}
-                                    placeholder={"مرحباً {{person.name}} 👋\n\n{{products}}\n\nللطلب تواصل معنا ✨"}
+                                    placeholder={"مرحباً {{customer.name}} 👋\n\n{{products}}\n\nللطلب تواصل معنا ✨"}
                                 />
                                 {/* Char limit warning strip */}
                                 {bodyTemplate.length > WA_CHAR_LIMIT * 0.8 && (
@@ -709,13 +709,11 @@ export function TemplateEditor({
                                 {/* contact header */}
                                 <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[#075E54]/10">
                                     <div className="size-8 rounded-full bg-[#075E54]/20 flex items-center justify-center text-sm font-bold text-[#075E54]">
-                                        {msg.personName?.[0] ?? 'أ'}
+                                        {msg.customerName?.[0] ?? 'أ'}
                                     </div>
                                     <div>
-                                        <p className="text-xs font-bold">{msg.personName}</p>
-                                        <p className="text-[10px] text-muted-foreground">
-                                            {msg.groupName} · {msg.groupNumber}
-                                        </p>
+                                        <p className="text-xs font-bold">{msg.customerName}</p>
+
                                     </div>
                                 </div>
 

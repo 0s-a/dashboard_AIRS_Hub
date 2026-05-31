@@ -50,10 +50,10 @@ export function WelcomeSection({ userName }: { userName: string }) {
                             إضافة منتج
                         </Button>
                     </Link>
-                    <Link href="/persons">
+                    <Link href="/customers">
                         <Button variant="outline" size="sm" className="rounded-lg font-semibold gap-1.5 shadow-sm transition-all hover:-translate-y-0.5">
                             <Users className="size-4" />
-                            إضافة شخص
+                            إضافة عميل
                         </Button>
                     </Link>
                     <Button variant="ghost" size="sm" className="rounded-lg font-semibold gap-1.5 text-muted-foreground hover:bg-muted/50 transition-colors">

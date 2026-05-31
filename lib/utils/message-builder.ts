@@ -1,16 +1,16 @@
 /**
  * lib/utils/message-builder.ts
  *
- * Transforms a message template + person data + product list into a
+ * Transforms a message template + customer data + product list into a
  * ready-to-send rendered message for n8n/WhatsApp.
  *
  * Supported variables:
- *   Body:     {{person.name}}, {{person.id}}, {{person.whatsapp}}, {{person.group}}, {{products}}
+ *   Body:     {{customer.name}}, {{customer.id}}, {{customer.whatsapp}}, {{customer.group}}, {{products}}
  *   Product:  {{product.name}}, {{product.itemNumber}}, {{product.variants}}, {{product.image}}
  */
 
 import type {
-    PersonPayload,
+    CustomerPayload,
     ProductPayload,
     RenderedMessage,
     MessageTemplateData,
@@ -22,7 +22,7 @@ export const DEFAULT_TEXT_TEMPLATE: Omit<MessageTemplateData, 'id'> = {
     name:         'النموذج الافتراضي',
     type:         'text',
     sendMode:     'combined',
-    bodyTemplate: `مرحباً {{person.name}} 👋
+    bodyTemplate: `مرحباً {{customer.name}} 👋
 
 لدينا عروض جديدة خصيصاً لك:
 
@@ -40,7 +40,7 @@ export const DEFAULT_IMAGE_TEMPLATE: Omit<MessageTemplateData, 'id'> = {
     name:         'نموذج مع صور',
     type:         'text_image',
     sendMode:     'combined',
-    bodyTemplate: `مرحباً {{person.name}} 👋
+    bodyTemplate: `مرحباً {{customer.name}} 👋
 
 إليك أحدث المنتجات المتوفرة:
 
@@ -58,10 +58,9 @@ export const DEFAULT_IMAGE_TEMPLATE: Omit<MessageTemplateData, 'id'> = {
 // ─── Variable Definitions (for the UI variable picker) ───────────────────────
 
 export const BODY_VARIABLES = [
-    { key: '{{person.name}}',     label: 'اسم العميل',     icon: '👤' },
-    { key: '{{person.id}}',       label: 'معرّف العميل',   icon: '🆔' },
-    { key: '{{person.whatsapp}}', label: 'رقم الواتساب',   icon: '📱' },
-    { key: '{{person.group}}',    label: 'المجموعة',       icon: '👥' },
+    { key: '{{customer.name}}',     label: 'اسم العميل',     icon: '👤' },
+    { key: '{{customer.id}}',       label: 'معرّف العميل',   icon: '🆔' },
+    { key: '{{customer.whatsapp}}', label: 'رقم الواتساب',   icon: '📱' },
     { key: '{{products}}',        label: 'كتلة المنتجات',  icon: '📦' },
 ] as const
 
@@ -92,18 +91,18 @@ export const PRODUCT_VARIABLES = [
 // ─── Renderer ─────────────────────────────────────────────────────────────────
 
 /**
- * Resolves the prices to show for a product given the person's assigned price labels.
+ * Resolves the prices to show for a product given the customer's assigned price labels.
  *
  * Priority chain:
- *   1. Prices whose priceLabelId matches one of the person's assigned labels
+ *   1. Prices whose priceLabelId matches one of the customer's assigned labels
  *   2. Prices in the default currency (isDefaultCurrency === true)
  *   3. All prices (last resort)
  */
-function resolvePersonPrices(
+function resolveCustomerPrices(
     allPrices: ProductPayload['prices'],
     priceLabelIds: string[]
 ): ProductPayload['prices'] {
-    // 1 — Person has assigned labels → show only matching ones
+    // 1 — Customer has assigned labels → show only matching ones
     if (priceLabelIds.length > 0) {
         const matched = allPrices.filter(p => priceLabelIds.includes(p.priceLabelId))
         if (matched.length > 0) return matched
@@ -117,7 +116,7 @@ function resolvePersonPrices(
 
 /**
  * Renders a single product block by replacing all product-level variables.
- * Personalizes prices based on priceLabelIds assigned to the person.
+ * Personalizes prices based on priceLabelIds assigned to the customer.
  */
 function renderProductBlock(
     block: string,
@@ -130,7 +129,7 @@ function renderProductBlock(
     const variantCount   = String(product.variants.length)
 
     // ─ Prices (personalized) ─────────────────────────────────────────
-    const prices     = resolvePersonPrices(product.prices, priceLabelIds)
+    const prices     = resolveCustomerPrices(product.prices, priceLabelIds)
     const pricesText = prices.length
         ? prices.map(p => `${p.label}: ${p.value} ${p.symbol} / ${p.unit}`).join('\n')
         : '—'
@@ -170,41 +169,40 @@ function renderProductBlock(
 
 
 /**
- * Renders a body template by replacing person-level variables and the {{products}} block.
+ * Renders a body template by replacing customer-level variables and the {{products}} block.
  */
 function renderBody(
     bodyTemplate: string,
-    person:       PersonPayload,
+    customer:       CustomerPayload,
     productsText: string
 ): string {
-    const whatsapp = person.contacts.find(c => c.type === 'whatsapp')?.value
-                  ?? person.contacts.find(c => c.type === 'phone')?.value
+    const whatsapp = customer.contacts.find(c => c.type === 'whatsapp')?.value
+                  ?? customer.contacts.find(c => c.type === 'phone')?.value
                   ?? ''
     return bodyTemplate
-        .replace(/\{\{person\.name\}\}/g,     person.name ?? 'عميل')
-        .replace(/\{\{person\.id\}\}/g,       person.id)
-        .replace(/\{\{person\.whatsapp\}\}/g, whatsapp)
-        .replace(/\{\{person\.group\}\}/g,    person.groupName ?? '')
+        .replace(/\{\{customer\.name\}\}/g,     customer.name ?? 'عميل')
+        .replace(/\{\{customer\.id\}\}/g,       customer.id)
+        .replace(/\{\{customer\.whatsapp\}\}/g, whatsapp)
         .replace(/\{\{products\}\}/g,         productsText)
 }
 
 /**
- * Main entry point: combines template + person + products into a RenderedMessage.
+ * Main entry point: combines template + customer + products into a RenderedMessage.
  *
  * NOTE: whatsappNumber is NOT included in the returned RenderedMessage.
  * It is extracted separately in publishMessage() and placed in AMQP headers.
  */
 export function renderMessage(
     template: Pick<MessageTemplateData, 'bodyTemplate' | 'productBlock' | 'separator' | 'type'>,
-    person:   PersonPayload,
+    customer:   CustomerPayload,
     products: ProductPayload[],
 ): RenderedMessage {
     // 1. Render each product block (with personalized pricing)
-    const productBlocks = products.map(p => renderProductBlock(template.productBlock, p, person.priceLabelIds))
+    const productBlocks = products.map(p => renderProductBlock(template.productBlock, p, customer.priceLabelIds))
     const productsText  = productBlocks.join(template.separator)
 
     // 2. Render the body
-    const messageBody = renderBody(template.bodyTemplate, person, productsText)
+    const messageBody = renderBody(template.bodyTemplate, customer, productsText)
 
     // 3. Collect image URLs for text_image type
     const imageUrls = template.type === 'text_image'
@@ -212,10 +210,8 @@ export function renderMessage(
         : []
 
     return {
-        personName:   person.name,
-        personId:     person.id,
-        groupName:    person.groupName,
-        groupNumber:  person.groupNumber,
+        customerName:   customer.name,
+        customerId:     customer.id,
         messageBody,
         imageUrls,
         templateType: template.type as 'text' | 'text_image',
@@ -231,27 +227,24 @@ export function renderMessage(
  */
 export function renderMessages(
     template: Pick<MessageTemplateData, 'bodyTemplate' | 'productBlock' | 'separator' | 'type' | 'sendMode'>,
-    person:   PersonPayload,
+    customer:   CustomerPayload,
     products: ProductPayload[],
 ): RenderedMessage[] {
     if (template.sendMode === 'per_product') {
         // Each product → one standalone message (no separator, single product block)
-        return products.map(product => renderMessage(template, person, [product]))
+        return products.map(product => renderMessage(template, customer, [product]))
     }
     // Default: all products combined in one message
-    return [renderMessage(template, person, products)]
+    return [renderMessage(template, customer, products)]
 }
 
 /**
  * Extracts the WhatsApp/phone number for AMQP message routing.
  * Called separately — NOT embedded in the message body.
  */
-export function extractWhatsappNumber(person: PersonPayload): string | null {
-    if (person.groupNumber) {
-        return person.groupNumber.includes('@') ? person.groupNumber : `${person.groupNumber}@g.us`
-    }
-    return person.contacts.find(c => c.type === 'whatsapp')?.value
-        ?? person.contacts.find(c => c.type === 'phone')?.value
+export function extractWhatsappNumber(customer: CustomerPayload): string | null {
+    return customer.contacts.find(c => c.type === 'whatsapp')?.value
+        ?? customer.contacts.find(c => c.type === 'phone')?.value
         ?? null
 }
 
@@ -259,11 +252,9 @@ export function extractWhatsappNumber(person: PersonPayload): string | null {
 
 // ─── Preview Helper (for UI with sample data) ─────────────────────────────────
 
-const SAMPLE_PERSON: PersonPayload = {
+const SAMPLE_CUSTOMER: CustomerPayload = {
     id:            'sample-001',
     name:          'أحمد محمد',
-    groupName:     'عملاء VIP',
-    groupNumber:   'G-001',
     priceLabelIds: ['label-wholesale'],   // سعر الجملة — لاختبار المعاينة
     contacts:      [{ type: 'whatsapp', value: '967771234567' }],
 }
@@ -324,11 +315,11 @@ const SAMPLE_PRODUCTS: ProductPayload[] = [
 export function previewTemplateRender(
     template: Pick<MessageTemplateData, 'bodyTemplate' | 'productBlock' | 'separator' | 'type' | 'sendMode'>
 ): Array<RenderedMessage & { whatsappNumber: string; productIndex?: number; totalProducts?: number }> {
-    const wn = extractWhatsappNumber(SAMPLE_PERSON) ?? '967771234567'
+    const wn = extractWhatsappNumber(SAMPLE_CUSTOMER) ?? '967771234567'
 
     if (template.sendMode === 'per_product') {
         return SAMPLE_PRODUCTS.map((product, i) => ({
-            ...renderMessage(template, SAMPLE_PERSON, [product]),
+            ...renderMessage(template, SAMPLE_CUSTOMER, [product]),
             whatsappNumber: wn,
             productIndex:   i + 1,
             totalProducts:  SAMPLE_PRODUCTS.length,
@@ -336,7 +327,7 @@ export function previewTemplateRender(
     }
 
     return [{
-        ...renderMessage(template, SAMPLE_PERSON, SAMPLE_PRODUCTS),
+        ...renderMessage(template, SAMPLE_CUSTOMER, SAMPLE_PRODUCTS),
         whatsappNumber: wn,
     }]
 }

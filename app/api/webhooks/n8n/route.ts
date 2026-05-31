@@ -1,8 +1,8 @@
 /**
  * app/api/webhooks/n8n/route.ts
  *
- * Receives per-person delivery callbacks from n8n.
- * Each call = result of ONE person's message delivery attempt.
+ * Receives per-customer delivery callbacks from n8n.
+ * Each call = result of ONE customer's message delivery attempt.
  *
  * ── Source of Truth Architecture ──────────────────────────────────────────────
  * The Backend owns the message content. AnnouncementMessage records are created
@@ -84,8 +84,8 @@ export async function POST(req: Request) {
         announcementId?: string
         messageIndex?:   number
         totalMessages?:  number
-        personId?:       string
-        personName?:     string | null
+        customerId?:       string
+        customerName?:     string | null
         contact?:        string | null
         success?:        boolean
         error?:          string | null
@@ -128,8 +128,8 @@ async function handleNewCallback(body: {
         where:  { id: messageId },
         select: {
             announcementId: true,
-            personId:       true,
-            personName:     true,
+            customerId:       true,
+            customerName:     true,
             whatsappNumber: true,
             messageIndex:   true,
             status:         true,
@@ -150,7 +150,7 @@ async function handleNewCallback(body: {
     }
 
     // Safe to update (confirmed status='pending')
-    let msg: { announcementId: string; personId: string | null; personName: string | null; whatsappNumber: string | null; messageIndex: number }
+    let msg: { announcementId: string; customerId: string | null; customerName: string | null; whatsappNumber: string | null; messageIndex: number }
     try {
         // WHERE includes status:'pending' as double-safety against race conditions
         msg = await prisma.announcementMessage.update({
@@ -163,8 +163,8 @@ async function handleNewCallback(body: {
             },
             select: {
                 announcementId: true,
-                personId:       true,
-                personName:     true,
+                customerId:       true,
+                customerName:     true,
                 whatsappNumber: true,
                 messageIndex:   true,
             },

@@ -69,7 +69,7 @@ export interface EtaResult {
 }
 
 export function calculateEta(
-    personCount: number,
+    customerCount: number,
     config: ThrottleConfig
 ): EtaResult {
     const { messagesPerMinute, delayBetweenSeconds, sendWindowStart, sendWindowEnd } = config
@@ -86,7 +86,7 @@ export function calculateEta(
 
     // Total minutes
     const totalMinutes = effectiveRate > 0
-        ? Math.ceil(personCount / effectiveRate)
+        ? Math.ceil(customerCount / effectiveRate)
         : 0  // instant
 
     // Finish time = now + totalMinutes

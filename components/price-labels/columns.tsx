@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { PriceLabel } from "@prisma/client"
-import { MoreHorizontal, Pencil, Trash2, Star, StarOff } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, Star, StarOff, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -56,6 +56,37 @@ export const columns: ColumnDef<PriceLabel>[] = [
                             افتراضية
                         </Badge>
                     )}
+                </div>
+            )
+        },
+    },
+    {
+        accessorKey: "customerType",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'نوع العميل...' },
+        header: "نوع العميل",
+        size: 160,
+        cell: ({ row }) => {
+            const ct = (row.original as any).customerType
+            if (!ct) return <span className="text-muted-foreground text-xs text-center block">—</span>
+            return (
+                <Badge className="bg-indigo-500/10 text-indigo-700 border-indigo-200 dark:border-indigo-500/30 text-[11px] font-medium">
+                    {ct}
+                </Badge>
+            )
+        },
+    },
+    {
+        id: "customersCount",
+        enableColumnFilter: false,
+        header: "العملاء",
+        size: 90,
+        cell: ({ row }) => {
+            const count = (row.original as any)._count?.customers ?? 0
+            return (
+                <div className="flex items-center justify-center gap-1.5 text-sm font-mono">
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className={count > 0 ? "text-foreground font-semibold" : "text-muted-foreground"}>{count}</span>
                 </div>
             )
         },

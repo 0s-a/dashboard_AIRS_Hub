@@ -67,7 +67,7 @@ export function apiError(
 // Shared Prisma Include/Select constants (re-exported)
 // ────────────────────────────────────────────────────────
 
-export { PERSON_INCLUDE } from '@/lib/prisma-includes'
+export { CUSTOMER_INCLUDE } from '@/lib/prisma-includes'
 
 // ────────────────────────────────────────────────────────
 // Phone Number Normalization
@@ -191,23 +191,21 @@ export async function resolveProduct(identifier: { productId?: string; productCo
 }
 
 /**
- * Auto-resolve the best priceLabelId for a person and product.
- * Finds the first ProductPrice matching one of the person's assigned price labels.
+ * Auto-resolve the best priceLabelId for a customer and product.
+ * Finds the first ProductPrice matching one of the customer's assigned price labels.
  * Returns { priceLabelId, value, currencyId } or null.
  */
-export async function autoResolvePriceLabel(productId: string, personId: string) {
-    const person = await prisma.person.findUnique({
-        where: { id: personId },
-        include: { priceLabels: { select: { priceLabelId: true } } },
+export async function autoResolvePriceLabel(productId: string, customerId: string) {
+    const customer = await prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { priceLabelId: true },
     })
-    if (!person || person.priceLabels.length === 0) return null
-
-    const personLabelIds = person.priceLabels.map(pl => pl.priceLabelId)
+    if (!customer?.priceLabelId) return null
 
     const productPrice = await prisma.productPrice.findFirst({
         where: {
             productId,
-            priceLabelId: { in: personLabelIds },
+            priceLabelId: customer.priceLabelId,
         },
         include: { currency: true },
     })

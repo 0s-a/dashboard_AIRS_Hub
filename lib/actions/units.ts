@@ -13,7 +13,7 @@ const PATHS = '/units'
 export async function getUnits() {
     return safeAction(
         () => prisma.$queryRawUnsafe<any[]>(
-            `SELECT id, "itemNumber", name, "pluralName", notes, "isActive", "createdAt", "updatedAt"
+            `SELECT id, "itemNumber", name, "pluralName", notes, "createdAt", "updatedAt"
              FROM "Unit" ORDER BY name ASC`
         ),
         'تعذّر جلب الوحدات'
@@ -23,7 +23,7 @@ export async function getUnits() {
 export async function getActiveUnits() {
     return safeAction(
         () => prisma.$queryRawUnsafe<any[]>(
-            `SELECT id, "itemNumber", name, "pluralName" FROM "Unit" WHERE "isActive" = true ORDER BY name ASC`
+            `SELECT id, "itemNumber", name, "pluralName" FROM "Unit" ORDER BY name ASC`
         ),
         'تعذّر جلب الوحدات النشطة'
     )
@@ -33,22 +33,20 @@ export async function createUnit(data: {
     name: string
     pluralName?: string | null
     notes?: string | null
-    isActive?: boolean
 }) {
     try {
         // Atomic item number generation — safely ignores non-numeric characters in existing data
         const rows = await prisma.$queryRawUnsafe<{ id: string; itemNumber: string }[]>(
-            `INSERT INTO "Unit" (id, "itemNumber", name, "pluralName", notes, "isActive", "createdAt", "updatedAt")
+            `INSERT INTO "Unit" (id, "itemNumber", name, "pluralName", notes, "createdAt", "updatedAt")
              VALUES (
                  gen_random_uuid(),
                  LPAD((COALESCE((SELECT MAX(NULLIF(REGEXP_REPLACE("itemNumber", '\\D', '', 'g'), '')::int) FROM "Unit"), 0) + 1)::text, 4, '0'),
-                 $1, $2, $3, $4, NOW(), NOW()
+                 $1, $2, $3, NOW(), NOW()
              )
              RETURNING id, "itemNumber"`,
             data.name.trim(),
             data.pluralName || null,
-            data.notes || null,
-            data.isActive ?? true
+            data.notes || null
         )
 
         revalidatePath(PATHS)
@@ -66,7 +64,6 @@ export async function updateUnit(id: string, data: {
     name?: string
     pluralName?: string | null
     notes?: string | null
-    isActive?: boolean
 }) {
     try {
         const now = new Date()
@@ -89,11 +86,6 @@ export async function updateUnit(id: string, data: {
         if (data.notes !== undefined) {
             setClauses.push(`notes = $${paramIndex}`)
             params.push(data.notes)
-            paramIndex++
-        }
-        if (data.isActive !== undefined) {
-            setClauses.push(`"isActive" = $${paramIndex}`)
-            params.push(data.isActive)
             paramIndex++
         }
 

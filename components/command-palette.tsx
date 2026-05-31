@@ -55,9 +55,9 @@ const navigationGroups = [
     {
         title: "العملاء والمستخدمين",
         items: [
-            { href: "/persons", label: "الأشخاص والعملاء", icon: Users, keywords: "persons people أشخاص عملاء زبون" },
+            { href: "/customers", label: "العملاء والعملاء", icon: Users, keywords: "customers people عملاء عملاء زبون" },
             { href: "/groups", label: "المجموعات", icon: UserSquare2, keywords: "groups مجموعات فئة" },
-            { href: "/person-types", label: "أنواع الأشخاص", icon: UserCog, keywords: "person types أنواع" },
+            { href: "/customer-types", label: "أنواع العملاء", icon: UserCog, keywords: "customer types أنواع" },
             { href: "/users", label: "المستخدمين", icon: ShieldCheck, keywords: "users admin مستخدمين إدارة موظفين" },
         ],
     },

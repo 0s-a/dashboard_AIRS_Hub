@@ -8,18 +8,18 @@
 
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
-import type { PersonFilters, ProductFilters, PersonPayload, ProductPayload } from '@/lib/types/announcements'
+import type { CustomerFilters, ProductFilters, CustomerPayload, ProductPayload } from '@/lib/types/announcements'
 import { toExternalUrl, toDisplayUrl } from '@/lib/utils/image-paths'
 
-export type { PersonFilters, ProductFilters, PersonPayload, ProductPayload }
+export type { CustomerFilters, ProductFilters, CustomerPayload, ProductPayload }
 
 // ─── Where Clause Builders ────────────────────────────────────────────────────
 
-export function buildPersonWhere(
-    filters: PersonFilters,
+export function buildCustomerWhere(
+    filters: CustomerFilters,
     manualIds: string[],
-): Prisma.PersonWhereInput {
-    const AND: Prisma.PersonWhereInput[] = [
+): Prisma.CustomerWhereInput {
+    const AND: Prisma.CustomerWhereInput[] = [
         { isActive: filters.isActive ?? true },
     ]
 
@@ -34,10 +34,8 @@ export function buildPersonWhere(
 
             // OR within inclusion conditions in this group
             if (inclusions.length > 0) {
-                const OR: Prisma.PersonWhereInput[] = inclusions.map(c => {
+                const OR: Prisma.CustomerWhereInput[] = inclusions.map(c => {
                     switch (c.type) {
-
-                        case 'group': return { groupName: c.value }
                         case 'tag':   return { tags: { some: { tag: { name: c.value } } } }
                         default:      return {}
                     }
@@ -59,11 +57,8 @@ export function buildPersonWhere(
 
     // ── Legacy Flat-Filter Mode ───────────────────────────────────────────────
     if (!filters.all) {
-        const OR: Prisma.PersonWhereInput[] = []
+        const OR: Prisma.CustomerWhereInput[] = []
 
-
-        if (filters.groupNames?.length)
-            OR.push({ groupName: { in: filters.groupNames } })
 
         if (filters.tags?.length)
             OR.push({ OR: filters.tags.map(tag => ({ tags: { some: { tag: { name: tag } } } })) })
@@ -124,34 +119,30 @@ export function buildProductWhere(
     return { AND }
 }
 
-// ─── Cursor-Based Person Streaming ────────────────────────────────────────────
+// ─── Cursor-Based Customer Streaming ────────────────────────────────────────────
 /**
- * Yields PersonPayload chunks of `chunkSize` using cursor pagination.
+ * Yields CustomerPayload chunks of `chunkSize` using cursor pagination.
  * Never loads the full audience into memory — safe for 100k+ records.
  */
-export async function* streamPersons(
-    filters: PersonFilters,
+export async function* streamCustomers(
+    filters: CustomerFilters,
     manualIds: string[],
     chunkSize: number
-): AsyncGenerator<PersonPayload[]> {
-    const where = buildPersonWhere(filters, manualIds)
+): AsyncGenerator<CustomerPayload[]> {
+    const where = buildCustomerWhere(filters, manualIds)
     let cursor: string | undefined
 
     while (true) {
-        const batch = await prisma.person.findMany({
+        const batch = await prisma.customer.findMany({
             where,
             select: {
                 id:          true,
                 name:        true,
-                groupName:   true,
-                groupNumber: true,
                 contacts: {
                     where:  { type: { in: ['whatsapp', 'phone'] } },
                     select: { type: true, value: true },
                 },
-                priceLabels: {
-                    select: { priceLabelId: true },
-                },
+                priceLabelId: true,
             },
             take: chunkSize,
             ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -163,11 +154,9 @@ export async function* streamPersons(
         yield batch.map((p: any) => ({
             id:            p.id,
             name:          p.name,
-            groupName:     p.groupName,
-            groupNumber:   p.groupNumber,
-            priceLabelIds: (p.priceLabels ?? []).map((pl: any) => pl.priceLabelId),
+            priceLabelIds: p.priceLabelId ? [p.priceLabelId] : [],
             contacts:      p.contacts,
-        })) as PersonPayload[]
+        })) as CustomerPayload[]
 
         if (batch.length < chunkSize) break
         cursor = batch[batch.length - 1].id
@@ -176,12 +165,12 @@ export async function* streamPersons(
 
 // ─── Count helpers (for preview & validation) ─────────────────────────────────
 
-export async function countPersons(
-    filters: PersonFilters,
+export async function countCustomers(
+    filters: CustomerFilters,
     manualIds: string[]
 ): Promise<number> {
-    const where = buildPersonWhere(filters, manualIds)
-    return prisma.person.count({ where })
+    const where = buildCustomerWhere(filters, manualIds)
+    return prisma.customer.count({ where })
 }
 
 export async function countProducts(

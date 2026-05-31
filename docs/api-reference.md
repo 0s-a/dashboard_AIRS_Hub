@@ -66,9 +66,9 @@ x-api-key: <BOT_API_KEY>
 
 ---
 
-## Persons API
+## Customers API
 
-### `GET /persons` — قائمة الأشخاص
+### `GET /customers` — قائمة العملاء
 
 **Query Params:**
 
@@ -81,12 +81,12 @@ x-api-key: <BOT_API_KEY>
 
 **مثال:**
 ```
-GET /api/v1/bot/persons?search=أحمد&active=true&limit=20
+GET /api/v1/bot/customers?search=أحمد&active=true&limit=20
 ```
 
 ---
 
-### `POST /persons` — إنشاء أو تحديث شخص (Upsert)
+### `POST /customers` — إنشاء أو تحديث عميل (Upsert)
 
 **Body:**
 ```json
@@ -95,8 +95,6 @@ GET /api/v1/bot/persons?search=أحمد&active=true&limit=20
   "contacts": [
     { "type": "phone", "value": "0501234567", "label": "جوال", "isPrimary": true }
   ],
-  "groupNumber": "966501234567@s.whatsapp.net",
-  "groupName": "مجموعة السعودية",
   "source": "whatsapp",
   "tags": {},
   "currencyIds": ["uuid"],
@@ -108,38 +106,37 @@ GET /api/v1/bot/persons?search=أحمد&active=true&limit=20
 
 **منطق Upsert:**
 1. يبحث بالـ contacts (هاتف/بريد) أولاً
-2. ثم يبحث بـ groupNumber
-3. إذا وجده → يحدّث البيانات الجديدة فقط
-4. إذا لم يجده → ينشئ سجلاً جديداً
+2. إذا وجده → يحدّث البيانات الجديدة فقط
+3. إذا لم يجده → ينشئ سجلاً جديداً
 
 ---
 
-### `GET /persons/:id` — تفاصيل شخص
+### `GET /customers/:id` — تفاصيل عميل
 
 ```
-GET /api/v1/bot/persons/{uuid}
+GET /api/v1/bot/customers/{uuid}
 ```
 
 ---
 
-### `PUT /persons/:id` — تحديث شخص
+### `PUT /customers/:id` — تحديث عميل
 
 نفس بنية الـ POST body، جميع الحقول اختيارية.
 
 ---
 
-### `DELETE /persons/:id` — حذف شخص
+### `DELETE /customers/:id` — حذف عميل
 
 ```
-DELETE /api/v1/bot/persons/{uuid}
+DELETE /api/v1/bot/customers/{uuid}
 ```
 
 ---
 
-### `GET /persons/search` — بحث برقم الهاتف
+### `GET /customers/search` — بحث برقم الهاتف
 
 ```
-GET /api/v1/bot/persons/search?phone=0501234567
+GET /api/v1/bot/customers/search?phone=0501234567
 ```
 
 | Param | Alias | Description |
@@ -150,7 +147,7 @@ GET /api/v1/bot/persons/search?phone=0501234567
 - يقبل `q` و `value` كـ alias للتوافق مع البوتات القديمة.
 - **لا** يقبل إيميلات أو نصوصاً عشوائية (يُرجع `400 INVALID_PHONE`).
 
-**استجابة — شخص موجود:**
+**استجابة — عميل موجود:**
 ```json
 {
   "success": true,
@@ -160,8 +157,6 @@ GET /api/v1/bot/persons/search?phone=0501234567
     "name": "محمد علي",
     "isActive": true,
     "source": "bot",
-    "groupName": "مجموعة العروض",
-    "groupNumber": "120363...@g.us",
     "lastInteraction": "2026-05-23T04:00:00Z",
     "createdAt": "2026-01-01T00:00:00Z",
     "contacts": [
@@ -183,7 +178,7 @@ GET /api/v1/bot/persons/search?phone=0501234567
 }
 ```
 
-**استجابة — شخص غير موجود:**
+**استجابة — عميل غير موجود:**
 ```json
 {
   "success": true,
@@ -202,38 +197,13 @@ GET /api/v1/bot/persons/search?phone=0501234567
 
 
 
----
-
-### `GET /persons/group` — بحث بـ groupNumber
-
-```
-GET /api/v1/bot/persons/group?groupNumber=966501234567@s.whatsapp.net
-```
 
 ---
 
-### `PATCH /persons/:id/toggle` — تبديل حالة النشاط
+### `GET /customers/:id/pricing` — تسعيرات العميل
 
 ```
-PATCH /api/v1/bot/persons/{uuid}/toggle
-```
-
----
-
-### `PATCH /persons/group/:groupNumber/toggle` — تبديل النشاط بـ groupNumber
-
-```
-PATCH /api/v1/bot/persons/group/966501234567%40s.whatsapp.net/toggle
-```
-
-> **ملاحظة:** يجب URL-encode الـ groupNumber إذا احتوى على `@`.
-
----
-
-### `GET /persons/:id/pricing` — تسعيرات الشخص
-
-```
-GET /api/v1/bot/persons/{uuid}/pricing
+GET /api/v1/bot/customers/{uuid}/pricing
 ```
 
 **الاستجابة:**
@@ -241,8 +211,8 @@ GET /api/v1/bot/persons/{uuid}/pricing
 {
   "success": true,
   "data": {
-    "personId": "...",
-    "personName": "...",
+    "customerId": "...",
+    "customerName": "...",
     "currencies": [{ "id": "...", "code": "SAR", "symbol": "ر.س", "name": "ريال سعودي" }],
     "priceLabels": [{ "id": "...", "name": "سعر الجملة" }]
   }
@@ -270,7 +240,7 @@ GET /api/v1/bot/persons/{uuid}/pricing
 | Param | Type | Description |
 |-------|------|-------------|
 | `q` | string | **مطلوب** — نص البحث |
-| `personId` | uuid | فلترة الأسعار حسب تسعيرة الشخص |
+| `customerId` | uuid | فلترة الأسعار حسب تسعيرة العميل |
 | `available` | `true` \| `false` | فلترة بالتوفر |
 | `category` | uuid | فلترة بالتصنيف |
 | `brand` | string | فلترة بالعلامة التجارية |
@@ -285,8 +255,8 @@ GET /api/v1/bot/persons/{uuid}/pricing
 
 ```json
 {
-  "personId": "uuid",
-  "groupNumber": "966501234567@s.whatsapp.net",
+  "customerId": "uuid",
+
   "notes": "ملاحظات الطلب",
   "items": [
     {
@@ -300,7 +270,7 @@ GET /api/v1/bot/persons/{uuid}/pricing
 }
 ```
 
-> `personId` أو `groupNumber` — واحد منهما كافٍ لربط الطلب بالشخص.
+> `customerId` — كافٍ لربط الطلب بالعميل.
 
 ---
 
@@ -308,8 +278,8 @@ GET /api/v1/bot/persons/{uuid}/pricing
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `personId` | uuid | فلترة بالشخص |
-| `groupNumber` | string | فلترة بـ groupNumber |
+| `customerId` | uuid | فلترة بالعميل |
+
 | `status` | string | فلترة بالحالة |
 
 ---
@@ -325,7 +295,7 @@ GET /api/v1/bot/persons/{uuid}/pricing
   "productId": "uuid",
   "productName": "تكييف سامسونج",
   "phoneNumber": "0501234567",
-  "personId": "uuid",
+  "customerId": "uuid",
   "source": "bot"
 }
 ```
@@ -365,7 +335,7 @@ GET /api/v1/bot/persons/{uuid}/pricing
   "data": {
     "productId": "...",
     "productName": "...",
-    "personName": "...",
+    "customerName": "...",
     "prices": [
       { "label": "سعر الجملة", "value": 150, "currency": { "code": "SAR", "symbol": "ر.س" }, "unit": "كرتون" }
     ]
@@ -373,8 +343,8 @@ GET /api/v1/bot/persons/{uuid}/pricing
 }
 ```
 
-> إذا لم يُعثر على الشخص → تُعاد جميع أسعار المنتج.  
-> إذا وُجد الشخص → تُعاد فقط الأسعار المخصصة له.
+> إذا لم يُعثر على العميل → تُعاد جميع أسعار المنتج.  
+> إذا وُجد العميل → تُعاد فقط الأسعار المخصصة له.
 
 ---
 

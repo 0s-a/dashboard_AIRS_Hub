@@ -3,8 +3,8 @@
 /**
  * components/announcements/audience-snapshot-dialog.tsx
  *
- * Audience Snapshot — shows exactly which N persons will receive this
- * announcement. Optionally "freezes" that list into personIds so the
+ * Audience Snapshot — shows exactly which N customers will receive this
+ * announcement. Optionally "freezes" that list into customerIds so the
  * audience never changes even if filters are later edited.
  */
 
@@ -21,10 +21,10 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface SnapshotPerson { id: string; name: string | null; groupName: string | null }
+interface SnapshotCustomer { id: string; name: string | null }
 interface SnapshotData {
     total:      number
-    sample:     SnapshotPerson[]
+    sample:     SnapshotCustomer[]
 }
 
 interface AudienceSnapshotDialogProps {
@@ -48,7 +48,7 @@ export function AudienceSnapshotDialog({
         const res = await getAudienceSnapshot(announcementId)
         if (res.success && res.data) {
             const d = res.data as any
-            setData({ total: d.personCount, sample: d.samplePersons })
+            setData({ total: d.customerCount, sample: d.sampleCustomers })
         } else {
             toast.error((res as any).error ?? "تعذّر جلب لقطة الجمهور")
             setOpen(false)
@@ -72,14 +72,6 @@ export function AudienceSnapshotDialog({
         }
     }
 
-    // Group persons by groupName
-    const grouped = data
-        ? [...new Map(data.sample.map(p => [p.groupName ?? "_none", p])).entries()]
-            .map(([g]) => ({
-                group:   g === "_none" ? "بدون مجموعة" : g,
-                persons: data.sample.filter(p => (p.groupName ?? "_none") === g),
-            }))
-        : []
 
     return (
         <>
@@ -103,7 +95,7 @@ export function AudienceSnapshotDialog({
                             لقطة الجمهور
                         </DialogTitle>
                         <DialogDescription className="text-xs">
-                            قائمة الأشخاص الذين سيتلقّون هذا الإعلان بناءً على الفلاتر الحالية
+                            قائمة العملاء الذين سيتلقّون هذا الإعلان بناءً على الفلاتر الحالية
                         </DialogDescription>
                     </DialogHeader>
 
@@ -118,7 +110,7 @@ export function AudienceSnapshotDialog({
                                 <div className="flex items-center gap-4 px-5 py-3 bg-muted/20 border-b border-border/30">
                                     <span className="flex items-center gap-1.5 text-sm font-black text-primary">
                                         <Users className="size-4" />
-                                        {data.total} شخص
+                                        {data.total} عميل
                                     </span>
                                     {data.total > 200 && (
                                         <span className="text-xs text-muted-foreground">
@@ -127,32 +119,16 @@ export function AudienceSnapshotDialog({
                                     )}
                                 </div>
 
-                                {/* Person list grouped */}
-                                <div className="divide-y divide-border/30">
-                                    {grouped.map(g => (
-                                        <div key={g.group}>
-                                            <div className="flex items-center gap-2 px-5 py-2 bg-muted/10 sticky top-0">
-                                                <Group className="size-3 text-muted-foreground" />
-                                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                                                    {g.group}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground/60">
-                                                    ({g.persons.length})
+                                    {data.sample.map(p => (
+                                        <div key={p.id} className="flex items-center gap-2.5 px-5 py-2">
+                                            <div className="size-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                                <span className="text-[10px] font-black text-primary">
+                                                    {(p.name ?? "؟")[0]}
                                                 </span>
                                             </div>
-                                            {g.persons.map(p => (
-                                                <div key={p.id} className="flex items-center gap-2.5 px-5 py-2">
-                                                    <div className="size-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                                        <span className="text-[10px] font-black text-primary">
-                                                            {(p.name ?? "؟")[0]}
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-xs font-semibold">{p.name ?? "—"}</span>
-                                                </div>
-                                            ))}
+                                            <span className="text-xs font-semibold">{p.name ?? "—"}</span>
                                         </div>
                                     ))}
-                                </div>
                             </>
                         ) : null}
                     </div>

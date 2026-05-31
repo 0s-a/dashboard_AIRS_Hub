@@ -57,6 +57,7 @@ interface DataTableProps<TData, TValue> {
     globalFilterFn?: (row: any, columnId: string, filterValue: string) => boolean
     onRefresh?: () => void | Promise<void>
     footerContent?: React.ReactNode
+    getRowClassName?: (row: TData) => string | undefined
 }
 
 // Pre-compute row model factories outside the component to avoid
@@ -327,6 +328,7 @@ export function DataTable<TData, TValue>({
     globalFilterFn,
     onRefresh,
     footerContent,
+    getRowClassName,
 }: DataTableProps<TData, TValue>) {
     const [isMounted, setIsMounted] = React.useState(false)
     const [globalFilter, setGlobalFilter] = React.useState("")
@@ -625,7 +627,8 @@ export function DataTable<TData, TValue>({
                                             className={cn(
                                                 "group hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0",
                                                 isGrouped && "bg-muted/20 font-semibold",
-                                                row.getIsExpanded() && "bg-muted/10 border-b-0"
+                                                row.getIsExpanded() && "bg-muted/10 border-b-0",
+                                                getRowClassName?.(row.original)
                                             )}
                                         >
                                             {row.getVisibleCells().map((cell) => {

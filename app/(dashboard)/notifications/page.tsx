@@ -217,7 +217,7 @@ export default function NotificationsPage() {
             items = items.filter(n => 
                 n.searchQuery?.toLowerCase().includes(q) ||
                 n.productName?.toLowerCase().includes(q) ||
-                n.person?.name?.toLowerCase().includes(q) ||
+                n.customer?.name?.toLowerCase().includes(q) ||
                 n.phoneNumber?.includes(q)
             )
         }
@@ -641,13 +641,13 @@ export default function NotificationsPage() {
                                                 </p>
 
                                                 <div className="flex items-center gap-4 mt-3 flex-wrap">
-                                                    {notif.person && (
+                                                    {notif.customer && (
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="size-5 rounded-full bg-blue-500/10 flex items-center justify-center">
                                                                 <User className="h-3 w-3 text-blue-600" />
                                                             </div>
                                                             <span className="text-xs font-semibold text-blue-700/80">
-                                                                {notif.person.name || 'عميل غير مسمّى'}
+                                                                {notif.customer.name || 'عميل غير مسمّى'}
                                                             </span>
                                                         </div>
                                                     )}

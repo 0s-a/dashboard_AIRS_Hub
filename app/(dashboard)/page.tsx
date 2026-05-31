@@ -2,7 +2,7 @@ import { WelcomeSection } from "@/components/dashboard/welcome-section"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { ActivityChart } from "@/components/dashboard/activity-chart"
 import { RecentProducts } from "@/components/dashboard/recent-products"
-import { RecentPersons } from "@/components/dashboard/recent-persons"
+import { RecentCustomers } from "@/components/dashboard/recent-customers"
 import { prisma } from "@/lib/prisma"
 import { unstable_cache } from "next/cache"
 import { toDisplayUrl } from "@/lib/utils/image-paths"
@@ -14,15 +14,15 @@ const getDashboardData = unstable_cache(
         // Optimize: Run all queries in parallel using Promise.all
         const [
             productCount,
-            personCount,
-            activePersonCount,
+            customerCount,
+            activeCustomerCount,
             unavailableProductCount,
             recentProducts,
-            recentPersons
+            recentCustomers
         ] = await Promise.all([
             prisma.product.count(),
-            prisma.person.count(),
-            prisma.person.count({ where: { isActive: true } }),
+            prisma.customer.count(),
+            prisma.customer.count({ where: { isActive: true } }),
             prisma.product.count({ where: { isAvailable: false } }),
             // Get recent products (last 5)
             prisma.product.findMany({
@@ -36,8 +36,8 @@ const getDashboardData = unstable_cache(
                     },
                 },
             }),
-            // Get recent persons (last 5) - with personType and contacts
-            prisma.person.findMany({
+            // Get recent customers (last 5) - with customerType and contacts
+            prisma.customer.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 select: {
@@ -56,8 +56,8 @@ const getDashboardData = unstable_cache(
         return {
             stats: {
                 productCount,
-                personCount,
-                activePersonCount,
+                customerCount,
+                activeCustomerCount,
                 unavailableProductCount
             },
             recentProducts: recentProducts.map((p: any) => ({
@@ -72,7 +72,7 @@ const getDashboardData = unstable_cache(
                     currencySymbol: pp.currency.symbol,
                 })),
             })),
-            recentPersons,
+            recentCustomers,
             activityData
         }
     },
@@ -100,18 +100,18 @@ async function generateActivityData() {
     // Execute all count queries in parallel
     const results = await Promise.all(
         dateRanges.map(async ({ date, nextDate }) => {
-            const [products, persons] = await Promise.all([
+            const [products, customers] = await Promise.all([
                 prisma.product.count({
                     where: { createdAt: { gte: date, lt: nextDate } }
                 }),
-                prisma.person.count({
+                prisma.customer.count({
                     where: { createdAt: { gte: date, lt: nextDate } }
                 })
             ])
             return {
                 date: date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
                 products,
-                persons
+                customers
             }
         })
     )
@@ -127,12 +127,12 @@ export default async function DashboardPage() {
     ])
     
     const userName = userRes.success && userRes.data ? userRes.data.name : ""
-    const { stats, recentProducts, recentPersons, activityData } = dashboardData
+    const { stats, recentProducts, recentCustomers, activityData } = dashboardData
 
     const statCardsData = [
         { title: "عدد المنتجات", value: stats.productCount, iconName: "package" as const, desc: "منتج متوفر في المخزون", color: "indigo" as const },
-        { title: "إجمالي الأشخاص", value: stats.personCount, iconName: "users" as const, desc: "شخص مسجل حالياً", color: "blue" as const },
-        { title: "الأشخاص النشطون", value: stats.activePersonCount, iconName: "trending-up" as const, desc: "شخص نشط", color: "green" as const },
+        { title: "إجمالي العملاء", value: stats.customerCount, iconName: "users" as const, desc: "عميل مسجل حالياً", color: "blue" as const },
+        { title: "العملاء النشطون", value: stats.activeCustomerCount, iconName: "trending-up" as const, desc: "عميل نشط", color: "green" as const },
         { title: "منتجات غير متوفرة", value: stats.unavailableProductCount, iconName: "alert-circle" as const, desc: "منتج غير متاح حالياً", color: "orange" as const },
     ]
 
@@ -172,7 +172,7 @@ export default async function DashboardPage() {
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '500ms', animationFillMode: 'both' }}>
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-6">
                     <RecentProducts products={recentProducts as any} />
-                    <RecentPersons persons={recentPersons as any} />
+                    <RecentCustomers customers={recentCustomers as any} />
                 </div>
             </div>
         </div>

@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LaunchSummary {
-    personCount:          number
+    customerCount:          number
     productCount?:        number
     messagesPerMinute?:   number
     delayBetweenSeconds?: number
@@ -80,7 +80,7 @@ export function LaunchConfirmDialog({
     }
 
     const {
-        personCount,
+        customerCount,
         productCount = 0,
         messagesPerMinute = 0,
         delayBetweenSeconds = 0,
@@ -111,8 +111,8 @@ export function LaunchConfirmDialog({
                 {/* Summary */}
                 <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-1 divide-y divide-border/20 my-1">
                     <SummaryRow
-                        icon={Users} label="عدد الأشخاص" color="text-primary"
-                        value={<span className="text-primary">{personCount.toLocaleString("ar")} شخص</span>}
+                        icon={Users} label="عدد العملاء" color="text-primary"
+                        value={<span className="text-primary">{customerCount.toLocaleString("ar")} عميل</span>}
                     />
                     {productCount > 0 && (
                         <SummaryRow
@@ -162,9 +162,9 @@ export function LaunchConfirmDialog({
                 )}
 
                 {/* Large audience note */}
-                {personCount >= 500 && (
+                {customerCount >= 500 && (
                     <p className="text-[11px] text-muted-foreground text-center">
-                        💡 سيتم إعداد <strong>{personCount.toLocaleString("ar")}</strong> رسالة في قاعدة البيانات قبل الإرسال — قد يستغرق الإعداد بضع ثوانٍ
+                        💡 سيتم إعداد <strong>{customerCount.toLocaleString("ar")}</strong> رسالة في قاعدة البيانات قبل الإرسال — قد يستغرق الإعداد بضع ثوانٍ
                     </p>
                 )}
 

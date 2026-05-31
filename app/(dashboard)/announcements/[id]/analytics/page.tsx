@@ -148,8 +148,8 @@ export default function AnnouncementAnalyticsPage() {
             if (logsRes.success) {
                 const allItems = ((logsRes.data as any)?.messages ?? []).map((m: any) => ({
                     id:           m.id,
-                    personId:     m.personId,
-                    personName:   m.personName,
+                    customerId:     m.customerId,
+                    customerName:   m.customerName,
                     whatsapp:     m.whatsappNumber,
                     status:       m.status,
                     failReason:   m.errorReason,
@@ -160,8 +160,8 @@ export default function AnnouncementAnalyticsPage() {
                 const failedItems = allItems.filter((r: any) => r.status === "failed")
                 const map = new Map<string, { name: string; count: number; reason: string }>()
                 for (const r of failedItems) {
-                    const key = r.whatsapp ?? r.personId ?? "?"
-                    if (!map.has(key)) map.set(key, { name: r.personName ?? "—", count: 0, reason: r.failReason ?? "—" })
+                    const key = r.whatsapp ?? r.customerId ?? "?"
+                    if (!map.has(key)) map.set(key, { name: r.customerName ?? "—", count: 0, reason: r.failReason ?? "—" })
                     map.get(key)!.count++
                 }
                 setTopFail(Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 10))

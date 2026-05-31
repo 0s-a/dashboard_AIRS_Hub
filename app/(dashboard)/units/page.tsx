@@ -43,8 +43,6 @@ export default function UnitsPage() {
         loadUnits()
     }
 
-    const activeCount = units.filter(u => u.isActive).length
-
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -71,7 +69,7 @@ export default function UnitsPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 <div className="glass-panel rounded-xl p-6 border border-border/50">
                     <div className="flex items-center justify-between">
                         <div>
@@ -80,18 +78,6 @@ export default function UnitsPage() {
                         </div>
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
                             <Package className="size-6 text-primary" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="glass-panel rounded-xl p-6 border border-border/50">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">الوحدات النشطة</p>
-                            <h3 className="text-3xl font-bold mt-2">{activeCount}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                            <CheckCircle2 className="size-6 text-green-500" />
                         </div>
                     </div>
                 </div>

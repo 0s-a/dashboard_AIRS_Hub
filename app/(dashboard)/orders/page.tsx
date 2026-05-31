@@ -1,16 +1,17 @@
 import { OrderSheet } from "@/components/orders/order-sheet"
 import { OrdersTable } from "@/components/orders/orders-table"
-import { getOrders } from "@/lib/actions/orders"
-import { getPersons } from "@/lib/actions/persons"
+import { getOrders, getOrderStats } from "@/lib/actions/orders"
+import { getCustomers } from "@/lib/actions/customers"
 import { prisma } from "@/lib/prisma"
 import { ShoppingCart, Clock, CheckCircle2, XCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
 export default async function OrdersPage() {
-    const [ordersRes, personsRes, products] = await Promise.all([
-        getOrders(),
-        getPersons(),
+    const [ordersRes, statsRes, customersRes, products] = await Promise.all([
+        getOrders({ page: 1, limit: 100 }),
+        getOrderStats(),
+        getCustomers(),
         prisma.product.findMany({
             select: { id: true, name: true, itemNumber: true },
             orderBy: { name: "asc" },
@@ -18,20 +19,21 @@ export default async function OrdersPage() {
     ])
 
     // Serialize to remove Decimal objects before passing to Client Components
-    const orders = JSON.parse(JSON.stringify(ordersRes.success ? ordersRes.data : []))
-    const persons = JSON.parse(JSON.stringify(personsRes.success ? personsRes.data : []))
+    const orders = JSON.parse(JSON.stringify(
+        ordersRes.success ? ordersRes.data.data : []
+    ))
+    const customers = JSON.parse(JSON.stringify(
+        customersRes.success ? customersRes.data.customers : []
+    ))
 
-    // ── Stats ──
-    const total = orders.length
-    const pending = orders.filter((o: any) => o.status === "pending").length
-    const delivered = orders.filter((o: any) => o.status === "delivered").length
-    const cancelled = orders.filter((o: any) => o.status === "cancelled").length
+    // ── Stats — computed at database level ──
+    const s = statsRes.success ? statsRes.data : { total: 0, pending: 0, delivered: 0, cancelled: 0 }
 
     const stats = [
-        { label: "إجمالي الطلبات", value: total, icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-500/10" },
-        { label: "معلقة", value: pending, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-500/10" },
-        { label: "مسلّمة", value: delivered, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-        { label: "ملغاة", value: cancelled, icon: XCircle, color: "text-red-600", bg: "bg-red-500/10" },
+        { label: "إجمالي الطلبات", value: s.total, icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-500/10" },
+        { label: "معلقة", value: s.pending, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-500/10" },
+        { label: "مسلّمة", value: s.delivered, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+        { label: "ملغاة", value: s.cancelled, icon: XCircle, color: "text-red-600", bg: "bg-red-500/10" },
     ]
 
     return (
@@ -47,7 +49,7 @@ export default async function OrdersPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <OrderSheet persons={persons} products={products} />
+                    <OrderSheet customers={customers} products={products} />
                 </div>
             </div>
 
@@ -71,7 +73,7 @@ export default async function OrdersPage() {
 
             {/* Table */}
             <main className="rounded-2xl border bg-card shadow-sm overflow-hidden p-1">
-                <OrdersTable orders={orders} persons={persons} products={products} />
+                <OrdersTable orders={orders} customers={customers} products={products} />
             </main>
         </div>
     )

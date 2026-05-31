@@ -76,12 +76,12 @@ export function AnnouncementCard({ announcement: ann, onRefresh, compact = false
     const router = useRouter()
     const cfg = STATUS_CONFIG[ann.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending
 
-    const pFilters = ann.personFilters as any
+    const pFilters = ann.customerFilters as any
     const rFilters = ann.productFilters as any
-    const personLabel = pFilters?.all
+    const customerLabel = pFilters?.all
         ? "الكل"
         : pFilters?.manualIds?.length > 0
-            ? `${pFilters.manualIds.length} شخص`
+            ? `${pFilters.manualIds.length} عميل`
             : "فلتر"
     const productLabel = rFilters?.all
         ? "الكل"
@@ -164,7 +164,7 @@ export function AnnouncementCard({ announcement: ann, onRefresh, compact = false
 
                 {/* Stats */}
                 <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                    <span className="flex items-center gap-1"><Users className="size-3.5" />{personLabel}</span>
+                    <span className="flex items-center gap-1"><Users className="size-3.5" />{customerLabel}</span>
                     <span className="flex items-center gap-1"><Package className="size-3.5" />{productLabel}</span>
                     {hasPct && (
                         <span className="flex items-center gap-1 text-emerald-600 font-bold">
@@ -242,8 +242,8 @@ export function AnnouncementCard({ announcement: ann, onRefresh, compact = false
                 </div>
                 <div className="flex flex-col gap-1 bg-primary/5 rounded-xl p-2.5">
                     <Users className="size-3.5 text-primary" />
-                    <span className="text-[10px] text-muted-foreground">الأشخاص</span>
-                    <span className="text-xs font-bold text-primary">{personLabel}</span>
+                    <span className="text-[10px] text-muted-foreground">العملاء</span>
+                    <span className="text-xs font-bold text-primary">{customerLabel}</span>
                 </div>
                 <div className="flex flex-col gap-1 bg-indigo-500/5 rounded-xl p-2.5">
                     <Package className="size-3.5 text-indigo-500" />
@@ -265,7 +265,7 @@ export function AnnouncementCard({ announcement: ann, onRefresh, compact = false
                 <div className="mb-3 space-y-1">
                     <div className="flex justify-between text-[10px] font-bold">
                         <span className="text-emerald-600 flex items-center gap-1">
-                            <CheckCircle2 className="size-3" /> {success} شخص
+                            <CheckCircle2 className="size-3" /> {success} عميل
                         </span>
                         <span className="text-muted-foreground">{pct}% نجاح</span>
                     </div>

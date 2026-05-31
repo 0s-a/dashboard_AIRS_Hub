@@ -15,6 +15,8 @@ import {
     Ruler,
     Sparkles,
     Bookmark,
+    ShieldCheck,
+    MessageSquare,
     LucideIcon
 } from "lucide-react"
 
@@ -42,7 +44,7 @@ export const navigationGroups: NavigationGroup[] = [
     {
         title: "المبيعات والمخزون",
         items: [
-            { href: "/orders", label: "الطلبات", icon: ShoppingCart, disabled: true },
+            { href: "/orders", label: "الطلبات", icon: ShoppingCart},
             { href: "/inventory",  label: "المخزون",     icon: Package  },
             { href: "/categories", label: "التصنيفات",  icon: Layers   },
             { href: "/brands",     label: "البراندات",   icon: Bookmark },
@@ -50,10 +52,11 @@ export const navigationGroups: NavigationGroup[] = [
         ]
     },
     {
-        title: "العملاء والشركاء",
+        title: "العملاء والمشرفون",
         items: [
-            { href: "/persons", label: "الأشخاص", icon: Users },
-            { href: "/persons/archived", label: "الأرشيف", icon: UserCog },
+            { href: "/customers", label: "العملاء", icon: Users },
+            { href: "/supervisors", label: "المشرفون", icon: ShieldCheck },
+            { href: "/whatsapp-groups", label: "مجموعات الواتساب", icon: MessageSquare },
         ]
     },
     {

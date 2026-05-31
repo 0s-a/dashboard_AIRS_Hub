@@ -1,7 +1,6 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { 
     DropdownMenu, 
@@ -39,7 +38,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Actions Cell ─────────────────────────────────────────────────────────────
 
-function ActionsCell({ row, persons, products }: { row: any, persons: any[], products: any[] }) {
+function ActionsCell({ row, customers, products }: { row: any, customers: any[], products: any[] }) {
     const order = row.original
 
     async function handleDelete() {
@@ -60,7 +59,7 @@ function ActionsCell({ row, persons, products }: { row: any, persons: any[], pro
             <OrderSheet
                 mode="edit"
                 order={order}
-                persons={persons}
+                customers={customers}
                 products={products}
                 trigger={
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-primary/10 hover:text-primary">
@@ -94,16 +93,14 @@ function ActionsCell({ row, persons, products }: { row: any, persons: any[], pro
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
 
-export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>[] {
+export function getOrderColumns(customers: any[], products: any[]): ColumnDef<any>[] {
     return [
         {
             accessorKey: "orderNumber",
-            enableColumnFilter: true,
-            meta: { filterType: 'text' as const, filterPlaceholder: 'رقم الطلب...' },
             header: "رقم الطلب",
-            size: 120,
-            minSize: 100,
-            maxSize: 150,
+            size: 110,
+            minSize: 90,
+            maxSize: 130,
             cell: ({ row }) => (
                 <span className="font-mono font-bold text-primary text-sm">
                     #{row.original.orderNumber}
@@ -111,38 +108,24 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
             ),
         },
         {
-            accessorKey: "person",
-            enableColumnFilter: true,
-            meta: { filterType: 'text' as const, filterPlaceholder: 'اسم الشخص...' },
-            filterFn: (row: any, _columnId: string, filterValue: string) => {
-                return row.original.person?.name?.toLowerCase().includes(filterValue.toLowerCase()) ?? false
-            },
-            header: "الشخص",
-            size: 180,
-            minSize: 140,
-            maxSize: 230,
+            accessorKey: "customer",
+            header: "العميل",
+            size: 170,
+            minSize: 130,
+            maxSize: 220,
             cell: ({ row }) => (
                 <span className="text-sm font-medium">
-                    {row.original.person?.name ?? <span className="text-muted-foreground">—</span>}
+                    {row.original.customer?.name ?? <span className="text-muted-foreground">—</span>}
                 </span>
             ),
         },
         {
             accessorKey: "items",
-            enableColumnFilter: true,
-            meta: { filterType: 'text' as const, filterPlaceholder: 'اسم المنتج...' },
-            filterFn: (row: any, _columnId: string, filterValue: string) => {
-                const items = row.original.items ?? []
-                const search = filterValue.toLowerCase()
-                return items.some((item: any) =>
-                    item.product?.name?.toLowerCase().includes(search) ||
-                    item.variant?.name?.toLowerCase().includes(search)
-                )
-            },
             header: "المنتجات",
-            size: 250,
+            size: 260,
             minSize: 200,
-            maxSize: 320,
+            maxSize: 340,
+            enableSorting: false,
             cell: ({ row }) => {
                 const items = row.original.items ?? []
                 if (items.length === 0) return <span className="text-muted-foreground text-sm">—</span>
@@ -151,53 +134,41 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
                 const extraCount = items.length - visibleItems.length
 
                 return (
-                    <div className="flex flex-col gap-0.5 text-xs">
-                        <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5">
-                            {visibleItems.map((item: any, i: number) => (
-                                <span key={i} className="flex items-center gap-1">
-                                    {i > 0 && <span className="text-muted-foreground/30">·</span>}
-                                    {item.variant?.hex && (
-                                        <span
-                                            className="size-2 rounded-full border border-black/10 shrink-0"
-                                            style={{ backgroundColor: item.variant.hex }}
-                                        />
+                    <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-xs">
+                        {visibleItems.map((item: any, i: number) => (
+                            <span key={i} className="flex items-center gap-1">
+                                {i > 0 && <span className="text-muted-foreground/30">·</span>}
+                                {item.variant?.hex && (
+                                    <span
+                                        className="size-2 rounded-full border border-black/10 shrink-0"
+                                        style={{ backgroundColor: item.variant.hex }}
+                                    />
+                                )}
+                                <span className="text-foreground/80 truncate max-w-[130px]">
+                                    {item.product?.name ?? '—'}
+                                    {item.variant?.name && (
+                                        <span className="text-muted-foreground/60 text-[10px]"> ({item.variant.name})</span>
                                     )}
-                                    <span className="text-foreground/80 truncate max-w-[130px]">
-                                        {item.product?.name ?? '—'}
-                                        {item.variant?.name && (
-                                            <span className="text-muted-foreground/60 text-[10px]"> ({item.variant.name})</span>
-                                        )}
-                                    </span>
-                                    <span className="text-foreground font-semibold shrink-0">×{item.quantity}</span>
                                 </span>
-                            ))}
-                            {extraCount > 0 && (
-                                <span className="text-primary font-semibold text-[10px]">+{extraCount}</span>
-                            )}
-                        </div>
+                                <span className="text-foreground font-semibold shrink-0">×{item.quantity}</span>
+                            </span>
+                        ))}
+                        {extraCount > 0 && (
+                            <span className="text-primary font-semibold text-[10px]">+{extraCount}</span>
+                        )}
                     </div>
                 )
             },
         },
         {
             accessorKey: "totalAmount",
-            enableColumnFilter: true,
-            meta: { filterType: 'number-range' as const },
-            filterFn: (row: any, _columnId: string, filterValue: any) => {
-                const amount = row.original.totalAmount
-                if (amount == null) return false
-                if (filterValue.min && amount < Number(filterValue.min)) return false
-                if (filterValue.max && amount > Number(filterValue.max)) return false
-                return true
-            },
             header: "الإجمالي",
-            size: 150,
-            minSize: 120,
-            maxSize: 180,
+            size: 130,
+            minSize: 100,
+            maxSize: 160,
             cell: ({ row }) => {
                 const order = row.original
                 const amount = order.totalAmount
-                // determine currency from first item
                 const firstItem = order.items?.[0]
                 const symbol = firstItem?.currency?.symbol ?? ""
                 if (amount == null) return <span className="text-muted-foreground">—</span>
@@ -219,26 +190,17 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
                 return row.original.status === filterValue
             },
             header: "الحالة",
-            size: 150,
-            minSize: 130,
-            maxSize: 180,
+            size: 140,
+            minSize: 120,
+            maxSize: 170,
             cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
         {
             accessorKey: "createdAt",
-            enableColumnFilter: true,
-            meta: { filterType: 'date-range' as const },
-            filterFn: (row: any, _columnId: string, filterValue: any) => {
-                const date = new Date(row.original.createdAt)
-                const d = date.toISOString().split('T')[0]
-                if (filterValue.from && d < filterValue.from) return false
-                if (filterValue.to && d > filterValue.to) return false
-                return true
-            },
             header: "التاريخ",
-            size: 140,
-            minSize: 120,
-            maxSize: 170,
+            size: 120,
+            minSize: 100,
+            maxSize: 150,
             cell: ({ row }) => {
                 const d = new Date(row.original.createdAt)
                 return (
@@ -252,8 +214,9 @@ export function getOrderColumns(persons: any[], products: any[]): ColumnDef<any>
             id: "actions",
             enableColumnFilter: false,
             header: "",
+            size: 100,
             cell: ({ row }) => (
-                <ActionsCell row={row} persons={persons} products={products} />
+                <ActionsCell row={row} customers={customers} products={products} />
             ),
         },
     ]

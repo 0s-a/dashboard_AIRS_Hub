@@ -8,7 +8,7 @@
  * Orchestrates the full announcement send pipeline:
  *   1. Validate announcement state
  *   2. Fetch template + product payloads
- *   3. Stream persons in batches → render personalised messages → upsert DB records
+ *   3. Stream customers in batches → render personalised messages → upsert DB records
  *   4. Publish all records to RabbitMQ in parallel
  */
 
@@ -17,25 +17,25 @@ import { requireAdmin }               from '@/lib/auth-utils'
 import { publishBatch, createAnnouncementChannel } from '@/lib/utils/rabbitmq'
 import { renderMessage, extractWhatsappNumber } from '@/lib/utils/message-builder'
 import { convertUrlsToBase64 } from './base64-helper'
-import type { ThrottleConfig, PersonPayload } from '@/lib/types/announcements'
+import type { ThrottleConfig, CustomerPayload } from '@/lib/types/announcements'
 import type { QueueMessagePayload }   from '@/lib/utils/rabbitmq'
 import {
     dbGetAnnouncement,
     dbSetAnnouncementStatus,
     dbGetRenderableTemplate,
     dbGetProductPayloads,
-    dbGetPersonIds,
+    dbGetCustomerIds,
     dbUpsertMessage,
 } from './queries'
 import {
-    streamPersons,
+    streamCustomers,
 } from './queries'
 import {
     ANNOUNCEMENTS_PATH,
     BATCH_SIZE,
     ALREADY_PROCESSED_STATUSES,
 } from './types'
-import type { PersonFilters, ProductFilters } from '@/lib/types/announcements'
+import type { CustomerFilters, ProductFilters } from '@/lib/types/announcements'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ function buildThrottle(ann: {
 /**
  * Full announcement send pipeline.
  *
- * - Resolves audience via streaming (safe for 100k+ persons)
+ * - Resolves audience via streaming (safe for 100k+ customers)
  * - Renders personalised messages using the saved template
  * - Upserts AnnouncementMessage records (idempotent)
  * - Publishes to RabbitMQ with concurrency-50 batching
@@ -78,20 +78,20 @@ export async function executeAnnouncementToQueue(id: string) {
 
         await dbSetAnnouncementStatus(id, 'queueing', { queueingProgress: 0 })
 
-        const personFilters  = ann.personFilters  as PersonFilters
+        const customerFilters  = ann.personFilters  as CustomerFilters
         const productFilters = ann.productFilters as ProductFilters
 
-        // ── 1. Resolve person IDs (lightweight count pass) ────────────────────
-        const resolvedPersonIds = await dbGetPersonIds(
-            personFilters, personFilters.manualIds ?? []
+        // ── 1. Resolve customer IDs (lightweight count pass) ────────────────────
+        const resolvedCustomerIds = await dbGetCustomerIds(
+            customerFilters, customerFilters.manualIds ?? []
         )
 
-        if (resolvedPersonIds.length === 0) {
+        if (resolvedCustomerIds.length === 0) {
             await dbSetAnnouncementStatus(id, 'failed', { queueingProgress: 0 })
-            throw new Error('لا يوجد أشخاص في الجمهور المحدد')
+            throw new Error('لا يوجد عملاء في الجمهور المحدد')
         }
 
-        // ── 2. Fetch template + products (shared across all persons) ──────────
+        // ── 2. Fetch template + products (shared across all customers) ──────────
         const [template, productPayloads] = await Promise.all([
             dbGetRenderableTemplate(ann.templateId),
             dbGetProductPayloads(productFilters, productFilters.manualIds ?? []),
@@ -99,22 +99,22 @@ export async function executeAnnouncementToQueue(id: string) {
 
         const resolvedProductIds = productPayloads.map(p => p.id)
         const throttle           = buildThrottle(ann)
-        const totalMessages      = resolvedPersonIds.length
+        const totalMessages      = resolvedCustomerIds.length
         const mqMessages: Array<{ payload: QueueMessagePayload; whatsappNumber: string | null }> = []
 
-        // ── 3. Stream persons → render → upsert ───────────────────────────────
+        // ── 3. Stream customers → render → upsert ───────────────────────────────
         let processed = 0
-        for await (const personChunk of streamPersons(personFilters, personFilters.manualIds ?? [], BATCH_SIZE)) {
+        for await (const customerChunk of streamCustomers(customerFilters, customerFilters.manualIds ?? [], BATCH_SIZE)) {
             const messageRecords = await Promise.all(
-                personChunk.map(async (person: PersonPayload, idx: number) => {
-                    const rendered       = renderMessage(template, person, productPayloads)
-                    const whatsappNumber = extractWhatsappNumber(person)
+                customerChunk.map(async (customer: CustomerPayload, idx: number) => {
+                    const rendered       = renderMessage(template, customer, productPayloads)
+                    const whatsappNumber = extractWhatsappNumber(customer)
 
                     return dbUpsertMessage({
                         announcementId: id,
                         messageIndex:   processed + idx + 1,
-                        personId:       person.id,
-                        personName:     person.name,
+                        customerId:       customer.id,
+                        customerName:     customer.name,
                         whatsappNumber,
                         productIds:     resolvedProductIds,
                         messageBody:    rendered.messageBody,
@@ -124,8 +124,8 @@ export async function executeAnnouncementToQueue(id: string) {
             )
 
             // Build RabbitMQ payloads from the upserted records
-            for (let j = 0; j < personChunk.length; j++) {
-                const person = personChunk[j]
+            for (let j = 0; j < customerChunk.length; j++) {
+                const customer = customerChunk[j]
                 const msg    = messageRecords[j]
 
                 mqMessages.push({
@@ -136,10 +136,8 @@ export async function executeAnnouncementToQueue(id: string) {
                         totalMessages,
                         retryCount:     0,
                         rendered: {
-                            personName:   person.name,
-                            personId:     person.id,
-                            groupName:    person.groupName,
-                            groupNumber:  person.groupNumber,
+                            customerName:   customer.name,
+                            customerId:     customer.id,
                             messageBody:  msg.messageBody,
                             imageUrls:    convertUrlsToBase64(msg.imageUrls as string[]),
                             templateType: (template.type === 'text_image' && Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0) ? 'text_image' : 'text',
@@ -150,7 +148,7 @@ export async function executeAnnouncementToQueue(id: string) {
                 })
             }
 
-            processed += personChunk.length
+            processed += customerChunk.length
 
             // Update progress after each chunk
             const pct = Math.round((processed / totalMessages) * 100)

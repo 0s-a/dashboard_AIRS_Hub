@@ -7,7 +7,7 @@ import { TrendingUp } from "lucide-react"
 interface ActivityData {
     date: string
     products: number
-    persons: number
+    customers: number
 }
 
 interface ActivityChartProps {
@@ -128,12 +128,12 @@ export function ActivityChart({ data }: ActivityChartProps) {
                         />
                         <Area
                             type="monotone"
-                            dataKey="persons"
+                            dataKey="customers"
                             stroke="#10b981"
                             strokeWidth={2.5}
                             fillOpacity={1}
                             fill="url(#colorCustomers)"
-                            name="الأشخاص"
+                            name="العملاء"
                             dot={false}
                             activeDot={{
                                 r: 6,

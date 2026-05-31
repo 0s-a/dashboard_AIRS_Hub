@@ -19,6 +19,8 @@ import { createCategory, updateCategory } from "@/lib/actions/categories"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Category } from "@prisma/client"
+import { Loader2, FolderTree, Tag, Info, List, Component } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
 const formSchema = z.object({
     code: z
@@ -74,95 +76,121 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-6 relative">
+                <Card className="border-border/50 shadow-sm hover:border-primary/20 transition-all duration-300">
+                    <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
+                        <div className="flex items-center gap-2">
+                            <FolderTree className="w-5 h-5 text-primary" />
+                            <CardTitle className="text-lg">بيانات التصنيف</CardTitle>
+                        </div>
+                        <CardDescription>إدارة معلومات تصنيفات المنتجات</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6 pt-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Code */}
+                            <FormField
+                                control={form.control}
+                                name="code"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" />كود التصنيف *</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="مثال: ELC"
+                                                maxLength={3}
+                                                className="font-mono uppercase tracking-widest text-center text-lg w-full md:w-32 focus-visible:ring-primary/20"
+                                                {...field}
+                                                onChange={(e) =>
+                                                    field.onChange(e.target.value.toUpperCase())
+                                                }
+                                            />
+                                        </FormControl>
+                                        <FormDescription className="text-xs">
+                                            3 أحرف إنجليزية أو أرقام
+                                        </FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                {/* Code — الحقل الأول والأهم */}
-                <FormField
-                    control={form.control}
-                    name="code"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>كود التصنيف *</FormLabel>
-                            <FormControl>
-                                <Input
-                                    placeholder="مثال: ELC"
-                                    maxLength={3}
-                                    className="font-mono uppercase tracking-widest text-center text-lg w-28"
-                                    {...field}
-                                    onChange={(e) =>
-                                        field.onChange(e.target.value.toUpperCase())
-                                    }
-                                />
-                            </FormControl>
-                            <FormDescription className="text-xs">
-                                3 أحرف إنجليزية أو أرقام — مثال: ELC، A12، MOB
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                            {/* Name */}
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-1.5"><List className="w-3.5 h-3.5" />اسم التصنيف *</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="مثال: إلكترونيات..." className="focus-visible:ring-primary/20" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
-                {/* Name */}
-                <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>اسم التصنيف *</FormLabel>
-                            <FormControl>
-                                <Input placeholder="مثال: إلكترونيات..." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                        {/* Icon - Replaced emoji with simple text/icon reference */}
+                        <FormField
+                            control={form.control}
+                            name="icon"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5"><Component className="w-3.5 h-3.5" />الأيقونة/الرمز</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            placeholder="اكتب اسم أيقونة (مثال: laptop, phone)..."
+                                            className="focus-visible:ring-primary/20"
+                                            {...field}
+                                            value={field.value || ""}
+                                        />
+                                    </FormControl>
+                                    <FormDescription className="text-xs">
+                                        يستخدم لعرض أيقونة مميزة للتصنيف
+                                    </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                {/* Icon */}
-                <FormField
-                    control={form.control}
-                    name="icon"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>الأيقونة/الرمز</FormLabel>
-                            <FormControl>
-                                <Input
-                                    placeholder="📱 أو emoji..."
-                                    {...field}
-                                    value={field.value || ""}
-                                />
-                            </FormControl>
-                            <FormDescription className="text-xs">
-                                يمكنك استخدام emoji أو نص
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                        {/* Description */}
+                        <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5"><Info className="w-3.5 h-3.5" />الوصف</FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder="وصف تفصيلي للتصنيف..."
+                                            {...field}
+                                            value={field.value || ""}
+                                            className="resize-none focus-visible:ring-primary/20"
+                                            rows={3}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
 
-                {/* Description */}
-                <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>الوصف</FormLabel>
-                            <FormControl>
-                                <Textarea
-                                    placeholder="وصف تفصيلي للتصنيف..."
-                                    {...field}
-                                    value={field.value || ""}
-                                    className="resize-none"
-                                    rows={3}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <Button type="submit" className="w-full">
-                    {category ? "حفظ التعديلات" : "إضافة تصنيف جديد"}
-                </Button>
+                {/* Sticky Action Bar */}
+                <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background border-t border-border/50">
+                    <div className="flex items-center justify-end w-full">
+                        <Button 
+                            type="submit" 
+                            disabled={form.formState.isSubmitting}
+                            className="w-full h-11 bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md transition-all duration-300"
+                        >
+                            {form.formState.isSubmitting ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> جاري الحفظ...</>
+                            ) : (
+                                category ? "حفظ التعديلات" : "إضافة تصنيف جديد"
+                            )}
+                        </Button>
+                    </div>
+                </div>
             </form>
         </Form>
     )

@@ -1,15 +1,15 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { Person } from "@prisma/client"
+import { Customer } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit, Mail, Phone, MessageCircle, Copy, ExternalLink, Crown, Star, User, Building, Sparkles, ShieldCheck, MoreHorizontal, UserCheck, UserX, AlertTriangle, Power, Wallet, Coins, UsersRound } from "lucide-react"
-import { softDeletePerson, hardDeletePerson, togglePersonActive } from "@/lib/actions/persons"
-import { ContactRecord } from "@/lib/person-types"
+import { hardDeleteCustomer, toggleCustomerActive } from "@/lib/actions/customers"
+import { ContactRecord } from "@/lib/customer-types"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { PersonSheet } from "@/components/persons/person-sheet"
+import { CustomerSheet } from "@/components/customers/customer-sheet"
 import {
     Tooltip,
     TooltipContent,
@@ -49,9 +49,9 @@ const formatPhoneNumber = (phone: string) => {
 }
 
 // Helper to extract contacts from relation
-function getContacts(person: any): ContactRecord[] {
-    if (!person.contacts || !Array.isArray(person.contacts)) return []
-    return person.contacts as ContactRecord[]
+function getContacts(customer: any): ContactRecord[] {
+    if (!customer.contacts || !Array.isArray(customer.contacts)) return []
+    return customer.contacts as ContactRecord[]
 }
 
 function getContactsByType(contacts: ContactRecord[], type: string): ContactRecord[] {
@@ -88,13 +88,13 @@ function copyToClipboard(text: string) {
     toast.success('تم النسخ', { duration: 1500 })
 }
 
-export const columns: ColumnDef<Person>[] = [
+export const columns: ColumnDef<Customer>[] = [
     // ──────────────────────────────────────
-    // Column 1: Person Name + Avatar
+    // Column 1: Customer Name + Avatar
     // ──────────────────────────────────────
     {
         accessorKey: "name",
-        header: "الشخص",
+        header: "العميل",
         enableColumnFilter: true,
         meta: { filterType: 'text' as const, filterPlaceholder: 'ابحث بالاسم...' },
         size: 250,
@@ -138,95 +138,43 @@ export const columns: ColumnDef<Person>[] = [
         }
     },
 
+
+
+
+
+
+
     // ──────────────────────────────────────
-    // Column 1.5: Group Name
+    // Column 2.5: نوع العميل (Price Label)
     // ──────────────────────────────────────
     {
-        accessorKey: "groupName",
-        header: "المجموعة",
-        enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'ابحث بالمجموعة...' },
-        size: 160,
-        minSize: 130,
-        maxSize: 210,
-        cell: ({ row }) => {
-            const groupName = (row.original as any).groupName
-            if (!groupName) return <span className="text-muted-foreground text-xs">—</span>
-            return (
-                <div className="flex items-center gap-1.5">
-                    <div className="size-5 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                        <UsersRound className="size-3 text-primary" />
-                    </div>
-                    <span className="text-xs font-medium truncate max-w-[140px]">{groupName}</span>
-                </div>
-            )
-        }
-    },
-
-    // ──────────────────────────────────────
-    // Column 1.6: Group Number
-    // ──────────────────────────────────────
-    {
-        accessorKey: "groupNumber",
-        header: "رقم المجموعة",
-        enableColumnFilter: true,
-        meta: { filterType: 'text' as const },
-        size: 150,
-        minSize: 120,
-        maxSize: 180,
-        cell: ({ row }) => {
-            const groupNumber = (row.original as any).groupNumber
-            if (!groupNumber) return <span className="text-muted-foreground text-xs">—</span>
-            return (
-                <span className="font-mono text-[11px] text-muted-foreground">
-                    {groupNumber}
-                </span>
-            )
-        }
-    },
-
-
-
-    // ──────────────────────────────────────
-    // Column 2.5: Price Labels
-    // ──────────────────────────────────────
-    {
-        id: "priceLabels",
-        accessorFn: (row: any) => row.priceLabels,
-        header: "التسعيرات",
+        id: "priceLabel",
+        accessorFn: (row: any) => row.priceLabel?.name,
+        header: "نوع العميل",
         enableColumnFilter: true,
         meta: {
-            filterType: 'select' as const,
-            filterOptions: [
-                { label: "جملة", value: "جملة" },
-                { label: "مفرق", value: "مفرق" },
-                { label: "خاص", value: "خاص" },
-            ]
+            filterType: 'text' as const,
+            filterPlaceholder: 'بحث بنوع العميل...'
         },
         filterFn: (row: any, _columnId: string, filterValue: string) => {
-            const priceLabels = row.original.priceLabels || []
-            return priceLabels.some((pl: any) => pl.priceLabel?.name?.includes(filterValue))
+            const pl = row.original.priceLabel
+            if (!pl) return false
+            return (
+                pl.name?.toLowerCase().includes(filterValue.toLowerCase()) ||
+                pl.customerType?.toLowerCase().includes(filterValue.toLowerCase())
+            )
         },
         size: 190,
         minSize: 150,
         maxSize: 240,
         cell: ({ row }) => {
-            const priceLabels = (row.original as any).priceLabels || []
-            if (priceLabels.length === 0) return <span className="text-muted-foreground text-xs text-center block">-</span>
-
-            const displayLabels = priceLabels.slice(0, 2)
-            const remaining = priceLabels.length - 2
-
+            const pl = (row.original as any).priceLabel
+            if (!pl) return <span className="text-muted-foreground text-xs text-center block">-</span>
             return (
-                <div className="flex flex-wrap gap-1.5 items-center justify-center max-w-[150px] text-xs text-indigo-700 dark:text-indigo-400 font-medium">
-                    <Wallet className="h-3 w-3 opacity-70" />
-                    <span className="truncate" title={displayLabels.map((pl: any) => pl.priceLabel?.name || "بدون اسم").join("، ")}>
-                        {displayLabels.map((pl: any) => pl.priceLabel?.name || "بدون اسم").join("، ")}
-                    </span>
-                    {remaining > 0 && (
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                            +{remaining}
-                        </span>
+                <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-xs font-medium text-indigo-700 dark:text-indigo-400">{pl.name}</span>
+                    {pl.customerType && (
+                        <span className="text-[10px] text-muted-foreground">{pl.customerType}</span>
                     )}
                 </div>
             )
@@ -314,143 +262,116 @@ export const columns: ColumnDef<Person>[] = [
     },
 
     // ──────────────────────────────────────
-    // Column 3a: Phone
+    // Column 3: معلومات الاتصال
     // ──────────────────────────────────────
     {
-        id: "phone",
+        id: "contacts",
         accessorFn: (row: any) => row.contacts,
-        header: "الهاتف",
+        header: "معلومات الاتصال",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'رقم الهاتف...' },
+        meta: { filterType: 'text' as const, filterPlaceholder: 'بحث في الاتصال...' },
         filterFn: (row: any, _: string, filterValue: string) => {
-            const phones = getContactsByType(getContacts(row.original), 'phone')
-            return phones.some(p => p.value.includes(filterValue))
+            const contacts = getContacts(row.original)
+            return contacts.some(c => c.value.toLowerCase().includes(filterValue.toLowerCase()))
         },
-        size: 190,
-        minSize: 160,
-        maxSize: 220,
+        size: 240,
+        minSize: 200,
+        maxSize: 300,
         cell: ({ row }) => {
-            const phones = getContactsByType(getContacts(row.original), 'phone')
-            if (phones.length === 0) return <span className="text-muted-foreground/40 text-xs">—</span>
-            const primary = phones[0]
-            return (
-                <div className="flex items-center gap-1 group/phone">
-                    <div className="h-5 w-5 rounded-md bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
-                        <Phone className="h-3 w-3 text-blue-600" />
-                    </div>
-                    <a
-                        href={`tel:${primary.value}`}
-                        className="font-mono text-xs font-medium hover:text-blue-600 transition-colors"
-                        dir="ltr"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {formatPhoneNumber(primary.value)}
-                    </a>
-                    {phones.length > 1 && (
-                        <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded shrink-0">+{phones.length - 1}</span>
-                    )}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); copyToClipboard(primary.value) }}
-                        className="opacity-0 group-hover/phone:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0"
-                    >
-                        <Copy className="h-2.5 w-2.5 text-muted-foreground" />
-                    </button>
-                </div>
-            )
-        }
-    },
+            const contacts = getContacts(row.original)
+            const phones = getContactsByType(contacts, 'phone')
+            const whatsapp = getContactsByType(contacts, 'whatsapp')
+            const emails = getContactsByType(contacts, 'email')
 
-    // ──────────────────────────────────────
-    // Column 3b: WhatsApp
-    // ──────────────────────────────────────
-    {
-        id: "whatsapp",
-        accessorFn: (row: any) => row.contacts,
-        header: "واتساب",
-        enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'رقم واتساب...' },
-        filterFn: (row: any, _: string, filterValue: string) => {
-            const wa = getContactsByType(getContacts(row.original), 'whatsapp')
-            return wa.some(p => p.value.includes(filterValue))
-        },
-        size: 170,
-        minSize: 145,
-        maxSize: 210,
-        cell: ({ row }) => {
-            const wa = getContactsByType(getContacts(row.original), 'whatsapp')
-            if (wa.length === 0) return <span className="text-muted-foreground/40 text-xs">—</span>
-            const primary = wa[0]
-            const waLink = `https://wa.me/${primary.value.replace(/\D/g, '').replace(/^0/, '966')}`
-            return (
-                <div className="flex items-center gap-1 group/wa">
-                    <div className="h-5 w-5 rounded-md bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center shrink-0">
-                        <MessageCircle className="h-3 w-3 text-emerald-600" />
-                    </div>
-                    <a
-                        href={waLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-xs font-medium hover:text-emerald-600 transition-colors"
-                        dir="ltr"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {formatPhoneNumber(primary.value)}
-                    </a>
-                    {wa.length > 1 && (
-                        <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded shrink-0">+{wa.length - 1}</span>
-                    )}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); copyToClipboard(primary.value) }}
-                        className="opacity-0 group-hover/wa:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0"
-                    >
-                        <Copy className="h-2.5 w-2.5 text-muted-foreground" />
-                    </button>
-                </div>
-            )
-        }
-    },
+            if (contacts.length === 0) return <span className="text-muted-foreground/40 text-xs">—</span>
 
-    // ──────────────────────────────────────
-    // Column 3c: Email
-    // ──────────────────────────────────────
-    {
-        id: "email",
-        accessorFn: (row: any) => row.contacts,
-        header: "البريد",
-        enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'البريد الإلكتروني...' },
-        filterFn: (row: any, _: string, filterValue: string) => {
-            const emails = getContactsByType(getContacts(row.original), 'email')
-            return emails.some(e => e.value.toLowerCase().includes(filterValue.toLowerCase()))
-        },
-        size: 220,
-        minSize: 180,
-        maxSize: 270,
-        cell: ({ row }) => {
-            const emails = getContactsByType(getContacts(row.original), 'email')
-            if (emails.length === 0) return <span className="text-muted-foreground/40 text-xs">—</span>
-            const primary = emails[0]
             return (
-                <div className="flex items-center gap-1 group/email">
-                    <div className="h-5 w-5 rounded-md bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
-                        <Mail className="h-3 w-3 text-rose-600" />
-                    </div>
-                    <a
-                        href={`mailto:${primary.value}`}
-                        className="text-xs hover:text-rose-600 transition-colors truncate max-w-[170px]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {primary.value}
-                    </a>
-                    {emails.length > 1 && (
-                        <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded shrink-0">+{emails.length - 1}</span>
-                    )}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); copyToClipboard(primary.value) }}
-                        className="opacity-0 group-hover/email:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0"
-                    >
-                        <Copy className="h-2.5 w-2.5 text-muted-foreground" />
-                    </button>
+                <div className="flex flex-col gap-1 py-1">
+                    {/* Phones */}
+                    {phones.map((phone, i) => (
+                        <div key={phone.id || i} className="flex items-center gap-1.5 group/phone text-xs py-0.5">
+                            <a
+                                href={`tel:${phone.value}`}
+                                className="font-mono text-xs font-medium hover:text-blue-600 transition-colors text-muted-foreground hover:text-foreground"
+                                dir="ltr"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {formatPhoneNumber(phone.value)}
+                            </a>
+                            {phone.label && (
+                                <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded shrink-0">
+                                    {phone.label}
+                                </span>
+                            )}
+                            {phone.isPrimary && (
+                                <span className="text-[9px] text-blue-600 bg-blue-500/10 px-1 rounded shrink-0">أساسي</span>
+                            )}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); copyToClipboard(phone.value) }}
+                                className="opacity-0 group-hover/phone:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0"
+                            >
+                                <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+                            </button>
+                        </div>
+                    ))}
+
+                    {/* WhatsApp */}
+                    {whatsapp.map((wa, i) => (
+                        <div key={wa.id || i} className="flex items-center gap-1.5 group/wa text-xs py-0.5">
+                            <a
+                                href={`https://wa.me/${wa.value.replace(/\D/g, '').replace(/^0/, '966')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-xs font-medium hover:text-emerald-600 transition-colors text-muted-foreground hover:text-foreground"
+                                dir="ltr"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {formatPhoneNumber(wa.value)}
+                            </a>
+                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium shrink-0 opacity-80">(واتساب)</span>
+                            {wa.label && (
+                                <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded shrink-0">
+                                    {wa.label}
+                                </span>
+                            )}
+                            {wa.isPrimary && (
+                                <span className="text-[9px] text-emerald-600 bg-emerald-500/10 px-1 rounded shrink-0">أساسي</span>
+                            )}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); copyToClipboard(wa.value) }}
+                                className="opacity-0 group-hover/wa:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0"
+                            >
+                                <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+                            </button>
+                        </div>
+                    ))}
+
+                    {/* Email */}
+                    {emails.map((email, i) => (
+                        <div key={email.id || i} className="flex items-center gap-1.5 group/email text-xs py-0.5">
+                            <a
+                                href={`mailto:${email.value}`}
+                                className="text-xs hover:text-rose-600 transition-colors truncate max-w-[150px] text-muted-foreground hover:text-foreground"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {email.value}
+                            </a>
+                            {email.label && (
+                                <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 rounded shrink-0">
+                                    {email.label}
+                                </span>
+                            )}
+                            {email.isPrimary && (
+                                <span className="text-[9px] text-rose-600 bg-rose-500/10 px-1 rounded shrink-0">أساسي</span>
+                            )}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); copyToClipboard(email.value) }}
+                                className="opacity-0 group-hover/email:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0"
+                            >
+                                <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+                            </button>
+                        </div>
+                    ))}
                 </div>
             )
         }
@@ -499,25 +420,10 @@ export const columns: ColumnDef<Person>[] = [
         minSize: 60,
         maxSize: 80,
         cell: ({ row }) => {
-            const person = row.original
+            const customer = row.original
 
             return (
                 <div className="flex items-center justify-end gap-1">
-                    {/* Status indicator dot */}
-                    <Tooltip delayDuration={300}>
-                        <TooltipProvider>
-                            <TooltipTrigger asChild>
-                                <div className={`h-2.5 w-2.5 rounded-full shrink-0 transition-colors ${person.isActive
-                                    ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]'
-                                    : 'bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.4)]'
-                                    }`} />
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="text-xs">
-                                {person.isActive ? 'نشط' : 'غير نشط'}
-                            </TooltipContent>
-                        </TooltipProvider>
-                    </Tooltip>
-
                     <AlertDialog>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -532,9 +438,9 @@ export const columns: ColumnDef<Person>[] = [
                                 <DropdownMenuSeparator />
 
                                 {/* Edit */}
-                                <PersonSheet
-                                    key={`edit-${person.id}`}
-                                    person={person}
+                                <CustomerSheet
+                                    key={`edit-${customer.id}`}
+                                    customer={customer}
                                     trigger={
                                         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                             <Edit className="h-4 w-4 ml-2 text-blue-500" />
@@ -547,16 +453,16 @@ export const columns: ColumnDef<Person>[] = [
                                 <DropdownMenuItem
                                     onClick={async () => {
                                         toast.promise(
-                                            togglePersonActive(person.id, !person.isActive),
+                                            toggleCustomerActive(customer.id, !customer.isActive),
                                             {
-                                                loading: person.isActive ? 'جاري إلغاء التفعيل...' : 'جاري التفعيل...',
-                                                success: person.isActive ? 'تم إلغاء تفعيل الشخص' : 'تم تفعيل الشخص',
+                                                loading: customer.isActive ? 'جاري إلغاء التفعيل...' : 'جاري التفعيل...',
+                                                success: customer.isActive ? 'تم إلغاء تفعيل العميل' : 'تم تفعيل العميل',
                                                 error: 'فشل تحديث الحالة'
                                             }
                                         )
                                     }}
                                 >
-                                    {person.isActive ? (
+                                    {customer.isActive ? (
                                         <>
                                             <UserX className="h-4 w-4 ml-2 text-amber-500" />
                                             <span>إلغاء التفعيل</span>
@@ -589,7 +495,7 @@ export const columns: ColumnDef<Person>[] = [
                                     تأكيد الحذف النهائي
                                 </AlertDialogTitle>
                                 <AlertDialogDescription className="text-right leading-relaxed">
-                                    هل أنت متأكد من حذف الشخص <strong className="text-foreground">{person.name}</strong> نهائياً؟
+                                    هل أنت متأكد من حذف العميل <strong className="text-foreground">{customer.name}</strong> نهائياً؟
                                     <br />
                                     <span className="text-red-500 font-medium">
                                         هذا الإجراء لا يمكن التراجع عنه وسيتم حذف جميع البيانات المرتبطة.
@@ -601,9 +507,9 @@ export const columns: ColumnDef<Person>[] = [
                                 <AlertDialogAction
                                     className="bg-red-600 hover:bg-red-700 text-white"
                                     onClick={async () => {
-                                        toast.promise(hardDeletePerson(person.id), {
+                                        toast.promise(hardDeleteCustomer(customer.id), {
                                             loading: 'جاري الحذف النهائي...',
-                                            success: 'تم حذف الشخص نهائياً',
+                                            success: 'تم حذف العميل نهائياً',
                                             error: 'فشل الحذف النهائي'
                                         })
                                     }}

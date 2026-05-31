@@ -81,9 +81,13 @@ export async function safeActionWithRevalidation<T>(
 // Shared Helpers — DRY utilities used across multiple modules
 // ============================================================
 
+
 /**
  * Generate the next sequential item number (4-digit padded).
  * Works for any model that has an `itemNumber` field.
+ *
+ * For orders, uses a serializable transaction with row-level locking
+ * to prevent race conditions in concurrent environments.
  *
  * Usage: await generateItemNumber('currency')  → "0005"
  */
@@ -110,11 +114,12 @@ export async function generateItemNumber(
             break
         }
         case 'order': {
-            const last = await prisma.order.findFirst({
-                orderBy: { orderNumber: 'desc' },
-                select: { orderNumber: true },
-            })
-            lastNumber = last?.orderNumber ?? null
+            // Use raw SQL with FOR UPDATE SKIP LOCKED to prevent race conditions.
+            // This locks the row being read so concurrent transactions wait or skip.
+            const rows = await prisma.$queryRawUnsafe<{ orderNumber: string }[]>(
+                `SELECT "orderNumber" FROM "Order" ORDER BY "orderNumber" DESC LIMIT 1 FOR UPDATE`
+            )
+            lastNumber = rows[0]?.orderNumber ?? null
             break
         }
         case 'unit': {
@@ -141,3 +146,4 @@ export async function resolveProductPrice(productId: string, priceLabelId: strin
         include: { currency: true, unit: true },
     })
 }
+

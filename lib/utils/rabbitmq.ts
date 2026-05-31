@@ -1,10 +1,10 @@
 /**
  * lib/utils/rabbitmq.ts
  *
- * RabbitMQ connection manager for the Per-Person announcement system.
+ * RabbitMQ connection manager for the Per-Customer announcement system.
  *
  * Architecture:
- *   Backend is the Source of Truth — each person gets an AnnouncementMessage
+ *   Backend is the Source of Truth — each customer gets an AnnouncementMessage
  *   record created BEFORE publishing to RabbitMQ. The messageId links:
  *     DB (AnnouncementMessage) ↔ RabbitMQ payload ↔ n8n callback
  *
@@ -47,17 +47,17 @@ export const ROUTING_KEYS = {
 //
 // ✅ What's in AMQP headers (routing metadata):
 //   - whatsappNumber → n8n routes the message to this number
-//   - messageId, personId, announcementId  → for idempotency / tracking
+//   - messageId, customerId, announcementId  → for idempotency / tracking
 //   - throttle fields → n8n rate limiter reads these from headers
 
 export interface QueueMessagePayload {
     messageId:      string    // ← UUID from AnnouncementMessage.id (Source of Truth link)
     announcementId: string
-    messageIndex:   number    // 1-based position of this person
-    totalMessages:  number    // Total persons in this campaign
+    messageIndex:   number    // 1-based position of this customer
+    totalMessages:  number    // Total customers in this campaign
     retryCount:     number    // 0 on first attempt; incremented on retry
 
-    rendered:  RenderedMessage   // Ready-to-send content (no raw person/product data)
+    rendered:  RenderedMessage   // Ready-to-send content (no raw customer/product data)
     throttle:  ThrottleConfig
 }
 
@@ -108,7 +108,7 @@ export async function createAnnouncementChannel(): Promise<amqp.ConfirmChannel> 
     return channel
 }
 
-// ─── Publish a single person's message ───────────────────────────────────────
+// ─── Publish a single customer's message ───────────────────────────────────────
 //
 // whatsappNumber comes from the caller (extracted via extractWhatsappNumber())
 // and is placed ONLY in AMQP headers — not in the JSON body.
@@ -133,8 +133,8 @@ export async function publishMessage(
                 headers: {
                     // ── Routing ───────────────────────────────────────────────
                     whatsappNumber:      whatsappNumber ?? '',
-                    personId:            payload.rendered.personId,
-                    groupNumber:         payload.rendered.groupNumber ?? '',
+                    customerId:            payload.rendered.customerId,
+
                     // ── Source of Truth Link ──────────────────────────────────
                     messageId:           payload.messageId,      // ← n8n sends this in callback
                     // ── Tracking ──────────────────────────────────────────────

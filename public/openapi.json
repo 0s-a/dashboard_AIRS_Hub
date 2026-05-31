@@ -185,29 +185,6 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "تم إنشاء شخص جديد",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "action": {
-                      "type": "string",
-                      "example": "created"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Person"
-                    }
-                  }
-                }
-              }
-            }
-          },
           "200": {
             "description": "تم تحديث شخص موجود",
             "content": {
@@ -222,6 +199,29 @@
                     "action": {
                       "type": "string",
                       "example": "updated"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Person"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "تم إنشاء شخص جديد",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "action": {
+                      "type": "string",
+                      "example": "created"
                     },
                     "data": {
                       "$ref": "#/components/schemas/Person"
@@ -307,56 +307,115 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean", "example": true },
-                    "found": { "type": "boolean", "example": true },
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "found": {
+                      "type": "boolean",
+                      "example": true
+                    },
                     "data": {
                       "nullable": true,
                       "oneOf": [
                         {
                           "type": "object",
                           "properties": {
-                            "id": { "type": "string", "format": "uuid" },
-                            "name": { "type": "string", "nullable": true, "example": "محمد علي" },
-                            "isActive": { "type": "boolean", "example": true },
-                            "source": { "type": "string", "nullable": true, "example": "bot" },
-                            "groupName": { "type": "string", "nullable": true },
-                            "groupNumber": { "type": "string", "nullable": true },
-                            "lastInteraction": { "type": "string", "format": "date-time" },
-                            "createdAt": { "type": "string", "format": "date-time" },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "name": {
+                              "type": "string",
+                              "nullable": true,
+                              "example": "محمد علي"
+                            },
+                            "isActive": {
+                              "type": "boolean",
+                              "example": true
+                            },
+                            "source": {
+                              "type": "string",
+                              "nullable": true,
+                              "example": "bot"
+                            },
+                            "groupName": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "groupNumber": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "lastInteraction": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
                             "contacts": {
                               "type": "array",
-                              "items": { "$ref": "#/components/schemas/Contact" }
+                              "items": {
+                                "$ref": "#/components/schemas/Contact"
+                              }
                             },
                             "priceLabels": {
                               "type": "array",
                               "items": {
                                 "type": "object",
                                 "properties": {
-                                  "id": { "type": "string", "format": "uuid" },
-                                  "name": { "type": "string", "example": "تاجر" }
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "example": "تاجر"
+                                  }
                                 }
                               }
                             },
                             "currencies": {
                               "type": "array",
-                              "items": { "$ref": "#/components/schemas/CurrencyFull" }
+                              "items": {
+                                "$ref": "#/components/schemas/CurrencyFull"
+                              }
                             },
                             "tags": {
                               "type": "array",
                               "items": {
                                 "type": "object",
                                 "properties": {
-                                  "id": { "type": "string", "format": "uuid" },
-                                  "name": { "type": "string", "example": "VIP" }
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "example": "VIP"
+                                  }
                                 }
                               }
                             },
                             "stats": {
                               "type": "object",
                               "properties": {
-                                "totalOrders": { "type": "integer", "example": 12 },
-                                "lastOrderAt": { "type": "string", "format": "date-time", "nullable": true },
-                                "lastOrderStatus": { "type": "string", "nullable": true, "example": "delivered" }
+                                "totalOrders": {
+                                  "type": "integer",
+                                  "example": 12
+                                },
+                                "lastOrderAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "nullable": true
+                                },
+                                "lastOrderStatus": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "example": "delivered"
+                                }
                               }
                             }
                           }
@@ -366,11 +425,20 @@
                     "meta": {
                       "type": "object",
                       "properties": {
-                        "phone": { "type": "string", "example": "0512345678" },
+                        "phone": {
+                          "type": "string",
+                          "example": "0512345678"
+                        },
                         "patterns": {
                           "type": "array",
-                          "items": { "type": "string" },
-                          "example": ["0512345678", "512345678", "966512345678"]
+                          "items": {
+                            "type": "string"
+                          },
+                          "example": [
+                            "0512345678",
+                            "512345678",
+                            "966512345678"
+                          ]
                         }
                       }
                     }
@@ -386,11 +454,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean", "example": false },
-                    "error": { "type": "string", "example": "رقم الهاتف غير صالح" },
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "رقم الهاتف غير صالح"
+                    },
                     "code": {
                       "type": "string",
-                      "enum": ["MISSING_PHONE", "INVALID_PHONE"],
+                      "enum": [
+                        "MISSING_PHONE",
+                        "INVALID_PHONE"
+                      ],
                       "example": "INVALID_PHONE"
                     }
                   }
@@ -407,7 +484,6 @@
         }
       }
     },
-
     "/api/v1/bot/persons/{id}": {
       "get": {
         "tags": [
@@ -1005,7 +1081,7 @@
                               },
                               "value": {
                                 "type": "number",
-                                "example": 150.0
+                                "example": 150
                               },
                               "currency": {
                                 "type": "object",
@@ -1073,262 +1149,6 @@
                     "error": {
                       "type": "string",
                       "example": "Product not found"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/api/v1/bot/persons/group": {
-      "get": {
-        "tags": [
-          "Persons"
-        ],
-        "summary": "بحث عن شخص برقم المجموعة",
-        "description": "بحث عن شخص بناءً على رقم المجموعة (WhatsApp group ID). يُرجع جميع الأشخاص المطابقين.\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X GET \"http://localhost:3000/api/v1/bot/persons/group?groupNumber=VALUE\" \\\n  -H \"x-api-key: YOUR_API_KEY\"\n```\n",
-        "operationId": "searchPersonByGroup",
-        "parameters": [
-          {
-            "name": "groupNumber",
-            "in": "query",
-            "description": "رقم المجموعة (يدعم أيضاً group أو g)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "group",
-            "in": "query",
-            "description": "بديل لـ groupNumber",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "نتائج البحث",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "personId": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "ID أول شخص في النتائج"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Person"
-                      }
-                    },
-                    "count": {
-                      "type": "integer",
-                      "example": 1
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "معلمة البحث مفقودة",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "يجب تمرير groupNumber كمعلمة بحث"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/api/v1/bot/persons/group/{groupNumber}/activate": {
-      "patch": {
-        "tags": [
-          "Persons"
-        ],
-        "summary": "تفعيل شخص بواسطة رقم المجموعة",
-        "description": "تفعيل الشخص (isActive: true) بناءً على رقم المجموعة مباشرة.\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X PATCH \"http://localhost:3000/api/v1/bot/persons/group/123e4567-e89b-12d3-a456-426614174000/activate\" \\\n  -H \"x-api-key: YOUR_API_KEY\"\n```\n",
-        "operationId": "activatePersonByGroup",
-        "parameters": [
-          {
-            "name": "groupNumber",
-            "in": "path",
-            "required": true,
-            "description": "رقم المجموعة (مثال: 123456789@g.us)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "تم التفعيل بنجاح",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "name": {
-                          "type": "string",
-                          "example": "أحمد محمد"
-                        },
-                        "groupNumber": {
-                          "type": "string",
-                          "example": "120363xxx@g.us"
-                        },
-                        "isActive": {
-                          "type": "boolean",
-                          "example": true
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "تم تفعيل الشخص بنجاح"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "description": "لم يتم العثور على الشخص",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "لم يتم العثور على الشخص بهذا الرقم"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/api/v1/bot/persons/group/{groupNumber}/deactivate": {
-      "patch": {
-        "tags": [
-          "Persons"
-        ],
-        "summary": "إلغاء تفعيل شخص بواسطة رقم المجموعة",
-        "description": "إلغاء تفعيل الشخص (isActive: false) بناءً على رقم المجموعة مباشرة.\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X PATCH \"http://localhost:3000/api/v1/bot/persons/group/123e4567-e89b-12d3-a456-426614174000/deactivate\" \\\n  -H \"x-api-key: YOUR_API_KEY\"\n```\n",
-        "operationId": "deactivatePersonByGroup",
-        "parameters": [
-          {
-            "name": "groupNumber",
-            "in": "path",
-            "required": true,
-            "description": "رقم المجموعة (مثال: 123456789@g.us)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "تم إلغاء التفعيل بنجاح",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "name": {
-                          "type": "string",
-                          "example": "أحمد محمد"
-                        },
-                        "groupNumber": {
-                          "type": "string",
-                          "example": "120363xxx@g.us"
-                        },
-                        "isActive": {
-                          "type": "boolean",
-                          "example": false
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "تم إلغاء تفعيل الشخص بنجاح"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "description": "لم يتم العثور على الشخص",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "لم يتم العثور على الشخص بهذا الرقم"
                     }
                   }
                 }
@@ -2138,14 +1958,6 @@
             "type": "boolean",
             "default": true
           },
-          "groupName": {
-            "type": "string",
-            "nullable": true
-          },
-          "groupNumber": {
-            "type": "string",
-            "nullable": true
-          },
           "lastInteraction": {
             "type": "string",
             "format": "date-time"
@@ -2248,14 +2060,6 @@
               "format": "uuid"
             }
           },
-          "groupName": {
-            "type": "string",
-            "nullable": true
-          },
-          "groupNumber": {
-            "type": "string",
-            "nullable": true
-          },
           "priceLabelIds": {
             "type": "array",
             "items": {
@@ -2326,14 +2130,6 @@
               "format": "uuid"
             }
           },
-          "groupName": {
-            "type": "string",
-            "nullable": true
-          },
-          "groupNumber": {
-            "type": "string",
-            "nullable": true
-          },
           "priceLabelIds": {
             "type": "array",
             "items": {
@@ -2393,7 +2189,7 @@
           },
           "value": {
             "type": "number",
-            "example": 150.0
+            "example": 150
           },
           "unit": {
             "type": "string",
@@ -2561,11 +2357,6 @@
             "nullable": true,
             "description": "UUID العميل (أو استخدم groupNumber)"
           },
-          "groupNumber": {
-            "type": "string",
-            "nullable": true,
-            "description": "رقم المجموعة — يبحث عن العميل تلقائياً"
-          },
           "notes": {
             "type": "string",
             "nullable": true,
@@ -2645,7 +2436,7 @@
           },
           "unitPrice": {
             "type": "number",
-            "example": 150.0
+            "example": 150
           },
           "quantity": {
             "type": "integer",
@@ -2690,7 +2481,7 @@
           "totalAmount": {
             "type": "number",
             "nullable": true,
-            "example": 300.0
+            "example": 300
           },
           "person": {
             "type": "object",
@@ -2806,7 +2597,7 @@
                 },
                 "value": {
                   "type": "number",
-                  "example": 150.0
+                  "example": 150
                 },
                 "unit": {
                   "type": "string",

@@ -35,8 +35,8 @@ type MsgStatus = "pending" | "sent" | "failed" | "all"
 
 interface MessageRow {
     id:             string
-    personId:       string | null
-    personName:     string | null
+    customerId:       string | null
+    customerName:     string | null
     whatsappNumber: string | null
     messageBody:    string
     imageUrls:      string[]
@@ -146,7 +146,7 @@ function MessageRowItem({ msg }: { msg: MessageRow }) {
 
                 {/* Name + phone */}
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{msg.personName ?? "—"}</p>
+                    <p className="text-sm font-semibold truncate">{msg.customerName ?? "—"}</p>
                     {msg.whatsappNumber && (
                         <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                             <Phone className="size-2.5" />
@@ -417,7 +417,7 @@ export function DeliveryProgressPanel({
                 <div className="text-center">
                     <h3 className="text-lg font-black text-emerald-700">اكتمل الإرسال! 🎉</h3>
                     <p className="text-sm text-emerald-600 mt-1">
-                        وصلت الرسالة إلى <strong>{progress.successCount}</strong> شخص من أصل <strong>{total}</strong>
+                        وصلت الرسالة إلى <strong>{progress.successCount}</strong> عميل من أصل <strong>{total}</strong>
                     </p>
                 </div>
             </div>

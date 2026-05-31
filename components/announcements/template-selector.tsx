@@ -237,7 +237,7 @@ export function TemplateSelector({
 
                             {/* Meta */}
                             <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-1 border-t border-border/20 flex-wrap">
-                                <span>👤 {preview.personName}</span>
+                                <span>👤 {preview.customerName}</span>
                                 <span>📋 {preview.templateType === "text_image" ? "نص + صور" : "نص فقط"}</span>
                                 {selected.sendMode === "per_product" && (
                                     <span className="flex items-center gap-0.5 font-bold text-violet-600">

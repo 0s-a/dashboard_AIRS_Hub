@@ -9,12 +9,14 @@ datasource db {
 
 // ── Enums ───────────────────────────────────────────────────
 
-enum PersonSource {
+enum CustomerSource {
   bot
   manual
   import
   api
 }
+
+// ── Core Business Models ─────────────────────────────────────
 
 model Product {
   id               String                   @id @default(uuid())
@@ -64,85 +66,138 @@ model Category {
   products    Product[]
 }
 
-model Person {
+// ── Customer (formerly Person) ───────────────────────────────
+
+model Customer {
   id                   String                @id @default(uuid())
   name                 String?
-  source               PersonSource?
+  source               CustomerSource?
   contacts             Contact[]
-  tags                 PersonTag[]
-  groupName            String?
-  groupNumber          String?               @unique
+  tags                 CustomerTag[]
   isActive             Boolean               @default(true)
   lastInteraction      DateTime              @default(now())
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
-  priceLabels          PersonPriceLabel[]
-  personCurrencies     PersonCurrency[]
+  priceLabelId         String?
+  priceLabel           PriceLabel?           @relation(fields: [priceLabelId], references: [id], onDelete: SetNull)
+  customerCurrencies   CustomerCurrency[]
   orders               Order[]
   notifications        AiNotification[]
   announcementMessages AnnouncementMessage[]
+  whatsappGroup        WhatsappGroup?        // علاقة عكسية — مجموعة واتساب اختيارية
 
-  @@index([groupName])
   @@index([isActive])
-  @@map("Person")
+  @@index([priceLabelId])
+  @@map("Customer")
 }
 
-// Tags — normalized labels for persons
+// Tags — normalized labels for customers
 model Tag {
-  id      String      @id @default(uuid())
-  name    String      @unique
-  persons PersonTag[]
-
-  createdAt DateTime @default(now())
+  id        String        @id @default(uuid())
+  name      String        @unique
+  customers CustomerTag[]
+  createdAt DateTime      @default(now())
 }
 
-// Junction: Person <-> Tag (many-to-many)
-model PersonTag {
-  personId String
-  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
-  tagId    String
-  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
+// Junction: Customer <-> Tag (many-to-many)
+model CustomerTag {
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
   assignedAt DateTime @default(now())
 
-  @@id([personId, tagId])
+  @@id([customerId, tagId])
 }
 
-// Product images — image metadata stored directly (no separate MediaImage table)
+// ── Supervisor (مشرف — بياناته فقط، لا يسجّل دخول) ──────────
+
+model Supervisor {
+  id             String                    @id @default(uuid())
+  name           String
+  notes          String?
+  isActive       Boolean                   @default(true)
+  contacts       Contact[]
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  whatsappGroups WhatsappGroupSupervisor[] // علاقة عكسية
+
+  @@index([isActive])
+  @@map("Supervisor")
+}
+
+// ── Contact (shared across Supervisor / Customer) ────────────
+
+// Contact information (phone, email, whatsapp) — normalized
+model Contact {
+  id           String      @id @default(uuid())
+  // Exactly ONE of the following must be set (enforced at app layer):
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  supervisorId String?
+  supervisor   Supervisor? @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+
+  type      String // "phone" | "email" | "whatsapp"
+  value     String // the actual number or email
+  label     String? // "جوال", "عمل", etc.
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // ── Uniqueness Constraints ──────────────────────────────────
+  // 1) Global: same value (phone/email) cannot exist twice in the entire system
+  @@unique([value], name: "contact_value_unique")
+  // 2) Per-customer: only ONE contact of each type per customer
+  //    (NULL customerId rows are treated as distinct by PostgreSQL)
+  @@unique([customerId, type], name: "contact_customer_type_unique")
+  // 3) Per-supervisor: only ONE contact of each type per supervisor
+  @@unique([supervisorId, type], name: "contact_supervisor_type_unique")
+}
+
+// Junction table: Customer <-> Currency
+model CustomerCurrency {
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  currencyId String
+  currency   Currency @relation(fields: [currencyId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@id([customerId, currencyId])
+}
+
+// ── Product Images ───────────────────────────────────────────
+
 model ProductImage {
   id        String  @id @default(uuid())
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  // ── Image metadata (previously in MediaImage) ──
-  url       String // Sub-path only, e.g. "products/001-bf-607/main.webp" — base path is in .env
+  url       String
   filename  String
   alt       String?
   sizeBytes Int?
   width     Int?
   height    Int?
 
-  // ── Linking metadata ──
   isPrimary Boolean  @default(false)
   order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // ── Variant association ──
   variants Variant[] @relation("VariantToProductImages")
 
   @@unique([productId, url])
 }
 
-// Variants table: colors, sizes, custom variants
+// ── Variants ────────────────────────────────────────────────
+
 model Variant {
   id            String         @id @default(uuid())
-  variantNumber String         @unique // "001-BF-483-01" — globally unique
-  suffix        String // "01", "أسود", "XL" — user-entered 4th segment
-  name          String // display name
-  type          String         @default("color") // "color" | "size" | "custom"
-  hex           String? // CSS hex color (for type=color only)
-  price         Decimal?       @db.Decimal(12, 2) // Variant-specific price override
+  variantNumber String         @unique
+  suffix        String
+  name          String
+  type          String         @default("color")
+  hex           String?
+  price         Decimal?       @db.Decimal(12, 2)
   order         Int            @default(0)
   isDefault     Boolean        @default(false)
   productId     String
@@ -155,78 +210,37 @@ model Variant {
   @@unique([productId, suffix])
 }
 
-// Price label names for product pricing
+// ── Pricing ──────────────────────────────────────────────────
+
 model PriceLabel {
-  id            String             @id @default(uuid())
-  itemNumber    String             @unique
-  name          String             @unique
+  id            String         @id @default(uuid())
+  itemNumber    String         @unique
+  name          String         @unique
+  customerType  String?        // نوع العميل المناسب: "عميل جملة"، "عميل مفرد"، "VIP"، إلخ
   notes         String?
-  isDefault     Boolean            @default(false)
-  persons       PersonPriceLabel[]
+  isDefault     Boolean        @default(false)
+  customers     Customer[]
   productPrices ProductPrice[]
   orderItems    OrderItem[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
-// Explicit join table for Person <-> PriceLabel
-model PersonPriceLabel {
-  person       Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
-  personId     String
-  priceLabel   PriceLabel @relation(fields: [priceLabelId], references: [id], onDelete: Cascade)
-  priceLabelId String
-
-  assignedAt DateTime @default(now())
-
-  @@id([personId, priceLabelId])
-}
-
-// Contact information (phone, email, whatsapp) — normalized
-model Contact {
-  id        String   @id @default(uuid())
-  personId  String?
-  person    Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String // "phone" | "email" | "whatsapp"
-  value     String // the actual number or email
-  label     String? // "جوال", "عمل", etc.
-  isPrimary Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  // Global uniqueness — same contact value cannot exist twice in the system
-  @@unique([type, value], name: "contact_global_unique")
-}
-
-// Junction table: Person <-> Currency (replaces currencies Json field)
-model PersonCurrency {
-  personId   String
-  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-  currencyId String
-  currency   Currency @relation(fields: [currencyId], references: [id], onDelete: Cascade)
-  assignedAt DateTime @default(now())
-
-  @@id([personId, currencyId])
-}
-
-// Currency management
 model Currency {
-  id               String           @id @default(uuid())
-  itemNumber       String           @unique
-  name             String           @unique // e.g. "ريال يمني"
-  code             String           @unique // e.g. "YER"
-  symbol           String // e.g. "ر.ي"
-  isDefault        Boolean          @default(false)
-  isActive         Boolean          @default(true)
-  exchangeRate     Decimal?         @db.Decimal(18, 6) // rate relative to default currency (null for default)
-  productPrices    ProductPrice[]
-  orderItems       OrderItem[]
-  personCurrencies PersonCurrency[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id                String             @id @default(uuid())
+  itemNumber        String             @unique
+  name              String             @unique
+  code              String             @unique
+  symbol            String
+  isDefault         Boolean            @default(false)
+  exchangeRate      Decimal?           @db.Decimal(18, 6)
+  productPrices     ProductPrice[]
+  orderItems        OrderItem[]
+  customerCurrencies CustomerCurrency[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
-// Product prices — normalized pricing with multi-currency support
 model ProductPrice {
   id               String     @id @default(uuid())
   productId        String
@@ -245,7 +259,6 @@ model ProductPrice {
   @@unique([productId, priceLabelId, currencyId, unitId])
 }
 
-// Links available units to a product
 model ProductUnit {
   id               String  @id @default(uuid())
   productId        String
@@ -253,21 +266,19 @@ model ProductUnit {
   unitId           String
   unit             Unit    @relation(fields: [unitId], references: [id], onDelete: Cascade)
   isBase           Boolean @default(false)
-  conversionFactor Int     @default(1) // how many base units in this specific product's unit (e.g. this product's carton has 24 pieces)
-  barcode          String? @unique // barcode specifically for this product's unit size
+  conversionFactor Int     @default(1)
+  barcode          String? @unique
   order            Int     @default(0)
 
   @@unique([productId, unitId])
 }
 
-// Unit model for pricing units (e.g., Piece, Dozen, Box)
 model Unit {
   id         String   @id @default(uuid())
   itemNumber String   @unique
   name       String   @unique
   pluralName String?
   notes      String?
-  isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -275,22 +286,26 @@ model Unit {
   productUnits  ProductUnit[]
 }
 
-// Represents a customer order
+// ── Orders ───────────────────────────────────────────────────
+
 model Order {
   id          String      @id @default(uuid())
-  orderNumber String      @unique // auto-generated e.g. "0001"
-  personId    String?
-  person      Person?     @relation(fields: [personId], references: [id], onDelete: SetNull)
+  orderNumber String      @unique
+  customerId  String?
+  customer    Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
   status      String      @default("pending")
-  // "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
   notes       String?
-  totalAmount Decimal?    @db.Decimal(12, 2) // pre-computed sum from items
+  totalAmount Decimal?    @db.Decimal(12, 2)
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
 }
 
-// Individual line items inside an order
 model OrderItem {
   id           String      @id @default(uuid())
   orderId      String
@@ -301,7 +316,6 @@ model OrderItem {
   variant      Variant?    @relation(fields: [variantId], references: [id], onDelete: SetNull)
   priceLabelId String?
   priceLabel   PriceLabel? @relation(fields: [priceLabelId], references: [id], onDelete: SetNull)
-  // Snapshot of price & currency from ProductPrice at order creation time
   unitPrice    Decimal     @db.Decimal(12, 2)
   currencyId   String?
   currency     Currency?   @relation(fields: [currencyId], references: [id], onDelete: SetNull)
@@ -310,7 +324,8 @@ model OrderItem {
   createdAt    DateTime    @default(now())
 }
 
-// AI-driven notifications from bot product searches
+// ── Notifications ────────────────────────────────────────────
+
 model AiNotification {
   id            String    @id @default(uuid())
   type          String // "out_of_stock" | "not_found"
@@ -318,9 +333,9 @@ model AiNotification {
   productId     String?
   product       Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
   productName   String?
-  personId      String?
-  person        Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
-  source        String?   @default("bot") // "bot" | "api"
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  source        String?   @default("bot")
   phoneNumber   String?
   isRead        Boolean   @default(false)
   isArchived    Boolean   @default(false)
@@ -332,31 +347,31 @@ model AiNotification {
   @@index([isArchived])
   @@index([type])
   @@index([createdAt])
-  @@index([personId])
+  @@index([customerId])
 }
 
-// User accounts for dashboard authentication
+// ── User Accounts (dashboard login) ─────────────────────────
+
 model User {
   id        String    @id @default(uuid())
   name      String
   username  String    @unique
   password  String // bcrypt hashed
-  role      String    @default("user") // "admin" | "user"
   color     String    @default("#6366f1") // avatar color
   isActive  Boolean   @default(true)
   lastLogin DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  contacts  Contact[]
 }
 
-// Store settings — singleton row (id = "default")
+// ── Store Settings ───────────────────────────────────────────
+
 model StoreSettings {
   id           String   @id @default("default")
   name         String   @default("المتجر الرئيسي")
   description  String?
-  logo         String? // URL path to uploaded logo image
-  favicon      String? // URL path to uploaded favicon
+  logo         String?
+  favicon      String?
   phone        String?
   email        String?
   whatsapp     String?
@@ -364,18 +379,19 @@ model StoreSettings {
   address      String?
   city         String?
   country      String?
-  workingHours Json? // { "sun": "8:00-17:00", ... }
-  socialLinks  Json? // { "facebook": "...", "instagram": "...", ... }
+  workingHours Json?
+  socialLinks  Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
 
-// Message templates for announcement campaigns
+// ── Announcements ────────────────────────────────────────────
+
 model MessageTemplate {
   id            String         @id @default(uuid())
   name          String
-  type          String         @default("text") // "text" | "text_image"
-  sendMode      String         @default("combined") // "combined" | "per_product"
+  type          String         @default("text")
+  sendMode      String         @default("combined")
   bodyTemplate  String         @db.Text
   productBlock  String         @db.Text
   separator     String         @default("\n---\n")
@@ -387,77 +403,98 @@ model MessageTemplate {
   @@index([isDefault])
 }
 
-// Announcements system for mass messaging
 model Announcement {
   id                  String                @id @default(uuid())
   title               String
   description         String?
-  status              String                @default("pending") // pending | queueing | queued | sent | failed | cancelled
+  status              String                @default("pending")
   scheduledAt         DateTime
   sentAt              DateTime?
-  // ── Targeting (JSON filters — single source) ──
-  personFilters       Json // { all: true } | { manualIds: [...] } | { typeIds: [...], tags: [...] }
-  productFilters      Json // { all: true } | { manualIds: [...] } | { categoryIds: [...] }
-  // ── Template ──
+  personFilters       Json
+  productFilters      Json
   templateId          String?
   template            MessageTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  // ── Throttle / Rate Limit ──
   delayBetweenSeconds Int                   @default(0)
-  sendWindowStart     String? // "09:00"
-  sendWindowEnd       String? // "18:00"
-  // ── Queueing progress (0-100) ──
+  sendWindowStart     String?
+  sendWindowEnd       String?
   queueingProgress    Int                   @default(0)
-  // ── Metadata ──
   createdBy           String?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
-  // ── Relations ──
   messages            AnnouncementMessage[]
 }
 
-// Per-person delivery record — THE source of truth for tracking
 model AnnouncementMessage {
   id             String       @id @default(uuid())
-  // ── Campaign ──
   announcementId String
   announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  messageIndex   Int // 1-based order
-  // ── Person (FK required) ──
-  personId       String
-  person         Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
-  personName     String?
+  messageIndex   Int
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerName   String?
   whatsappNumber String?
-  // ── Products (JSON array of IDs) ──
   productIds     Json         @default("[]")
-  // ── Content ──
   messageBody    String       @db.Text
   imageUrls      Json         @default("[]")
-  // ── Delivery ──
-  status         String       @default("pending") // pending | sent | failed
-  providerId     String? // WhatsApp message ID
+  status         String       @default("pending")
+  providerId     String?
   errorReason    String?
   retryCount     Int          @default(0)
-  // ── Timestamps ──
   queuedAt       DateTime     @default(now())
   sentAt         DateTime?
 
-  @@unique([announcementId, personId])
+  @@unique([announcementId, customerId])
   @@index([announcementId])
   @@index([announcementId, status])
-  @@index([personId])
+  @@index([customerId])
   @@index([announcementId, messageIndex])
   @@index([status])
 }
 
-/// Tracks the last used sequence number per category+brand combo.
-/// Ensures product code numbers are never reused even after deletion.
+// ── Product Code Sequences ───────────────────────────────────
+
 model ProductCodeSequence {
   id           String   @id @default(uuid())
-  categoryCode String // e.g. "ELC" or "GEN"
-  brandCode    String // e.g. "AP" or "XX"
-  lastSequence Int      @default(0) // Last used number (0001, 0002, ...)
+  categoryCode String
+  brandCode    String
+  lastSequence Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@unique([categoryCode, brandCode])
+}
+
+// ── WhatsApp Groups ───────────────────────────────────────────────────
+
+// مجموعة واتساب — تربط عميلاً واحداً بمشرفين عدة
+model WhatsappGroup {
+  id          String   @id @default(uuid())
+  groupNumber String?  @unique // معرّف المجموعة على واتساب: "120363...@g.us"
+  name        String // اسم وصفي للمجموعة
+  notes       String? // ملاحظات داخلية
+  isActive    Boolean  @default(true)
+
+  // علاقة 1-to-1 مع العميل — عميل واحد فقط لكل مجموعة
+  customerId  String   @unique
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // علاقة many-to-many مع المشرفين
+  supervisors WhatsappGroupSupervisor[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("WhatsappGroup")
+}
+
+// جدول وسيط بسيط — بدون حقول إضافية
+model WhatsappGroupSupervisor {
+  groupId      String
+  group        WhatsappGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  supervisorId String
+  supervisor   Supervisor    @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, supervisorId])
+  @@map("WhatsappGroupSupervisor")
 }

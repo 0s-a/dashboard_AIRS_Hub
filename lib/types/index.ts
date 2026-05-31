@@ -16,7 +16,7 @@ export type ActionResultList<T> =
 // ─── Entity Summaries ───────────────────────────────────────
 // Lightweight types for list views and select dropdowns
 
-export interface PersonSummary {
+export interface CustomerSummary {
     id: string
     name: string | null
 }
@@ -66,21 +66,19 @@ export interface ContactFull {
     isPrimary: boolean
 }
 
-export interface PersonFull {
+export interface CustomerFull {
     id: string
     name: string | null
     address: string | null
     notes: string | null
     source: string | null
     isActive: boolean
-    groupName: string | null
-    groupNumber: string | null
     lastInteraction: Date | string
     createdAt: Date | string
     updatedAt: Date | string
     contacts: ContactFull[]
     currencies: CurrencySummary[]
-    priceLabels: { priceLabel: PriceLabelSummary }[]
+    priceLabel: { id: string; name: string; customerType: string | null } | null
 }
 
 export interface VariantFull {
@@ -129,8 +127,8 @@ export interface OrderItemFull {
 export interface OrderFull {
     id: string
     orderNumber: string
-    personId: string | null
-    person: PersonSummary | null
+    customerId: string | null
+    customer: CustomerSummary | null
     status: string
     notes: string | null
     totalAmount: number | null

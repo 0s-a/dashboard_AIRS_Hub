@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
 
         if (!product) return apiError('Product not found', 404, { code: 'NOT_FOUND' })
 
-        // Find person by phone number — using normalized patterns
+        // Find customer by phone number — using normalized patterns
         const patterns = normalizePhonePatterns(phoneNumber)
-        const person = await prisma.person.findFirst({
+        const customer = await prisma.customer.findFirst({
             where: {
                 contacts: {
                     some: {
@@ -51,19 +51,14 @@ export async function POST(req: NextRequest) {
                     },
                 },
             },
-            include: {
-                priceLabels: {
-                    include: { priceLabel: true },
-                },
-            },
+            select: { id: true, name: true, priceLabelId: true },
         })
 
-        // Filter prices based on person's assigned price labels
+        // Filter prices based on customer's assigned price labels
         let filteredPrices = product.productPrices
 
-        if (person && person.priceLabels.length > 0) {
-            const allowedLabelIds = new Set(person.priceLabels.map(pl => pl.priceLabelId))
-            filteredPrices = product.productPrices.filter(pp => allowedLabelIds.has(pp.priceLabelId))
+        if (customer?.priceLabelId) {
+            filteredPrices = product.productPrices.filter(pp => pp.priceLabelId === customer.priceLabelId)
         }
 
         // Format response
@@ -81,7 +76,7 @@ export async function POST(req: NextRequest) {
         return apiSuccess({
             productId: product.id,
             productName: product.name,
-            personName: person?.name || null,
+            customerName: customer?.name || null,
             prices,
         })
 

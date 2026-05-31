@@ -20,7 +20,7 @@ export type AnnouncementRow = {
     scheduledAt: Date | string
     status: string
     sentAt: Date | string | null
-    personFilters: unknown
+    customerFilters: unknown
     productFilters: unknown
     createdAt: Date | string
 }
@@ -86,15 +86,15 @@ export const announcementColumns: ColumnDef<AnnouncementRow>[] = [
         id: "audience",
         header: "الجمهور",
         cell: ({ row }) => {
-            const pf = row.original.personFilters as any
+            const pf = row.original.customerFilters as any
             const prf = row.original.productFilters as any
-            const personLabel = pf?.all ? "الكل" :
-                pf?.manualIds?.length > 0 ? `${pf.manualIds.length} شخص` : "فلتر"
+            const customerLabel = pf?.all ? "الكل" :
+                pf?.manualIds?.length > 0 ? `${pf.manualIds.length} عميل` : "فلتر"
             const productLabel = prf?.all ? "الكل" :
                 prf?.manualIds?.length > 0 ? `${prf.manualIds.length} منتج` : "فلتر"
             return (
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Users className="size-3.5" />{personLabel}</span>
+                    <span className="flex items-center gap-1"><Users className="size-3.5" />{customerLabel}</span>
                     <span className="flex items-center gap-1"><Package className="size-3.5" />{productLabel}</span>
                 </div>
             )

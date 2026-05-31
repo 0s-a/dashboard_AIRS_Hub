@@ -43,8 +43,8 @@ const IMAGES_SUBQUERY = `
     ) AS images
 `
 
-const getPriceSubquery = (personId: string | null, paramIdx: number) => {
-    if (personId) {
+const getPriceSubquery = (customerId: string | null, paramIdx: number) => {
+    if (customerId) {
         return `
             (
                 SELECT COALESCE(jsonb_agg(
@@ -65,12 +65,12 @@ const getPriceSubquery = (personId: string | null, paramIdx: number) => {
                 LEFT JOIN "Unit" u ON u.id = pp."unitId"
                 WHERE pp."productId" = p.id
                   AND (
-                      pp."priceLabelId" IN (SELECT "priceLabelId" FROM "PersonPriceLabel" WHERE "personId" = $${paramIdx})
-                      OR (NOT EXISTS (SELECT 1 FROM "PersonPriceLabel" WHERE "personId" = $${paramIdx}) AND pl."isDefault" = true)
+                      pp."priceLabelId" IN (SELECT "priceLabelId" FROM "CustomerPriceLabel" WHERE "customerId" = $${paramIdx})
+                      OR (NOT EXISTS (SELECT 1 FROM "CustomerPriceLabel" WHERE "customerId" = $${paramIdx}) AND pl."isDefault" = true)
                   )
                   AND (
-                      pp."currencyId" IN (SELECT "currencyId" FROM "PersonCurrency" WHERE "personId" = $${paramIdx})
-                      OR (NOT EXISTS (SELECT 1 FROM "PersonCurrency" WHERE "personId" = $${paramIdx}) AND c."isDefault" = true)
+                      pp."currencyId" IN (SELECT "currencyId" FROM "CustomerCurrency" WHERE "customerId" = $${paramIdx})
+                      OR (NOT EXISTS (SELECT 1 FROM "CustomerCurrency" WHERE "customerId" = $${paramIdx}) AND c."isDefault" = true)
                   )
             ) AS prices
         `
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url)
         const query = (searchParams.get('q') || searchParams.get('search') || '').trim()
-        const personId = searchParams.get('personId')
+        const customerId = searchParams.get('customerId') || searchParams.get('customerId') // backward compat
         const available = searchParams.get('available')
         const categoryId = searchParams.get('category')
         const brand = searchParams.get('brand')
@@ -173,11 +173,11 @@ export async function GET(req: NextRequest) {
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-        // ── Person price label filter ────────────────
+        // ── Customer price label filter ────────────────
         let priceSubquery = ""
-        if (personId) {
-            params.push(personId)
-            priceSubquery = getPriceSubquery(personId, paramIndex)
+        if (customerId) {
+            params.push(customerId)
+            priceSubquery = getPriceSubquery(customerId, paramIndex)
             paramIndex++
         } else {
             priceSubquery = getPriceSubquery(null, paramIndex)

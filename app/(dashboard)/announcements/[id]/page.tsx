@@ -16,7 +16,7 @@ import { Textarea }  from "@/components/ui/textarea"
 import { Label }     from "@/components/ui/label"
 import { Badge }     from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { PersonTargetingPanel }  from "@/components/announcements/person-targeting-panel"
+import { CustomerTargetingPanel }  from "@/components/announcements/customer-targeting-panel"
 import { ProductTargetingPanel } from "@/components/announcements/product-targeting-panel"
 import { DeliveryProgressPanel } from "@/components/announcements/delivery-progress-panel"
 import { LaunchConfirmDialog }   from "@/components/announcements/launch-confirm-dialog"
@@ -29,7 +29,7 @@ import {
     executeAnnouncementToQueue,
     previewAudience,
 } from "@/lib/actions/announcements"
-import type { PersonFilters, ProductFilters } from "@/lib/types/announcements"
+import type { CustomerFilters, ProductFilters } from "@/lib/types/announcements"
 import { getAnnouncementSheetData } from "@/lib/actions/announcement-sheet-data"
 import { THROTTLE_PRESETS, calculateEta } from "@/lib/utils/throttle-presets"
 import { toast }  from "sonner"
@@ -63,7 +63,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; dot?: string }>
     failed:    { label: "فشل",             color: "bg-destructive/10 text-destructive border-0" },
 }
 
-type PersonTarget  = { mode: "all"|"filter"|"manual"|"builder"; filters: PersonFilters;  manualIds: string[] }
+type CustomerTarget  = { mode: "all"|"filter"|"manual"|"builder"; filters: CustomerFilters;  manualIds: string[] }
 type ProductTarget = { mode: "all"|"filter"|"manual"; filters: ProductFilters; manualIds: string[] }
 
 // ─── Tab Definition ───────────────────────────────────────────────────────────
@@ -87,10 +87,10 @@ export default function AnnouncementDetailPage() {
     const [ann, setAnn] = useState<(AnnouncementRow & {
         queueingProgress?: number
     }) | null>(null)
-    const [sheetData,     setSheetData]     = useState<any>({ persons: [], products: [], categories: [] })
-    const [personTarget,  setPersonTarget]  = useState<PersonTarget>({ mode: "all", filters: { all: true }, manualIds: [] })
+    const [sheetData,     setSheetData]     = useState<any>({ customers: [], products: [], categories: [] })
+    const [customerTarget,  setCustomerTarget]  = useState<CustomerTarget>({ mode: "all", filters: { all: true }, manualIds: [] })
     const [productTarget, setProductTarget] = useState<ProductTarget>({ mode: "all", filters: { all: true }, manualIds: [] })
-    const [preview,       setPreview]       = useState<{ personCount: number; productCount: number } | null>(null)
+    const [preview,       setPreview]       = useState<{ customerCount: number; productCount: number } | null>(null)
     const [saving,           setSaving]           = useState(false)
     const [launching,         setLaunching]         = useState(false)
     const [confirmOpen,       setConfirmOpen]       = useState(false)
@@ -119,12 +119,12 @@ export default function AnnouncementDetailPage() {
             setTemplateId(a.templateId ?? null)
             reset({ title: a.title, description: a.description || "", scheduledAt: toLocalDatetime(a.scheduledAt) })
 
-            const pf   = a.personFilters  as any
+            const pf   = a.customerFilters  as any
             const rf   = a.productFilters as any
             const pIds = (pf?.manualIds as string[]) || []
             const rIds = (rf?.manualIds as string[]) || []
 
-            setPersonTarget({
+            setCustomerTarget({
                 mode:      pf?.all ? "all" : pIds.length > 0 ? "manual" : pf?.filterGroups ? "builder" : Object.keys(pf || {}).length > 0 ? "filter" : "all",
                 filters:   pf || {},
                 manualIds: pIds,
@@ -140,25 +140,25 @@ export default function AnnouncementDetailPage() {
 
     // ── Live preview ──────────────────────────────────────────────────────────
     useEffect(() => {
-        const pf = personTarget.mode  === "all" ? { all: true } : personTarget.mode  === "filter" ? personTarget.filters  : { manualIds: personTarget.manualIds }
+        const pf = customerTarget.mode  === "all" ? { all: true } : customerTarget.mode  === "filter" ? customerTarget.filters  : { manualIds: customerTarget.manualIds }
         const rf = productTarget.mode === "all" ? { all: true } : productTarget.mode === "filter" ? productTarget.filters : { manualIds: productTarget.manualIds }
         previewAudience(pf, rf)
             .then(res => { if (res.success && res.data) setPreview(res.data as any) })
-    }, [personTarget, productTarget])
+    }, [customerTarget, productTarget])
 
 
     const buildPayload = (data: { title: string; description: string; scheduledAt: string }) => {
-        const personFilters =
-            personTarget.mode === "all"     ? { all: true } :
-            personTarget.mode === "filter"  ? personTarget.filters :
-            personTarget.mode === "builder" ? personTarget.filters : // contains filterGroups
+        const customerFilters =
+            customerTarget.mode === "all"     ? { all: true } :
+            customerTarget.mode === "filter"  ? customerTarget.filters :
+            customerTarget.mode === "builder" ? customerTarget.filters : // contains filterGroups
             {}
 
         return {
             title:               data.title,
             description:         data.description,
             scheduledAt:         new Date(data.scheduledAt).toISOString(),
-            personFilters,
+            customerFilters,
             productFilters:      productTarget.mode === "all" ? { all: true } : productTarget.mode === "filter" ? productTarget.filters : { manualIds: productTarget.manualIds },
             templateId,
             delayBetweenSeconds: delaySeconds,
@@ -178,8 +178,8 @@ export default function AnnouncementDetailPage() {
 
     // Opens the confirmation dialog (validates audience first)
     const onLaunch = (data: { title: string; description: string; scheduledAt: string }) => {
-        if ((preview?.personCount ?? 0) === 0) {
-            toast.error("لا يوجد أشخاص في الجمهور المحدد")
+        if ((preview?.customerCount ?? 0) === 0) {
+            toast.error("لا يوجد عملاء في الجمهور المحدد")
             return
         }
         // Store latest form data for when the dialog confirms
@@ -222,8 +222,8 @@ export default function AnnouncementDetailPage() {
     const isDone    = status === "sent"
     const isDraft   = ["pending", "cancelled", "failed"].includes(status)
 
-    const expectedBatches = preview ? preview.personCount : 0
-    const eta = preview ? calculateEta(preview.personCount, {
+    const expectedBatches = preview ? preview.customerCount : 0
+    const eta = preview ? calculateEta(preview.customerCount, {
         messagesPerMinute,
         delayBetweenSeconds: delaySeconds,
         sendWindowStart: windowEnabled ? sendWindowStart : null,
@@ -265,7 +265,7 @@ export default function AnnouncementDetailPage() {
                         </span>
                         <span className="flex items-center gap-1">
                             <Users className="size-3.5 text-primary" />
-                            <span className="text-primary font-semibold">{preview?.personCount ?? "—"}</span> شخص
+                            <span className="text-primary font-semibold">{preview?.customerCount ?? "—"}</span> عميل
                         </span>
                         <span className="flex items-center gap-1">
                             <Package className="size-3.5 text-indigo-500" />
@@ -390,16 +390,16 @@ export default function AnnouncementDetailPage() {
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                                            <span className="size-2 rounded-full bg-primary inline-block" /> الأشخاص المستهدفون
+                                            <span className="size-2 rounded-full bg-primary inline-block" /> العملاء المستهدفون
                                         </h3>
-                                        <span className={cn("text-xs font-black", (preview?.personCount ?? 0) > 0 ? "text-primary" : "text-muted-foreground")}>
-                                            {preview?.personCount ?? "—"} شخص
+                                        <span className={cn("text-xs font-black", (preview?.customerCount ?? 0) > 0 ? "text-primary" : "text-muted-foreground")}>
+                                            {preview?.customerCount ?? "—"} عميل
                                         </span>
                                     </div>
-                                    <PersonTargetingPanel value={personTarget} onChange={setPersonTarget}
-                                        persons={sheetData.persons}
-                                        personTags={sheetData.personTags ?? []}
-                                        previewCount={preview?.personCount} />
+                                    <CustomerTargetingPanel value={customerTarget} onChange={setCustomerTarget}
+                                        customers={sheetData.customers}
+                                        customerTags={sheetData.customerTags ?? []}
+                                        previewCount={preview?.customerCount} />
 
                                 </div>
 
@@ -587,7 +587,7 @@ export default function AnnouncementDetailPage() {
                                 </div>
 
                                 {/* ── ETA Card ── */}
-                                {preview && preview.personCount > 0 && (
+                                {preview && preview.customerCount > 0 && (
                                     <div className={cn(
                                         "rounded-2xl border p-4 space-y-3 transition-colors",
                                         eta?.exceedsWindow
@@ -610,8 +610,8 @@ export default function AnnouncementDetailPage() {
                                         </p>
                                         <div className="grid grid-cols-4 gap-2 text-center">
                                             <div className="bg-background/60 rounded-xl p-2.5">
-                                                <p className="text-[10px] text-muted-foreground">الأشخاص</p>
-                                                <p className="text-base font-black text-primary">{preview.personCount.toLocaleString()}</p>
+                                                <p className="text-[10px] text-muted-foreground">العملاء</p>
+                                                <p className="text-base font-black text-primary">{preview.customerCount.toLocaleString()}</p>
                                             </div>
                                             <div className="bg-background/60 rounded-xl p-2.5">
                                                 <p className="text-[10px] text-muted-foreground">الدفعات</p>
@@ -637,7 +637,7 @@ export default function AnnouncementDetailPage() {
                                         <p className="text-[10px] text-muted-foreground/70 text-center">
                                             {messagesPerMinute > 0 ? `${messagesPerMinute} رسالة/دقيقة` : "بلا حد ∞"}
                                             {delaySeconds > 0 && ` · ${delaySeconds}ث بين كل رسالة`}
-                                            {" · "}{preview?.personCount?.toLocaleString("ar")} رسالة
+                                            {" · "}{preview?.customerCount?.toLocaleString("ar")} رسالة
                                         </p>
                                     </div>
                                 )}
@@ -656,7 +656,7 @@ export default function AnnouncementDetailPage() {
                     </h2>
                     <div className="flex flex-wrap items-center gap-3 text-sm">
                         <span className="flex items-center gap-1.5 text-primary font-semibold">
-                            <Users className="size-4" /> {preview?.personCount ?? "—"} رسالة
+                            <Users className="size-4" /> {preview?.customerCount ?? "—"} رسالة
                         </span>
                         {preview?.productCount ? (
                             <span className="flex items-center gap-1.5 text-indigo-500 font-semibold">
@@ -689,14 +689,14 @@ export default function AnnouncementDetailPage() {
                         </Button>
                         <AudienceSnapshotDialog
                             announcementId={id}
-                            disabled={saving || launching || (preview?.personCount ?? 0) === 0}
+                            disabled={saving || launching || (preview?.customerCount ?? 0) === 0}
                         />
                         <DryRunDialog
                             announcementId={id}
-                            disabled={saving || launching || (preview?.personCount ?? 0) === 0}
+                            disabled={saving || launching || (preview?.customerCount ?? 0) === 0}
                         />
                         <Button type="button"
-                            disabled={saving || launching || (preview?.personCount ?? 0) === 0}
+                            disabled={saving || launching || (preview?.customerCount ?? 0) === 0}
                             onClick={handleSubmit(onLaunch)}
                             className="flex-1 h-11 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
                             {launching ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
@@ -712,7 +712,7 @@ export default function AnnouncementDetailPage() {
                 onOpenChange={setConfirmOpen}
                 onConfirm={doLaunch}
                 summary={{
-                    personCount:          preview?.personCount ?? 0,
+                    customerCount:          preview?.customerCount ?? 0,
                     productCount:         preview?.productCount ?? 0,
                     messagesPerMinute:    0,
                     delayBetweenSeconds:  delaySeconds,

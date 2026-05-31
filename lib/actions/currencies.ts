@@ -24,7 +24,6 @@ export async function getActiveCurrencies() {
     return safeAction(
         async () => {
             const rows = await prisma.currency.findMany({
-                where:   { isActive: true },
                 orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
             })
             return rows.map(r => ({ ...r, exchangeRate: r.exchangeRate?.toString() ?? null }))
@@ -39,7 +38,6 @@ export async function createCurrency(data: {
     symbol: string
     itemNumber?: string
     isDefault?: boolean
-    isActive?: boolean
     exchangeRate?: number | null
 }) {
     return safeActionWithRevalidation(
@@ -56,7 +54,6 @@ export async function createCurrency(data: {
                     symbol:       data.symbol.trim(),
                     itemNumber,
                     isDefault:    data.isDefault  ?? false,
-                    isActive:     data.isActive   ?? true,
                     // Prisma Decimal accepts string — safe conversion from number
                     exchangeRate: (data.isDefault || data.exchangeRate == null)
                         ? null
@@ -79,7 +76,6 @@ export async function updateCurrency(id: string, data: {
     symbol?: string
     itemNumber?: string
     isDefault?: boolean
-    isActive?: boolean
     exchangeRate?: number | null
 }) {
     return safeActionWithRevalidation(
@@ -103,7 +99,6 @@ export async function updateCurrency(id: string, data: {
                     ...(data.symbol     !== undefined && { symbol:      data.symbol.trim()              }),
                     ...(data.itemNumber !== undefined && { itemNumber:  data.itemNumber.trim()          }),
                     ...(data.isDefault  !== undefined && { isDefault:   data.isDefault                 }),
-                    ...(data.isActive   !== undefined && { isActive:    data.isActive                  }),
                     exchangeRate: exchangeRateDecimal,
                 },
             })
@@ -136,7 +131,7 @@ export async function setDefaultCurrency(id: string) {
     return safeActionWithRevalidation(
         async () => {
             await prisma.currency.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
-            const updated = await prisma.currency.update({ where: { id }, data: { isDefault: true, isActive: true } })
+            const updated = await prisma.currency.update({ where: { id }, data: { isDefault: true } })
             return { ...updated, exchangeRate: updated.exchangeRate?.toString() ?? null }
         },
         PATHS,
@@ -144,16 +139,6 @@ export async function setDefaultCurrency(id: string) {
     )
 }
 
-export async function toggleCurrencyActive(id: string, isActive: boolean) {
-    return safeActionWithRevalidation(
-        async () => {
-            const updated = await prisma.currency.update({ where: { id }, data: { isActive } })
-            return { ...updated, exchangeRate: updated.exchangeRate?.toString() ?? null }
-        },
-        PATHS,
-        'تعذّر تغيير حالة العملة'
-    )
-}
 
 export async function getNextCurrencyItemNumber() {
     return generateItemNumber('currency')

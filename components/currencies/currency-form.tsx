@@ -13,7 +13,8 @@ import { createCurrency, updateCurrency, getNextCurrencyItemNumber } from "@/lib
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Currency } from "@prisma/client"
-import { Loader2, ArrowLeftRight, Info } from "lucide-react"
+import { Loader2, ArrowLeftRight, Info, Coins, Hash, Banknote, ShieldAlert } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useState, useEffect } from "react"
 import type { SerializedCurrency } from "@/app/(dashboard)/currencies/page"
 
@@ -22,9 +23,8 @@ const formSchema = z.object({
     name:         z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
     code:         z.string().min(2, "الكود يجب أن يكون حرفين على الأقل").max(10),
     symbol:       z.string().min(1, "الرمز مطلوب"),
-    exchangeRate: z.string().optional(),   // stored as string; converted to Decimal on server
+    exchangeRate: z.string().optional(),
     isDefault:    z.boolean(),
-    isActive:     z.boolean(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -49,7 +49,6 @@ export function CurrencyForm({ currency, onSuccess, baseCurrencySymbol = "ر.ي"
             symbol:       currency?.symbol      || "",
             exchangeRate: currency?.exchangeRate != null ? String(currency.exchangeRate) : "",
             isDefault:    currency?.isDefault   || false,
-            isActive:     currency?.isActive    ?? true,
         },
     })
 
@@ -85,7 +84,6 @@ export function CurrencyForm({ currency, onSuccess, baseCurrencySymbol = "ر.ي"
                 code:         values.code,
                 symbol:       values.symbol,
                 isDefault:    values.isDefault,
-                isActive:     values.isActive,
                 exchangeRate: values.isDefault ? null : exchangeRate,
             }
 
@@ -109,122 +107,134 @@ export function CurrencyForm({ currency, onSuccess, baseCurrencySymbol = "ر.ي"
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                <div className="grid grid-cols-1 gap-4">
-                    <FormField control={form.control} name="itemNumber" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>الرقم *</FormLabel>
-                            <FormControl>
-                                <Input placeholder="0001" {...field} className="font-mono" dir="ltr" maxLength={4} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-6 relative">
+                <Card className="border-border/50 shadow-sm hover:border-primary/20 transition-all duration-300">
+                    <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
+                        <div className="flex items-center gap-2">
+                            <Coins className="w-5 h-5 text-primary" />
+                            <CardTitle className="text-lg">بيانات العملة</CardTitle>
+                        </div>
+                        <CardDescription>إدارة تفاصيل العملة وأسعار الصرف</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6 pt-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={form.control} name="itemNumber" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5" />الرقم *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="0001" {...field} className="font-mono focus-visible:ring-primary/20" dir="ltr" maxLength={4} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
 
-                    <FormField control={form.control} name="name" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>اسم العملة *</FormLabel>
-                            <FormControl>
-                                <Input placeholder="مثال: ريال يمني" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
+                            <FormField control={form.control} name="name" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5"><Banknote className="w-3.5 h-3.5" />اسم العملة *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="مثال: ريال يمني" className="focus-visible:ring-primary/20" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField control={form.control} name="code" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>الكود (ISO) *</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="YER" {...field} onChange={e => field.onChange(e.target.value.toUpperCase())} className="font-mono" dir="ltr" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
+                        <div className="grid grid-cols-2 gap-6">
+                            <FormField control={form.control} name="code" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5"><Info className="w-3.5 h-3.5" />الكود (ISO) *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="YER" {...field} onChange={e => field.onChange(e.target.value.toUpperCase())} className="font-mono focus-visible:ring-primary/20" dir="ltr" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
 
-                        <FormField control={form.control} name="symbol" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>الرمز *</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="ر.ي" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                    </div>
+                            <FormField control={form.control} name="symbol" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5"><Coins className="w-3.5 h-3.5" />الرمز *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="ر.ي" className="focus-visible:ring-primary/20" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
 
-                    {/* ── سعر الصرف ─────────────────────────────────────────── */}
-                    {!watchedIsDefault && (
-                        <FormField control={form.control} name="exchangeRate" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center gap-1.5">
-                                    <ArrowLeftRight className="size-3.5 text-muted-foreground" />
-                                    سعر الصرف
-                                </FormLabel>
-                                <FormControl>
-                                    <div className="relative">
-                                        <Input
-                                            type="number"
-                                            step="0.000001"
-                                            min="0"
-                                            placeholder="530.00"
-                                            dir="ltr"
-                                            className="font-mono pl-24"
-                                            {...field}
-                                        />
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">
-                                            {baseCurrencySymbol} / {watchedSymbol || "؟"}
+                        {/* ── سعر الصرف ─────────────────────────────────────────── */}
+                        {!watchedIsDefault && (
+                            <FormField control={form.control} name="exchangeRate" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5">
+                                        <ArrowLeftRight className="size-3.5 text-primary" />
+                                        سعر الصرف
+                                    </FormLabel>
+                                    <FormControl>
+                                        <div className="relative">
+                                            <Input
+                                                type="number"
+                                                step="0.000001"
+                                                min="0"
+                                                placeholder="530.00"
+                                                dir="ltr"
+                                                className="font-mono pl-24 focus-visible:ring-primary/20"
+                                                {...field}
+                                            />
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">
+                                                {baseCurrencySymbol} / {watchedSymbol || "؟"}
+                                            </div>
                                         </div>
+                                    </FormControl>
+                                    {/* Live hint */}
+                                    {watchedRate && parseFloat(watchedRate) > 0 && (
+                                        <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1.5">
+                                            <Info className="size-3 shrink-0" />
+                                            1 {baseCurrencySymbol} = {(1 / parseFloat(watchedRate)).toFixed(6)} {watchedSymbol || "؟"}
+                                            &nbsp;|&nbsp;
+                                            1 {watchedSymbol || "؟"} = {parseFloat(watchedRate).toFixed(2)} {baseCurrencySymbol}
+                                        </p>
+                                    )}
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        )}
+
+                        <div className="grid grid-cols-1 gap-4">
+                            <FormField control={form.control} name="isDefault" render={({ field }) => (
+                                <FormItem className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/10 p-4 shadow-sm hover:border-primary/20 transition-colors">
+                                    <FormControl>
+                                        <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-primary" />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                                            <ShieldAlert className="w-4 h-4 text-blue-500" />
+                                            العملة الرئيسية
+                                        </FormLabel>
+                                        <p className="text-[11px] text-muted-foreground mt-1.5">التسعير يُدخَل بها تلقائياً</p>
                                     </div>
-                                </FormControl>
-                                {/* Live hint */}
-                                {watchedRate && parseFloat(watchedRate) > 0 && (
-                                    <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
-                                        <Info className="size-3 shrink-0" />
-                                        1 {baseCurrencySymbol} = {(1 / parseFloat(watchedRate)).toFixed(6)} {watchedSymbol || "؟"}
-                                        &nbsp;|&nbsp;
-                                        1 {watchedSymbol || "؟"} = {parseFloat(watchedRate).toFixed(2)} {baseCurrencySymbol}
-                                    </p>
-                                )}
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                    )}
+                                </FormItem>
+                            )} />
 
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                        <FormField control={form.control} name="isDefault" render={({ field }) => (
-                            <FormItem className="flex items-center gap-3 rounded-lg border p-4">
-                                <FormControl>
-                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                                </FormControl>
-                                <div className="space-y-0.5">
-                                    <FormLabel className="text-sm font-medium cursor-pointer">العملة الرئيسية</FormLabel>
-                                    <p className="text-xs text-muted-foreground">التسعير يُدخَل بها تلقائياً</p>
-                                </div>
-                            </FormItem>
-                        )} />
+                        </div>
+                    </CardContent>
+                </Card>
 
-                        <FormField control={form.control} name="isActive" render={({ field }) => (
-                            <FormItem className="flex items-center gap-3 rounded-lg border p-4">
-                                <FormControl>
-                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                                </FormControl>
-                                <div className="space-y-0.5">
-                                    <FormLabel className="text-sm font-medium cursor-pointer">مفعّلة</FormLabel>
-                                    <p className="text-xs text-muted-foreground">تظهر في القوائم المنسدلة</p>
-                                </div>
-                            </FormItem>
-                        )} />
+                {/* Sticky Action Bar */}
+                <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background border-t border-border/50">
+                    <div className="flex items-center justify-end w-full">
+                        <Button 
+                            type="submit" 
+                            disabled={isSubmitting}
+                            className="w-full h-11 bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md transition-all duration-300"
+                        >
+                            {isSubmitting ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> جاري الحفظ...</>
+                            ) : (
+                                currency ? "حفظ التعديلات" : "إضافة عملة جديدة"
+                            )}
+                        </Button>
                     </div>
                 </div>
-
-                <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> جاري الحفظ...</>
-                    ) : (
-                        currency ? "حفظ التعديلات" : "إضافة عملة جديدة"
-                    )}
-                </Button>
             </form>
         </Form>
     )

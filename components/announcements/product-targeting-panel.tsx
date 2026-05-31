@@ -168,7 +168,7 @@ export function ProductTargetingPanel({
             {mode === "all" && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-3 py-2.5 animate-in fade-in duration-200">
                     <Package className="size-3.5 text-emerald-600 shrink-0" />
-                    <span>سيتم إرسال <strong className="text-emerald-600">{products.length}</strong> منتج لكل شخص</span>
+                    <span>سيتم إرسال <strong className="text-emerald-600">{products.length}</strong> منتج لكل عميل</span>
                 </div>
             )}
 

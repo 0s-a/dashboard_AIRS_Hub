@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Coins, CheckCircle2, CircleDollarSign, ArrowLeftRight, AlertTriangle } from "lucide-react"
+import { Plus, Coins, CircleDollarSign, ArrowLeftRight, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CurrencySheet } from "@/components/currencies/currency-sheet"
 import { CurrencyTable } from "@/components/currencies/currency-table"
@@ -42,7 +42,6 @@ export default function CurrenciesPage() {
         }
     }
 
-    const activeCurrencies  = currencies.filter(c => c.isActive)
     const defaultCurrency   = currencies.find(c => c.isDefault)
     const withRate          = currencies.filter(c => !c.isDefault && c.exchangeRate != null)
     const missingRate       = currencies.filter(c => !c.isDefault && c.exchangeRate == null)
@@ -66,7 +65,7 @@ export default function CurrenciesPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                 {/* Total */}
                 <div className="glass-panel rounded-xl p-6 border border-border/50">
                     <div className="flex items-center justify-between">
@@ -76,19 +75,6 @@ export default function CurrenciesPage() {
                         </div>
                         <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
                             <Coins className="size-6 text-primary" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Active */}
-                <div className="glass-panel rounded-xl p-6 border border-border/50">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">العملات المفعّلة</p>
-                            <h3 className="text-3xl font-bold mt-2">{activeCurrencies.length}</h3>
-                        </div>
-                        <div className="size-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                            <CheckCircle2 className="size-6 text-emerald-600" />
                         </div>
                     </div>
                 </div>

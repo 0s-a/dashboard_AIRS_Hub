@@ -18,8 +18,7 @@ const OrderItemSchema = z.object({
 })
 
 const CreateOrderSchema = z.object({
-    personId: z.string().uuid().optional().nullable(),
-    groupNumber: z.string().optional().nullable(),
+    customerId: z.string().uuid().optional().nullable(),
     notes: z.string().optional().nullable(),
     items: z.array(OrderItemSchema).min(1, 'يجب أن يحتوي الطلب على منتج واحد على الأقل'),
 })
@@ -43,18 +42,8 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        const { personId, groupNumber, notes, items } = parsed.data
-
-        // ── Resolve person ID ──
-        let resolvedPersonId: string | null = personId ?? null
-
-        if (!resolvedPersonId && groupNumber) {
-            const person = await prisma.person.findFirst({
-                where: { groupNumber },
-                select: { id: true },
-            })
-            resolvedPersonId = person?.id ?? null
-        }
+        const { customerId, notes, items } = parsed.data
+        const resolvedCustomerId: string | null = customerId ?? null
 
         // ── Resolve prices for each item ──
         const resolvedItems: {
@@ -92,18 +81,20 @@ export async function POST(req: NextRequest) {
             (sum, i) => sum + i.unitPrice * i.quantity, 0
         )
 
-        // ── Create order ──
-        const orderNumber = await generateItemNumber('order')
+        // ── Create order in transaction (prevents order number race condition) ──
+        const order = await prisma.$transaction(async (tx) => {
+            const orderNumber = await generateItemNumber('order')
 
-        const order = await prisma.order.create({
-            data: {
-                orderNumber,
-                personId: resolvedPersonId,
-                notes: notes ?? null,
-                totalAmount,
-                items: { create: resolvedItems },
-            },
-            include: ORDER_INCLUDE,
+            return tx.order.create({
+                data: {
+                    orderNumber,
+                    customerId: resolvedCustomerId,
+                    notes: notes ?? null,
+                    totalAmount,
+                    items: { create: resolvedItems },
+                },
+                include: ORDER_INCLUDE,
+            })
         })
 
         return apiSuccess(order, 201)
@@ -123,30 +114,15 @@ export async function GET(req: NextRequest) {
 
     try {
         const { searchParams } = new URL(req.url)
-        const personId = searchParams.get('personId')
-        const groupNumber = searchParams.get('groupNumber')
+        const customerId = searchParams.get('customerId')
         const status = searchParams.get('status')
         const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
         const limit = Math.max(1, Math.min(50, parseInt(searchParams.get('limit') || '20')))
         const skip = (page - 1) * limit
 
         // ── Build where clause ──
-        const where: any = {}
-
-        if (personId) {
-            where.personId = personId
-        } else if (groupNumber) {
-            const person = await prisma.person.findFirst({
-                where: { groupNumber },
-                select: { id: true },
-            })
-            if (person) {
-                where.personId = person.id
-            } else {
-                return apiError('الشخص غير موجود', 404, { code: 'NOT_FOUND' })
-            }
-        }
-
+        const where: Record<string, unknown> = {}
+        if (customerId) where.customerId = customerId
         if (status) where.status = status
 
         const [orders, total] = await Promise.all([

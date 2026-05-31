@@ -13,19 +13,21 @@ export const ORDER_ITEM_INCLUDE = {
 } as const
 
 export const ORDER_INCLUDE = {
-    person: { select: { id: true, name: true } },
+    customer: { select: { id: true, name: true } },
     items: { include: ORDER_ITEM_INCLUDE },
 } as const
 
-// ─── Person ─────────────────────────────────────────────────
+// ─── Customer (formerly Customer) ─────────────────────────────
 
-export const PERSON_INCLUDE = {
+export const CUSTOMER_INCLUDE = {
     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
-
-    priceLabels: { include: { priceLabel: { select: { id: true, name: true } } } },
+    priceLabel: { select: { id: true, name: true, customerType: true } },
     tags: { include: { tag: { select: { id: true, name: true } } } },
-    personCurrencies: { include: { currency: { select: { id: true, name: true, code: true, symbol: true } } } },
+    customerCurrencies: { include: { currency: { select: { id: true, name: true, code: true, symbol: true } } } },
 } as const
+
+/** @deprecated use CUSTOMER_INCLUDE */
+export const PERSON_INCLUDE = CUSTOMER_INCLUDE
 
 // ─── Product ────────────────────────────────────────────────
 

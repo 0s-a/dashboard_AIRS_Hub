@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from "react-hook-form"
 import * as z from "zod"
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, X, Trash2, Plus, Hash } from "lucide-react"
+import { Loader2, X, Trash2, Plus, Hash, Package, FileText, Settings, Tags } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -144,263 +144,277 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit as any, onInvalid)} className="space-y-8 pb-20 relative">
+            <form onSubmit={form.handleSubmit(onSubmit as any, onInvalid)} className="space-y-6 pb-24 relative">
+
+                {/* ─── Card 1: Basic Info ──────────────────────── */}
+                <Card className="border-border/50 shadow-sm hover:border-primary/20 transition-all duration-300">
+                    <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
+                        <div className="flex items-center gap-2">
+                            <Package className="w-5 h-5 text-primary" />
+                            <CardTitle className="text-lg">البيانات الأساسية</CardTitle>
+                        </div>
+                        <CardDescription>أدخل بيانات المنتج الأساسية ومواصفاته</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6 pt-6">
+                        {/* Product Code — Read-only (auto-generated on creation) */}
+                        {product && (
+                            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 w-fit">
+                                <Hash className="h-4 w-4 text-primary" />
+                                <span className="text-sm text-muted-foreground">الرقم المركب:</span>
+                                <span className="font-mono text-sm font-bold text-primary tracking-wider">
+                                    {(product as any).productCode}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Name + Item Number (optional) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>اسم المنتج</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="مثال: آيفون 15..." className="focus-visible:ring-primary/20" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="itemNumber"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>رقم الصنف (اختياري)</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="رقم يدوي اختياري..." className="focus-visible:ring-primary/20" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        {/* Category + Brand */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="categoryId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>التصنيف</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
+                                            <FormControl>
+                                                <SelectTrigger className="w-full focus:ring-primary/20">
+                                                    <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر التصنيف"} />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {categories.length === 0 ? (
+                                                    <div className="px-2 py-4 text-xs text-muted-foreground text-center">
+                                                        لا توجد تصنيفات
+                                                    </div>
+                                                ) : (
+                                                    categories.map((cat) => (
+                                                        <SelectItem key={cat.id} value={cat.id}>
+                                                            {cat.name}
+                                                        </SelectItem>
+                                                    ))
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="brandId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>البراند</FormLabel>
+                                        <Select
+                                            onValueChange={v => field.onChange(v === "none" ? null : v)}
+                                            value={field.value ?? "none"}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger className="w-full focus:ring-primary/20">
+                                                    <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر البراند"} />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="none" className="text-muted-foreground text-sm">
+                                                    بدون براند
+                                                </SelectItem>
+                                                {brands.map(b => (
+                                                    <SelectItem key={b.id} value={b.id}>
+                                                        {b.name}
+                                                        {b.code && (
+                                                            <span className="mr-2 text-xs text-muted-foreground font-mono">{b.code}</span>
+                                                        )}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <FormField
+                            control={form.control}
+                            name="isAvailable"
+                            render={({ field }) => {
+                                const hasPrices = product ? ((product as any).productPrices?.length ?? 0) > 0 : false;
+                                const hasUnits = product ? ((product as any).productUnits?.length ?? 0) > 0 : false;
+                                const canEnable = hasPrices && hasUnits;
+
+                                return (
+                                    <FormItem className="flex flex-row items-center gap-3 space-y-0 rounded-xl border border-border/60 bg-muted/10 p-4 shadow-sm hover:border-primary/20 transition-colors">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                                disabled={!canEnable}
+                                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                            />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel className="cursor-pointer">متاح في المخزون</FormLabel>
+                                            {!canEnable && (
+                                                <p className="text-[11px] text-muted-foreground mt-1.5">
+                                                    {product ? "يجب إضافة وحدة قياس وتسعيرة أولاً" : "يمكنك إتاحة المنتج بعد الحفظ وإضافة التسعيرة والوحدات"}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </FormItem>
+                                )
+                            }}
+                        />
+                    </CardContent>
+                </Card>
+
+                {/* ─── Card 2: Description & Indexing ──────────── */}
+                <Card className="border-border/50 shadow-sm hover:border-primary/20 transition-all duration-300">
+                    <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
+                        <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <CardTitle className="text-lg">تفاصيل وفهرسة</CardTitle>
+                        </div>
+                        <CardDescription>البيانات الوصفية التي تساعد في البحث والأرشفة</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6 pt-6">
+                        {/* Description */}
+                        <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>الوصف</FormLabel>
+                                    <FormControl>
+                                        <Textarea placeholder="وصف تفصيلي للمنتج..." className="focus-visible:ring-primary/20 min-h-[100px]" {...field} value={field.value ?? ""} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* ─── Alternative Names Section ──────────── */}
+                        <div className="space-y-4 pt-4 border-t border-border/50">
+                            <div className="flex items-center justify-between">
+                                <FormLabel className="text-base font-semibold flex items-center gap-2">
+                                    <Tags className="h-4 w-4 text-muted-foreground" />
+                                    الأسماء البديلة
+                                </FormLabel>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => appendAlternativeName("" as any)}
+                                    className="bg-secondary/30 hover:bg-secondary/60 border-dashed"
+                                >
+                                    <Plus className="mr-2 h-3.5 w-3.5" />
+                                    إضافة اسم
+                                </Button>
+                            </div>
+
+                            {alternativeNameFields.length > 0 ? (
+                                <div className="grid gap-3">
+                                    {alternativeNameFields.map((field, index) => (
+                                        <div key={field.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-muted/5 animate-in fade-in slide-in-from-top-2">
+                                            <FormField
+                                                control={form.control}
+                                                name={`alternativeNames.${index}`}
+                                                render={({ field }) => (
+                                                    <FormItem className="flex-1">
+                                                        <FormControl>
+                                                            <Input placeholder="الاسم البديل للمنتج..." className="h-9 focus-visible:ring-primary/20" {...field} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => removeAlternativeName(index)}
+                                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 h-9 w-9"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-6 border border-dashed rounded-xl text-muted-foreground text-sm bg-muted/5">
+                                    لا توجد أسماء بديلة مضافة لهذا المنتج.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ─── Tags Section ────────────────────────── */}
+                        <TagsField control={form.control} />
+                    </CardContent>
+                </Card>
 
                 {/* Sticky Action Bar */}
-                <div className="sticky top-0 z-10 -mx-6 px-6 py-4 bg-background/80 backdrop-blur-md border-b flex items-center justify-between mb-6">
-                    <div>
-                        <h2 className="text-xl font-bold tracking-tight">
-                            {product ? "تعديل المنتج" : "منتج جديد"}
-                        </h2>
-                        <p className="text-sm text-muted-foreground hidden sm:block">
-                            {product ? "قم بتحديث بيانات المنتج والأسعار المرتبطة به" : "أدخل بيانات المنتج الجديد ومواصفاته"}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button type="button" variant="outline" onClick={() => router.back()}>
-                            إلغاء
-                        </Button>
-                        <Button type="submit">
-                            {product ? "حفظ التعديلات" : "إضافة المنتج"}
-                        </Button>
+                <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/80 backdrop-blur-xl border-t shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                    <div className="container max-w-5xl mx-auto flex items-center justify-between">
+                        <div className="hidden sm:block">
+                            <p className="text-sm font-medium">
+                                {product ? "تحديث بيانات المنتج" : "إضافة منتج جديد"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                تأكد من صحة البيانات قبل الحفظ
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => router.back()}
+                                className="flex-1 sm:flex-none border-dashed"
+                            >
+                                إلغاء
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={form.formState.isSubmitting}
+                                className="flex-1 sm:flex-none bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md transition-all duration-300"
+                            >
+                                {form.formState.isSubmitting ? (
+                                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                                ) : null}
+                                {product ? "حفظ التعديلات" : "إضافة المنتج"}
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
-                <Tabs defaultValue="basic" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 mb-8">
-                        <TabsTrigger value="basic">المعلومات الأساسية</TabsTrigger>
-                        <TabsTrigger value="indexing">الوصف والفهرسة</TabsTrigger>
-                    </TabsList>
-
-                    {/* ─── TAB 1: Basic Info ──────────────────────── */}
-                    <TabsContent value="basic" className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>البيانات الأساسية</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {/* Product Code — Read-only (auto-generated on creation) */}
-                                {product && (
-                                    <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                                        <Hash className="h-4 w-4 text-primary" />
-                                        <span className="text-sm text-muted-foreground">الرقم المركب:</span>
-                                        <span className="font-mono text-sm font-bold text-primary tracking-wider">
-                                            {(product as any).productCode}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {/* Name + Item Number (optional) */}
-                                <div className="grid grid-cols-1 gap-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="name"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>اسم المنتج</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="مثال: آيفون 15..." {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="itemNumber"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>رقم الصنف (اختياري)</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="رقم يدوي اختياري..." {...field} value={field.value ?? ""} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-
-                                {/* Category + Brand */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="categoryId"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>التصنيف</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
-                                                    <FormControl>
-                                                        <SelectTrigger className="w-full">
-                                                            <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر التصنيف"} />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        {categories.length === 0 ? (
-                                                            <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                                                                لا توجد تصنيفات
-                                                            </div>
-                                                        ) : (
-                                                            categories.map((cat) => (
-                                                                <SelectItem key={cat.id} value={cat.id}>
-                                                                    {cat.icon && <span className="ml-2">{cat.icon}</span>}
-                                                                    {cat.name}
-                                                                </SelectItem>
-                                                            ))
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="brandId"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>البراند</FormLabel>
-                                                <Select
-                                                    onValueChange={v => field.onChange(v === "none" ? null : v)}
-                                                    value={field.value ?? "none"}
-                                                >
-                                                    <FormControl>
-                                                        <SelectTrigger className="w-full">
-                                                            <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر البراند"} />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="none" className="text-muted-foreground text-sm">
-                                                            بدون براند
-                                                        </SelectItem>
-                                                        {brands.map(b => (
-                                                            <SelectItem key={b.id} value={b.id}>
-                                                                {b.name}
-                                                                {b.code && (
-                                                                    <span className="mr-2 text-xs text-muted-foreground font-mono">{b.code}</span>
-                                                                )}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-
-                                <FormField
-                                    control={form.control}
-                                    name="isAvailable"
-                                    render={({ field }) => {
-                                        const hasPrices = product ? ((product as any).productPrices?.length ?? 0) > 0 : false;
-                                        const hasUnits = product ? ((product as any).productUnits?.length ?? 0) > 0 : false;
-                                        const canEnable = hasPrices && hasUnits;
-
-                                        return (
-                                            <FormItem className="flex flex-row items-center gap-2 space-y-0 rounded-md border p-4 shadow-sm">
-                                                <FormControl>
-                                                    <Checkbox
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                        disabled={!canEnable}
-                                                    />
-                                                </FormControl>
-                                                <div className="space-y-1 leading-none">
-                                                    <FormLabel>متاح في المخزون</FormLabel>
-                                                    {!canEnable && (
-                                                        <p className="text-[11px] text-muted-foreground mt-1.5">
-                                                            {product ? "يجب إضافة وحدة قياس وتسعيرة أولاً" : "يمكنك إتاحة المنتج بعد الحفظ وإضافة التسعيرة والوحدات"}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </FormItem>
-                                        )
-                                    }}
-                                />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* ─── TAB 2: Description & Indexing ──────────── */}
-                    <TabsContent value="indexing" className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>تفاصيل وفهرسة</CardTitle>
-                                <CardDescription>البيانات الوصفية التي تساعد في البحث والأرشفة</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                {/* Description */}
-                                <FormField
-                                    control={form.control}
-                                    name="description"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>الوصف</FormLabel>
-                                            <FormControl>
-                                                <Textarea placeholder="وصف تفصيلي للمنتج..." {...field} value={field.value ?? ""} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                {/* ─── Alternative Names Section ──────────── */}
-                                <div className="space-y-4 pt-4 border-t">
-                                    <div className="flex items-center justify-between">
-                                        <FormLabel className="text-base font-semibold">الأسماء البديلة (تسميات أخرى)</FormLabel>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => appendAlternativeName("" as any)}
-                                            className="bg-secondary/50 border-dashed"
-                                        >
-                                            <Plus className="mr-2 h-3.5 w-3.5" />
-                                            إضافة اسم بديل
-                                        </Button>
-                                    </div>
-
-                                    {alternativeNameFields.length > 0 ? (
-                                        <div className="grid gap-3">
-                                            {alternativeNameFields.map((field, index) => (
-                                                <div key={field.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-muted/10 animate-in fade-in slide-in-from-top-2">
-                                                    <FormField
-                                                        control={form.control}
-                                                        name={`alternativeNames.${index}`}
-                                                        render={({ field }) => (
-                                                            <FormItem className="flex-1">
-                                                                <FormControl>
-                                                                    <Input placeholder="الاسم البديل للمنتج..." className="h-9" {...field} />
-                                                                </FormControl>
-                                                                <FormMessage />
-                                                            </FormItem>
-                                                        )}
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => removeAlternativeName(index)}
-                                                        className="text-muted-foreground hover:text-destructive shrink-0"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-6 border-2 border-dashed rounded-xl text-muted-foreground text-sm">
-                                            لا توجد أسماء بديلة مضافة لهذا المنتج.
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* ─── Tags Section ────────────────────────── */}
-                                <TagsField control={form.control} />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
             </form>
         </Form>
     )

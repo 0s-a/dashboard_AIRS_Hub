@@ -15,7 +15,7 @@ import { requireAdmin }     from '@/lib/auth-utils'
 import { publishBatch, createAnnouncementChannel } from '@/lib/utils/rabbitmq'
 import { renderMessage }    from '@/lib/utils/message-builder'
 import { convertUrlsToBase64 } from './base64-helper'
-import type { ThrottleConfig, PersonFilters, ProductFilters } from '@/lib/types/announcements'
+import type { ThrottleConfig, CustomerFilters, ProductFilters } from '@/lib/types/announcements'
 import type { QueueMessagePayload } from '@/lib/utils/rabbitmq'
 import {
     dbGetAnnouncement,
@@ -26,17 +26,17 @@ import {
     dbSetAnnouncementStatus,
     dbGetRenderableTemplate,
     dbGetProductPayloads,
-    dbGetPersonIds,
+    dbGetCustomerIds,
     dbGetProductIds,
-    dbGetPersonSnapshot,
+    dbGetCustomerSnapshot,
     dbGetProductSnapshot,
-    dbGetPersonSample,
+    dbGetCustomerSample,
     dbGetFailedMessages,
     dbMarkMessageRetrying,
     dbGetMessages,
     dbGetMessageCounts,
     dbGetAnnouncementFormData,
-    countPersons,
+    countCustomers,
     countProducts,
 } from './queries'
 import {
@@ -95,7 +95,7 @@ export async function createAnnouncement(data: AnnouncementInput) {
             title:               data.title.trim(),
             description:         data.description?.trim() || null,
             scheduledAt:         new Date(data.scheduledAt),
-            personFilters:       (data.personFilters  ?? { all: true }) as any,
+            customerFilters:       (data.customerFilters  ?? { all: true }) as any,
             productFilters:      (data.productFilters ?? { all: true }) as any,
             templateId:          data.templateId ?? null,
             delayBetweenSeconds: data.delayBetweenSeconds ?? 0,
@@ -117,7 +117,7 @@ export async function updateAnnouncement(id: string, data: Partial<AnnouncementI
         if (data.title                !== undefined) patch.title               = data.title.trim()
         if (data.description          !== undefined) patch.description          = data.description?.trim() || null
         if (data.scheduledAt          !== undefined) patch.scheduledAt          = new Date(data.scheduledAt)
-        if (data.personFilters        !== undefined) patch.personFilters        = data.personFilters
+        if (data.customerFilters        !== undefined) patch.customerFilters        = data.customerFilters
         if (data.productFilters       !== undefined) patch.productFilters       = data.productFilters
         if (data.templateId           !== undefined) patch.templateId           = data.templateId
         if (data.delayBetweenSeconds  !== undefined) patch.delayBetweenSeconds  = data.delayBetweenSeconds
@@ -156,7 +156,7 @@ export async function cloneAnnouncement(id: string) {
             title:               `نسخة - ${ann.title}`,
             description:         ann.description,
             scheduledAt:         new Date(),
-            personFilters:       ann.personFilters  as any,
+            customerFilters:       ann.customerFilters  as any,
             productFilters:      ann.productFilters as any,
             templateId:          ann.templateId,
             delayBetweenSeconds: ann.delayBetweenSeconds,
@@ -180,43 +180,43 @@ export async function cancelAnnouncement(id: string) {
 
 // ─── Audience Preview ─────────────────────────────────────────────────────────
 
-/** Returns estimated person + product counts for the given filters. */
+/** Returns estimated customer + product counts for the given filters. */
 export async function previewAudience(
-    personFilters:  PersonFilters,
+    customerFilters:  CustomerFilters,
     productFilters: ProductFilters,
 ) {
     return safeAction(async () => {
-        const [personCount, productCount] = await Promise.all([
-            countPersons(personFilters, personFilters.manualIds ?? []),
+        const [customerCount, productCount] = await Promise.all([
+            countCustomers(customerFilters, customerFilters.manualIds ?? []),
             countProducts(productFilters, productFilters.manualIds ?? []),
         ])
-        return { personCount, productCount }
+        return { customerCount, productCount }
     }, 'تعذّر حساب الجمهور')
 }
 
-/** Returns a sample of persons and products for the saved announcement. */
+/** Returns a sample of customers and products for the saved announcement. */
 export async function getAudienceSnapshot(id: string) {
     return safeAction(async () => {
         const ann = await dbGetAnnouncement(id)
         if (!ann) throw new Error('الإعلان غير موجود')
 
-        const personFilters  = ann.personFilters  as PersonFilters
+        const customerFilters  = ann.customerFilters  as CustomerFilters
         const productFilters = ann.productFilters as ProductFilters
 
-        const [personIds, productIds] = await Promise.all([
-            dbGetPersonIds(personFilters, personFilters.manualIds ?? []),
+        const [customerIds, productIds] = await Promise.all([
+            dbGetCustomerIds(customerFilters, customerFilters.manualIds ?? []),
             dbGetProductIds(productFilters, productFilters.manualIds ?? []),
         ])
 
-        const [samplePersons, sampleProducts] = await Promise.all([
-            dbGetPersonSnapshot(personIds),
+        const [sampleCustomers, sampleProducts] = await Promise.all([
+            dbGetCustomerSnapshot(customerIds),
             dbGetProductSnapshot(productIds),
         ])
 
         return {
-            personCount:    personIds.length,
+            customerCount:    customerIds.length,
             productCount:   productIds.length,
-            samplePersons,
+            sampleCustomers,
             sampleProducts,
         }
     }, 'تعذّر جلب لقطة الجمهور')
@@ -233,30 +233,28 @@ export async function dryRunAnnouncement(id: string, sampleSize = DEFAULT_SAMPLE
         const ann = await dbGetAnnouncement(id)
         if (!ann) throw new Error('الإعلان غير موجود')
 
-        const personFilters  = ann.personFilters  as PersonFilters
+        const customerFilters  = ann.customerFilters  as CustomerFilters
         const productFilters = ann.productFilters as ProductFilters
 
-        const [personIds, productPayloads, template] = await Promise.all([
-            dbGetPersonIds(personFilters, personFilters.manualIds ?? []),
+        const [customerIds, productPayloads, template] = await Promise.all([
+            dbGetCustomerIds(customerFilters, customerFilters.manualIds ?? []),
             dbGetProductPayloads(productFilters, productFilters.manualIds ?? []),
             dbGetRenderableTemplate(ann.templateId),
         ])
 
-        const samplePersons = await dbGetPersonSample(personIds, sampleSize)
+        const sampleCustomers = await dbGetCustomerSample(customerIds, sampleSize)
 
         // Render actual messages — same engine as the real send
-        const renderedMessages = samplePersons.map(person => {
-            const personPayload = {
-                id:            person.id,
-                name:          person.name,
-                groupName:     person.groupName,
-                groupNumber:   person.groupNumber,
-                priceLabelIds: person.priceLabels.map(pl => pl.priceLabelId),
-                contacts:      person.contacts,
+        const renderedMessages = sampleCustomers.map(customer => {
+            const customerPayload = {
+                id:            customer.id,
+                name:          customer.name,
+                priceLabelIds: customer.priceLabelId ? [customer.priceLabelId] : [],
+                contacts:      customer.contacts,
             }
-            const rendered = renderMessage(template, personPayload, productPayloads)
+            const rendered = renderMessage(template, customerPayload, productPayloads)
             return {
-                personName:  person.name,
+                customerName:  customer.name,
                 messageBody: rendered.messageBody,
                 imageUrls:   rendered.imageUrls,
                 templateType: template.type,
@@ -264,9 +262,9 @@ export async function dryRunAnnouncement(id: string, sampleSize = DEFAULT_SAMPLE
         })
 
         return {
-            totalPersons:  personIds.length,
+            totalCustomers:  customerIds.length,
             totalProducts: productPayloads.length,
-            samplePersons: samplePersons.map(p => ({ id: p.id, name: p.name, groupName: p.groupName })),
+            sampleCustomers: sampleCustomers.map(p => ({ id: p.id, name: p.name })),
             renderedMessages,
         }
     }, 'تعذّر تنفيذ المعاينة')
@@ -309,10 +307,8 @@ export async function retryFailedMessages(announcementId: string) {
                     totalMessages:  failedMsgs.length,
                     retryCount:     msg.retryCount + 1,
                     rendered: {
-                        personName:   msg.personName,
-                        personId:     msg.personId,
-                        groupName:    null,
-                        groupNumber:  null,
+                        customerName:   msg.customerName,
+                        customerId:     msg.customerId,
                         messageBody:  msg.messageBody,
                         imageUrls:    convertUrlsToBase64(msg.imageUrls as string[]),
                         templateType: (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0) ? 'text_image' : 'text',

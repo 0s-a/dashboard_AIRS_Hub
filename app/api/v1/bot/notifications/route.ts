@@ -11,7 +11,7 @@ const CreateNotificationSchema = z.object({
     productId: z.string().optional().nullable(),
     productName: z.string().optional().nullable(),
     phoneNumber: z.string().optional().nullable(),
-    personId: z.string().optional().nullable(),
+    customerId: z.string().optional().nullable(),
     source: z.string().optional().nullable(),
 })
 
@@ -31,19 +31,19 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        const { type, searchQuery, productId, productName, phoneNumber, personId, source } = parsed.data
+        const { type, searchQuery, productId, productName, phoneNumber, customerId, source } = parsed.data
 
         // Validate foreign keys — ignore invalid IDs instead of failing
         let validProductId: string | null = null
-        let validPersonId: string | null = null
+        let validCustomerId: string | null = null
 
         if (productId) {
             const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } })
             validProductId = product?.id ?? null
         }
-        if (personId) {
-            const person = await prisma.person.findUnique({ where: { id: personId }, select: { id: true } })
-            validPersonId = person?.id ?? null
+        if (customerId) {
+            const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } })
+            validCustomerId = customer?.id ?? null
         }
 
         const notification = await prisma.aiNotification.create({
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
                 searchQuery,
                 productId: validProductId,
                 productName: productName || null,
-                personId: validPersonId,
+                customerId: validCustomerId,
                 phoneNumber: phoneNumber || null,
                 source: source || 'bot',
             },
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
             prisma.aiNotification.findMany({
                 where,
                 include: {
-                    person: { select: { id: true, name: true } },
+                    customer: { select: { id: true, name: true } },
                 },
                 orderBy: { createdAt: 'desc' },
                 skip,

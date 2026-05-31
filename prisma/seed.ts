@@ -159,7 +159,7 @@ async function main() {
 
     console.log('\n👥 Seeding Persons...')
     for (const c of persons) {
-        const person = await prisma.person.upsert({
+        const person = await prisma.customer.upsert({
             where: { id: c.id },
             update: {},
             create: {

@@ -20,6 +20,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
+    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { deleteUnit } from "@/lib/actions/units"
@@ -33,11 +34,22 @@ export interface UnitRow {
     name: string
     pluralName?: string | null
     notes?: string | null
-    isActive: boolean
     createdAt?: string | Date
 }
 
 export const columns: ColumnDef<UnitRow>[] = [
+    {
+        accessorKey: "itemNumber",
+        enableColumnFilter: true,
+        meta: { filterType: 'text' as const, filterPlaceholder: 'الرقم...' },
+        header: "الرقم",
+        cell: ({ row }) => (
+            <span className="text-xs font-mono text-muted-foreground">
+                {row.original.itemNumber}
+            </span>
+        ),
+        size: 100,
+    },
     {
         accessorKey: "name",
         enableColumnFilter: true,
@@ -56,24 +68,9 @@ export const columns: ColumnDef<UnitRow>[] = [
                 </div>
             </div>
         ),
+        size: 250,
     },
-    {
-        accessorKey: "isActive",
-        enableColumnFilter: true,
-        meta: { filterType: 'boolean' as const },
-        filterFn: (row: any, _columnId: string, filterValue: string) => {
-            return String(row.original.isActive) === filterValue
-        },
-        header: "الحالة",
-        cell: ({ row }) => {
-            const isActive = row.original.isActive
-            return (
-                <Badge variant={isActive ? "default" : "secondary"} className={isActive ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20 shadow-none" : ""}>
-                    {isActive ? "نشط" : "معطل"}
-                </Badge>
-            )
-        },
-    },
+
     {
         accessorKey: "notes",
         enableColumnFilter: true,
@@ -84,22 +81,12 @@ export const columns: ColumnDef<UnitRow>[] = [
                 {row.original.notes || "—"}
             </div>
         ),
-    },
-    {
-        accessorKey: "itemNumber",
-        enableColumnFilter: true,
-        meta: { filterType: 'text' as const },
-        header: "الرقم",
-        cell: ({ row }) => (
-            <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded">
-                #{row.original.itemNumber}
-            </span>
-        ),
-        size: 80,
+        size: 300,
     },
     {
         id: "actions",
         enableColumnFilter: false,
+        header: "الإجراءات",
         cell: function ActionsCell({ row }) {
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
             const unit = row.original
@@ -116,39 +103,25 @@ export const columns: ColumnDef<UnitRow>[] = [
             }
 
             return (
-                <>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    window.dispatchEvent(new CustomEvent("edit-unit", { detail: unit }))
-                                }}
-                            >
-                                <Pencil className="ml-2 h-4 w-4" />
-                                تعديل
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => setIsDeleteDialogOpen(true)}
-                            >
-                                <Trash2 className="ml-2 h-4 w-4" />
-                                حذف
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                <div className="flex items-center gap-1">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-muted-foreground hover:text-primary" 
+                        onClick={() => window.dispatchEvent(new CustomEvent("edit-unit", { detail: unit }))}
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </Button>
 
                     <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                                <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                                 <AlertDialogDescription>
                                     سيتم حذف وحدة &quot;{unit.name}&quot; نهائياً.
                                     لا يمكن حذف وحدة مرتبطة بأسعار منتجات.
@@ -165,8 +138,9 @@ export const columns: ColumnDef<UnitRow>[] = [
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
-                </>
+                </div>
             )
         },
+        size: 150,
     },
 ]

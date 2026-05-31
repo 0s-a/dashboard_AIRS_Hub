@@ -7,10 +7,10 @@ import { toDisplayUrl } from '@/lib/utils/image-paths'
 /** Lightweight data needed to populate the announcement sheet */
 export async function getAnnouncementSheetData() {
     return safeAction(async () => {
-        const [persons, products, categories, rawTags] = await Promise.all([
-            prisma.person.findMany({
+        const [customers, products, categories, rawTags] = await Promise.all([
+            prisma.customer.findMany({
                 where: { isActive: true },
-                select: { id: true, name: true, groupName: true },
+                select: { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
             prisma.product.findMany({
@@ -31,16 +31,16 @@ export async function getAnnouncementSheetData() {
                 select: { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
-            // Fetch distinct tags from active persons via PersonTag relation
-            prisma.personTag.findMany({
-                where:  { person: { isActive: true } },
+            // Fetch distinct tags from active customers via CustomerTag relation
+            prisma.customerTag.findMany({
+                where:  { customer: { isActive: true } },
                 select: { tag: { select: { name: true } } },
                 distinct: ['tagId'],
             }),
         ])
 
         // Collect unique tag names
-        const personTags: string[] = [
+        const customerTags: string[] = [
             ...new Set(rawTags.map((pt: any) => pt.tag.name))
         ].sort()
 
@@ -54,7 +54,7 @@ export async function getAnnouncementSheetData() {
         }))
 
 
-        return { persons, products: mappedProducts, categories, personTags }
+        return { customers, products: mappedProducts, categories, customerTags }
     }, 'تعذّر جلب بيانات الإعلان')
 }
 

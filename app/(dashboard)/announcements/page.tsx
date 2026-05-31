@@ -59,7 +59,7 @@ export default function AnnouncementsPage() {
     const drafts    = announcements.filter(a => a.status === "pending")
     const active    = announcements.filter(a => ["queued", "queueing"].includes(a.status))
 
-    const totalReached = sent.length  // We no longer store sentCount — each sent row is one person
+    const totalReached = sent.length  // We no longer store sentCount — each sent row is one customer
     const successRate  = sent.length > 0
         ? Math.round((sent.length / (sent.length + failed.length || 1)) * 100)
         : 0
@@ -87,7 +87,7 @@ export default function AnnouncementsPage() {
             icon:  Users,
             color: "text-indigo-600",
             bg:    "bg-indigo-500/10",
-            sub:   "شخص وصلتهم الرسائل",
+            sub:   "عميل وصلتهم الرسائل",
         },
         {
             label: "مسودات",
@@ -126,7 +126,7 @@ export default function AnnouncementsPage() {
                         الإعلانات
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        أنشئ وأدِر إعلانات موجّهة للأشخاص والمنتجات
+                        أنشئ وأدِر إعلانات موجّهة للعملاء والمنتجات
                     </p>
                 </div>
                 <Button

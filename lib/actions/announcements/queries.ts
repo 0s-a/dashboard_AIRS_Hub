@@ -12,17 +12,17 @@ import type { Prisma } from '@prisma/client'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
 import {
     resolveProducts,
-    streamPersons,
-    countPersons,
+    streamCustomers,
+    countCustomers,
     countProducts,
-    buildPersonWhere,
+    buildCustomerWhere,
     buildProductWhere,
 } from '@/lib/utils/targeting'
 import {
     DEFAULT_TEXT_TEMPLATE,
 } from '@/lib/utils/message-builder'
 import type {
-    PersonFilters,
+    CustomerFilters,
     ProductFilters,
     ProductPayload,
 } from '@/lib/types/announcements'
@@ -31,8 +31,8 @@ import { SNAPSHOT_SAMPLE_SIZE } from './types'
 
 // ─── Re-export targeting helpers so callers import from one place ─────────────
 
-export { streamPersons, countPersons, countProducts, resolveProducts }
-export { buildPersonWhere, buildProductWhere }
+export { streamCustomers, countCustomers, countProducts, resolveProducts }
+export { buildCustomerWhere, buildProductWhere }
 
 // ─── Announcement ─────────────────────────────────────────────────────────────
 
@@ -125,37 +125,35 @@ export async function dbGetProductSnapshot(ids: string[]) {
     })
 }
 
-// ─── Persons ──────────────────────────────────────────────────────────────────
+// ─── Customers ──────────────────────────────────────────────────────────────────
 
-/** Resolves person IDs only — used for audience preview counts. */
-export async function dbGetPersonIds(
-    filters:   PersonFilters,
+/** Resolves customer IDs only — used for audience preview counts. */
+export async function dbGetCustomerIds(
+    filters:   CustomerFilters,
     manualIds: string[]
 ): Promise<string[]> {
-    const where = buildPersonWhere(filters, manualIds)
-    const rows  = await prisma.person.findMany({ where, select: { id: true } })
+    const where = buildCustomerWhere(filters, manualIds)
+    const rows  = await prisma.customer.findMany({ where, select: { id: true } })
     return rows.map(r => r.id)
 }
 
-/** Snapshot: first N persons for preview display. */
-export async function dbGetPersonSnapshot(ids: string[]) {
-    return prisma.person.findMany({
+/** Snapshot: first N customers for preview display. */
+export async function dbGetCustomerSnapshot(ids: string[]) {
+    return prisma.customer.findMany({
         where:  { id: { in: ids.slice(0, SNAPSHOT_SAMPLE_SIZE) } },
-        select: { id: true, name: true, groupName: true },
+        select: { id: true, name: true },
     })
 }
 
-/** Fetch small person sample with rendering data for dryRun. */
-export async function dbGetPersonSample(ids: string[], limit: number) {
-    return prisma.person.findMany({
+/** Fetch small customer sample with rendering data for dryRun. */
+export async function dbGetCustomerSample(ids: string[], limit: number) {
+    return prisma.customer.findMany({
         where:  { id: { in: ids.slice(0, limit) } },
         select: {
             id:          true,
             name:        true,
-            groupName:   true,
-            groupNumber: true,
             contacts:    { select: { type: true, value: true } },
-            priceLabels: { select: { priceLabelId: true } },
+            priceLabelId: true,
         },
     })
 }
@@ -164,9 +162,9 @@ export async function dbGetPersonSample(ids: string[], limit: number) {
 
 export interface UpsertMessageInput {
     announcementId: string
-    personId:       string
+    customerId:       string
     messageIndex:   number
-    personName:     string | null
+    customerName:     string | null
     whatsappNumber: string | null
     productIds:     string[]
     messageBody:    string
@@ -177,16 +175,16 @@ export interface UpsertMessageInput {
 export async function dbUpsertMessage(data: UpsertMessageInput) {
     return prisma.announcementMessage.upsert({
         where: {
-            announcementId_personId: {
+            announcementId_customerId: {
                 announcementId: data.announcementId,
-                personId:       data.personId,
+                customerId:       data.customerId,
             },
         },
         create: {
             announcementId: data.announcementId,
             messageIndex:   data.messageIndex,
-            personId:       data.personId,
-            personName:     data.personName,
+            customerId:       data.customerId,
+            customerName:     data.customerName,
             whatsappNumber: data.whatsappNumber,
             productIds:     data.productIds as any,
             messageBody:    data.messageBody,
@@ -239,8 +237,8 @@ export async function dbGetMessages(
             select: {
                 id:             true,
                 messageIndex:   true,
-                personId:       true,
-                personName:     true,
+                customerId:       true,
+                customerName:     true,
                 whatsappNumber: true,
                 status:         true,
                 errorReason:    true,
@@ -271,11 +269,11 @@ export async function dbGetMessageCounts(announcementId: string) {
 
 /** All reference data needed to populate the announcement creation form. */
 export async function dbGetAnnouncementFormData() {
-    const [persons, rawProducts, categories, rawTags] =
+    const [customers, rawProducts, categories, rawTags] =
         await Promise.all([
-            prisma.person.findMany({
+            prisma.customer.findMany({
                 where:   { isActive: true },
-                select:  { id: true, name: true, groupName: true },
+                select:  { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
             prisma.product.findMany({
@@ -294,14 +292,14 @@ export async function dbGetAnnouncementFormData() {
                 select:  { id: true, name: true },
                 orderBy: { name: 'asc' },
             }),
-            prisma.personTag.findMany({
-                where:  { person: { isActive: true } },
+            prisma.customerTag.findMany({
+                where:  { customer: { isActive: true } },
                 select: { tag: { select: { name: true } } },
                 distinct: ['tagId'],
             }),
         ])
 
-    const personTags: string[] = [
+    const customerTags: string[] = [
         ...new Set(rawTags.map(pt => pt.tag.name))
     ].sort()
 
@@ -313,5 +311,5 @@ export async function dbGetAnnouncementFormData() {
         mainImage:  (p as any).productImages?.[0]?.url ? toDisplayUrl((p as any).productImages[0].url) : null,
     }))
 
-    return { persons, products, categories, personTags }
+    return { customers, products, categories, customerTags }
 }

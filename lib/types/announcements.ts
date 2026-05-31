@@ -21,12 +21,12 @@ export const DEFAULT_THROTTLE: ThrottleConfig = {
 
 // ── Advanced audience builder types ──────────────────────────────────────────
 
-export type ConditionType = 'group' | 'tag' | 'exclude_tag'
+export type ConditionType = 'tag' | 'exclude_tag'
 
 export interface AudienceCondition {
     id:    string        // client-side UUID
     type:  ConditionType
-    value: string        // groupName | tagName
+    value: string        // tagName
     label: string        // human-readable
 }
 
@@ -40,9 +40,9 @@ export interface FilterGroup {
  * Logic: AND across groups, OR inside each group.
  * Example: (group=VIP) AND (tag=عطور)
  */
-export interface PersonFilters {
+export interface CustomerFilters {
     all?:          boolean
-    groupNames?:   string[]
+
     tags?:         string[]
     excludeTags?:  string[]
     excludeIds?:   string[]
@@ -62,22 +62,20 @@ export interface ProductFilters {
     [key: string]: unknown
 }
 
-// ── Minimal person data needed for rendering ──────────────────────────────────
+// ── Minimal customer data needed for rendering ──────────────────────────────────
 // contacts are resolved internally (whatsappNumber extracted), NOT exported raw.
 
-export interface PersonPayload {
+export interface CustomerPayload {
     id:            string
     name:          string | null
-    groupName:     string | null
-    groupNumber:   string | null          // رقم المجموعة من Person.groupNumber
-    priceLabelIds: string[]               // أسعار المخصصة لهذا الشخص (PersonPriceLabel)
+    priceLabelIds: string[]               // أسعار المخصصة لهذا العميل (CustomerPriceLabel)
     contacts:      Array<{ type: string; value: string }>  // internal only — extracted before publishing
 }
 
 // ── Minimal product data needed for rendering ─────────────────────────────────
 
 export interface ProductPricePayload {
-    priceLabelId: string          // ID التسعيرة — للمطابقة مع priceLabels الشخص
+    priceLabelId: string          // ID التسعيرة — للمطابقة مع priceLabels العميل
     label:        string          // e.g. "سعر الجملة"
     value:        string          // formatted number e.g. "1500"
     currency:     string          // e.g. "ريال يمني"
@@ -105,10 +103,8 @@ export interface ProductPayload {
 // whatsappNumber is NOT here — it goes to AMQP message headers only.
 
 export interface RenderedMessage {
-    personName:   string | null
-    personId:     string
-    groupName:    string | null
-    groupNumber:  string | null          // رقم المجموعة
+    customerName:   string | null
+    customerId:     string
     messageBody:  string                 // Formatted text after template interpolation
     imageUrls:    string[]               // Product image URLs (text_image templates)
     templateType: 'text' | 'text_image'

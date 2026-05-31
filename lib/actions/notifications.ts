@@ -25,7 +25,7 @@ export async function getNotifications(filters?: {
                 product: {
                     select: { id: true, name: true, itemNumber: true, isAvailable: true },
                 },
-                person: {
+                customer: {
                     select: { id: true, name: true },
                 },
             },
@@ -163,12 +163,13 @@ export async function createNotification(data: {
     searchQuery: string
     productId?: string
     productName?: string
-    personId?: string
+    customerId?: string
     source?: string
     phoneNumber?: string
 }) {
+    const payload = data
     return safeAction(
-        () => prisma.aiNotification.create({ data }),
+        () => prisma.aiNotification.create({ data: payload }),
         'تعذّر إنشاء الإشعار'
     )
 }

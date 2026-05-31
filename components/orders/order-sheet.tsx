@@ -72,7 +72,7 @@ interface OrderItemRow {
 interface Props {
     mode?: "create" | "edit"
     order?: any
-    persons: any[]
+    customers: any[]
     products: any[]
     trigger?: React.ReactNode
 }
@@ -192,13 +192,13 @@ function ProductCombobox({ products, value, onChange, disabled }: {
 // Component
 // ──────────────────────────────────────────────────────────
 
-export function OrderSheet({ mode = "create", order, persons, products, trigger }: Props) {
+export function OrderSheet({ mode = "create", order, customers, products, trigger }: Props) {
     const isEdit = mode === "edit"
     const [open, setOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
 
     // Form state
-    const [personId, setPersonId] = useState<string>(order?.personId ?? "")
+    const [customerId, setCustomerId] = useState<string>(order?.customerId ?? "")
     const [notes, setNotes] = useState(order?.notes ?? "")
     const [status, setStatus] = useState(order?.status ?? "pending")
     const [items, setItems] = useState<OrderItemRow[]>(
@@ -207,17 +207,15 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
             : []
     )
 
-    // ── Auto-update items when person changes ──
+    // ── Auto-update items when customer changes ──
     useEffect(() => {
-        if (!personId || personId === "none" || isEdit) return // Don't auto-update if editing existing order (unless requested)
-        const selectedPerson = persons.find(p => p.id === personId)
-        if (!selectedPerson?.priceLabels?.length) return
-
-        const personLabelIds = selectedPerson.priceLabels.map((pl: any) => pl.priceLabelId)
+        if (!customerId || customerId === "none" || isEdit) return
+        const selectedCustomer = customers.find(p => p.id === customerId)
+        if (!selectedCustomer?.priceLabelId) return
 
         setItems(prev => prev.map(item => {
             if (item.productId && (!item.priceLabelId || item.priceLabelId === "") && item.availablePriceLabels.length > 0) {
-                const match = item.availablePriceLabels.find(l => personLabelIds.includes(l.priceLabelId))
+                const match = item.availablePriceLabels.find(l => l.priceLabelId === selectedCustomer.priceLabelId)
                 if (match) {
                     return {
                         ...item,
@@ -229,13 +227,13 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
             }
             return item
         }))
-    }, [personId, persons])
+    }, [customerId, customers])
 
     // ── Reset on open ──
     function handleOpenChange(val: boolean) {
         setOpen(val)
         if (!val) return
-        setPersonId(order?.personId ?? "")
+        setCustomerId(order?.customerId ?? "")
         setNotes(order?.notes ?? "")
         setStatus(order?.status ?? "pending")
         setItems(
@@ -259,7 +257,7 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
         }
         window.addEventListener("keydown", handleKeyDown)
         return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [items, personId, notes, status]) // Dependencies for handleSubmit
+    }, [items, customerId, notes, status]) // Dependencies for handleSubmit
 
     // ── Item helpers ──
     function addItem() {
@@ -311,17 +309,15 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
             }))
             : []
 
-        // ── Auto-select price label based on person ──
+        // ── Auto-select price label based on customer ──
         let autoPriceLabelId = ""
         let autoUnitPrice = undefined
         let autoCurrencySymbol = ""
 
-        if (personId && personId !== "none") {
-            const selectedPerson = persons.find(p => p.id === personId)
-            if (selectedPerson?.priceLabels?.length > 0) {
-                // Find first matching price label from person's allowed labels
-                const personLabelIds = selectedPerson.priceLabels.map((pl: any) => pl.priceLabelId)
-                const match = labels.find(l => personLabelIds.includes(l.priceLabelId))
+        if (customerId && customerId !== "none") {
+            const selectedCustomer = customers.find(p => p.id === customerId)
+            if (selectedCustomer?.priceLabelId) {
+                const match = labels.find(l => l.priceLabelId === selectedCustomer.priceLabelId)
                 if (match) {
                     autoPriceLabelId = match.priceLabelId
                     autoUnitPrice = match.value
@@ -349,7 +345,7 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
             loadingPrices: false,
             loadingVariants: false,
         })
-    }, [personId, persons, items]) // Added dependencies
+    }, [customerId, customers, items]) // Added dependencies
 
     // When priceLabel changes → set unit price preview
     function onPriceLabelChange(idx: number, priceLabelId: string) {
@@ -379,7 +375,7 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
         }
 
         const payload = {
-            personId: personId && personId !== "none" ? personId : null,
+            customerId: customerId && customerId !== "none" ? customerId : null,
             notes: notes || null,
             items: validItems.map(it => ({
                 productId: it.productId,
@@ -403,7 +399,7 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
                 
                 if (keepOpen) {
                     // Reset everything to start a fresh order
-                    setPersonId("none")
+                    setCustomerId("none")
                     setNotes("")
                     setStatus("pending")
                     setItems([])
@@ -470,16 +466,16 @@ export function OrderSheet({ mode = "create", order, persons, products, trigger 
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
-                                {/* Person */}
+                                {/* Customer */}
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">الشخص <span className="text-muted-foreground font-normal">(اختياري)</span></Label>
-                                    <Select value={personId} onValueChange={setPersonId}>
-                                        <SelectTrigger className="rounded-xl h-10" id="order-person-select">
-                                            <SelectValue placeholder="اختر شخصاً..." />
+                                    <Label className="text-xs font-semibold">العميل <span className="text-muted-foreground font-normal">(اختياري)</span></Label>
+                                    <Select value={customerId} onValueChange={setCustomerId}>
+                                        <SelectTrigger className="rounded-xl h-10" id="order-customer-select">
+                                            <SelectValue placeholder="اختر عميلاً..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">— بدون —</SelectItem>
-                                            {persons.map(p => (
+                                            {customers.map(p => (
                                                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                                             ))}
                                         </SelectContent>

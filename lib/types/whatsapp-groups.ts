@@ -26,6 +26,7 @@ export type GroupSupervisor = {
 
 export type WhatsappGroupRow = {
     id: string
+    code: string
     name: string
     groupNumber: string | null
     notes: string | null
@@ -41,7 +42,7 @@ export type WhatsappGroupFormData = {
     name: string
     groupNumber?: string | null
     notes?: string | null
-    isActive?: boolean
+    isActive: boolean
     customerId: string
     supervisorIds: string[]
 }

@@ -20,6 +20,24 @@ export async function getCurrencies() {
     )
 }
 
+/** Returns the default currency (isDefault=true), or the first one, or null. */
+export async function getDefaultCurrency() {
+    return safeAction(
+        async () => {
+            const currency = await prisma.currency.findFirst({
+                where: { isDefault: true },
+                select: { id: true, name: true, code: true, symbol: true },
+            }) ?? await prisma.currency.findFirst({
+                orderBy: { createdAt: 'asc' },
+                select: { id: true, name: true, code: true, symbol: true },
+            })
+            return currency
+        },
+        'تعذّر جلب العملة الافتراضية'
+    )
+}
+
+
 export async function getActiveCurrencies() {
     return safeAction(
         async () => {

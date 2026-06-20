@@ -39,7 +39,6 @@ const userSheetSchema = z.object({
     name: z.string().min(1, 'الاسم مطلوب'),
     username: z.string().min(1, 'اسم المستخدم مطلوب'),
     password: z.string(),
-    role: z.string(),
     color: z.string(),
 })
 
@@ -59,7 +58,7 @@ export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps)
     const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormValues>({
         resolver: zodResolver(userSheetSchema),
         defaultValues: {
-            name: "", username: "", password: "", role: "user", color: "#6366f1",
+            name: "", username: "", password: "", color: "#6366f1",
         },
     })
 
@@ -73,12 +72,11 @@ export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps)
                     name: user.name,
                     username: user.username,
                     password: "",
-                    role: user.role,
                     color: user.color,
                 })
             } else {
                 reset({
-                    name: "", username: "", password: "", role: "user", color: "#6366f1",
+                    name: "", username: "", password: "", color: "#6366f1",
                 })
             }
             setShowPassword(false)
@@ -92,7 +90,6 @@ export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps)
                 const updateData: Record<string, string> = {
                     name:     data.name,
                     username: data.username,
-                    role:     data.role,
                     color:    data.color,
                 }
                 if (data.password.trim()) updateData.password = data.password
@@ -183,19 +180,7 @@ export function UserSheet({ open, onOpenChange, user, onSaved }: UserSheetProps)
                         {errors.username && <p className="text-xs text-destructive">{errors.username.message}</p>}
                     </div>
 
-                    {/* Role */}
-                    <div className="space-y-2">
-                        <Label className="text-sm font-semibold">الدور</Label>
-                        <Select defaultValue={user?.role ?? "user"} onValueChange={v => setValue("role", v)}>
-                            <SelectTrigger className="h-10 rounded-xl">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="user">مستخدم عادي</SelectItem>
-                                <SelectItem value="admin">مدير النظام</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+
 
                     {/* Password */}
                     <div className="space-y-2">

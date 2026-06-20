@@ -230,3 +230,37 @@ export async function updateProductDescription(id: string, description: string) 
         return { success: false, error: 'فشل تحديث الوصف' }
     }
 }
+
+/** Toggle "new" tag on a product */
+export async function toggleProductNewTag(id: string, isNew: boolean) {
+    try {
+        const product = await prisma.product.findUnique({
+            where: { id },
+            select: { tags: true }
+        })
+        
+        if (!product) return { success: false, error: 'المنتج غير موجود' }
+
+        let currentTags = Array.isArray(product.tags) ? [...product.tags] : []
+        
+        if (isNew) {
+            if (!currentTags.includes('new')) {
+                currentTags.push('new')
+            }
+        } else {
+            currentTags = currentTags.filter(tag => tag !== 'new')
+        }
+
+        await prisma.product.update({
+            where: { id },
+            data: { tags: currentTags.length > 0 ? currentTags : Prisma.JsonNull },
+        })
+        
+        const updated = await requireProduct(id)
+        revalidateProduct(id)
+        return { success: true, data: serializeProduct(updated) }
+    } catch (error) {
+        console.error('Failed to toggle new tag:', error)
+        return { success: false, error: 'فشل تحديث علامة جديد' }
+    }
+}

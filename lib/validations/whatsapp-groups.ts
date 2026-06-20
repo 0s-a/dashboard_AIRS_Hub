@@ -4,9 +4,9 @@ import { z } from 'zod'
 
 export const whatsappGroupSchema = z.object({
     name: z
-        .string({ required_error: 'اسم المجموعة مطلوب' })
-        .min(2, 'الاسم يجب أن يكون حرفَين على الأقل')
-        .max(100, 'الاسم طويل جداً'),
+        .string()
+        .max(100, 'الاسم طويل جداً')
+        .optional(),
 
     groupNumber: z
         .string()
@@ -20,10 +20,10 @@ export const whatsappGroupSchema = z.object({
         .nullable()
         .optional(),
 
-    isActive: z.boolean().optional().default(true),
+    isActive: z.boolean(),
 
     customerId: z
-        .string({ required_error: 'يجب اختيار عميل' })
+        .string()
         .min(1, 'يجب اختيار عميل'),
 
     supervisorIds: z

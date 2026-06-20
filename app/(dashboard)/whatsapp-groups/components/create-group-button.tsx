@@ -19,7 +19,7 @@ export function CreateGroupButton({ customers, supervisors }: CreateGroupButtonP
         <>
             <Button className="rounded-xl gap-2" onClick={() => setOpen(true)}>
                 <Plus className="h-4 w-4" />
-                مجموعة جديدة
+                <span>مجموعة جديدة</span>
             </Button>
 
             <WhatsappGroupSheet

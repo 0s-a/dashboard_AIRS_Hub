@@ -95,7 +95,7 @@ export async function createAnnouncement(data: AnnouncementInput) {
             title:               data.title.trim(),
             description:         data.description?.trim() || null,
             scheduledAt:         new Date(data.scheduledAt),
-            customerFilters:       (data.customerFilters  ?? { all: true }) as any,
+            personFilters:       (data.customerFilters  ?? { all: true }) as any,
             productFilters:      (data.productFilters ?? { all: true }) as any,
             templateId:          data.templateId ?? null,
             delayBetweenSeconds: data.delayBetweenSeconds ?? 0,
@@ -117,7 +117,7 @@ export async function updateAnnouncement(id: string, data: Partial<AnnouncementI
         if (data.title                !== undefined) patch.title               = data.title.trim()
         if (data.description          !== undefined) patch.description          = data.description?.trim() || null
         if (data.scheduledAt          !== undefined) patch.scheduledAt          = new Date(data.scheduledAt)
-        if (data.customerFilters        !== undefined) patch.customerFilters        = data.customerFilters
+        if (data.customerFilters        !== undefined) patch.personFilters        = data.customerFilters
         if (data.productFilters       !== undefined) patch.productFilters       = data.productFilters
         if (data.templateId           !== undefined) patch.templateId           = data.templateId
         if (data.delayBetweenSeconds  !== undefined) patch.delayBetweenSeconds  = data.delayBetweenSeconds
@@ -156,7 +156,7 @@ export async function cloneAnnouncement(id: string) {
             title:               `نسخة - ${ann.title}`,
             description:         ann.description,
             scheduledAt:         new Date(),
-            customerFilters:       ann.customerFilters  as any,
+            personFilters:       ann.personFilters  as any,
             productFilters:      ann.productFilters as any,
             templateId:          ann.templateId,
             delayBetweenSeconds: ann.delayBetweenSeconds,
@@ -200,7 +200,7 @@ export async function getAudienceSnapshot(id: string) {
         const ann = await dbGetAnnouncement(id)
         if (!ann) throw new Error('الإعلان غير موجود')
 
-        const customerFilters  = ann.customerFilters  as CustomerFilters
+        const customerFilters  = ann.personFilters  as CustomerFilters
         const productFilters = ann.productFilters as ProductFilters
 
         const [customerIds, productIds] = await Promise.all([
@@ -233,7 +233,7 @@ export async function dryRunAnnouncement(id: string, sampleSize = DEFAULT_SAMPLE
         const ann = await dbGetAnnouncement(id)
         if (!ann) throw new Error('الإعلان غير موجود')
 
-        const customerFilters  = ann.customerFilters  as CustomerFilters
+        const customerFilters  = ann.personFilters  as CustomerFilters
         const productFilters = ann.productFilters as ProductFilters
 
         const [customerIds, productPayloads, template] = await Promise.all([

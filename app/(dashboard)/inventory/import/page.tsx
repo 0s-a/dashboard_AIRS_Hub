@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import React from 'react'
 import { ImportWizard } from '@/components/inventory/import/import-wizard'
 import { ArrowRight } from 'lucide-react'

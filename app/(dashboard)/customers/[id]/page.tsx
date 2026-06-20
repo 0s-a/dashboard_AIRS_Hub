@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { CustomerSheet } from "@/components/customers/customer-sheet"
 import {
     Phone, Mail, MessageCircle,
-    Tag, Users, ShoppingCart, ArrowRight, Calendar,
+    Tag, Users, ShoppingCart, ArrowRight, ArrowLeft, Calendar,
     Wallet, Coins, CircleCheck, CircleX,
 } from "lucide-react"
 import Link from "next/link"
@@ -34,32 +34,63 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
     const { id } = await params
     const result = await getCustomerById(id)
     if (!result.success || !result.data) return notFound()
-    const customer = result.data as any
+    const raw = result.data as any
 
-    const totalOrders = customer.orders?.length ?? 0
-    const totalAmount = (customer.orders ?? []).reduce((sum: number, o: any) => sum + (parseFloat(o.totalAmount) || 0), 0)
-    const primaryPhone = customer.contacts?.find((c: any) => c.type === "phone" && c.isPrimary) ?? customer.contacts?.[0]
+    // ── حسابات الصفحة ────────────────────────────────────────────
+    const totalOrders = raw.orders?.length ?? 0
+    const totalAmount = (raw.orders ?? []).reduce(
+        (sum: number, o: any) => sum + (parseFloat(String(o.totalAmount)) || 0),
+        0
+    )
+    const primaryPhone = raw.contacts?.find((c: any) => c.type === "phone" && c.isPrimary) ?? raw.contacts?.[0]
+    const resolvedCurrencies = (raw.customerCurrencies || []).map((pc: any) => pc.currency).filter(Boolean)
+
+    // ── Serialize لتجنب Decimal → Client Component error ─────────
+    // نمرر فقط البيانات التي يحتاجها النموذج (بدون orders التي تحتوي Decimal)
+    const customerForForm = {
+        id:               raw.id,
+        name:             raw.name,
+        source:           raw.source,
+        isActive:         raw.isActive,
+        priceLabelId:     raw.priceLabelId,
+        createdAt:        raw.createdAt,
+        updatedAt:        raw.updatedAt,
+        lastInteraction:  raw.lastInteraction,
+        contacts:         raw.contacts ?? [],
+        tags:             raw.tags ?? [],
+        customerCurrencies: raw.customerCurrencies ?? [],
+        priceLabel:       raw.priceLabel ?? null,
+    }
+
+    // للعرض فقط — نحول totalAmount من Decimal إلى string
+    const orders = (raw.orders ?? []).map((o: any) => ({
+        ...o,
+        totalAmount: String(o.totalAmount ?? "0"),
+    }))
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Link href="/customers" className="hover:text-foreground transition-colors">العملاء</Link>
-                <ArrowRight className="h-3 w-3" />
-                <span className="text-foreground font-medium">{customer.name ?? "بدون اسم"}</span>
+                <Link href="/customers" className="hover:text-foreground transition-colors flex items-center gap-1">
+                    <ArrowRight className="h-3 w-3" />
+                    العملاء
+                </Link>
+                <span className="text-border">/</span>
+                <span className="text-foreground font-medium">{raw.name ?? "بدون اسم"}</span>
             </div>
 
             {/* Header */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border/50 pb-6">
                 <div className="flex items-center gap-4">
                     <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary">
-                        {customer.name?.[0] ?? "؟"}
+                        {raw.name?.[0] ?? "؟"}
                     </div>
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-2xl font-bold tracking-tight">{customer.name ?? "بدون اسم"}</h1>
-                            <Badge className={customer.isActive ? "bg-emerald-500/10 text-emerald-600 border-0" : "bg-muted text-muted-foreground border-0"}>
-                                {customer.isActive ? <><CircleCheck className="h-3 w-3 ml-1" />نشط</> : <><CircleX className="h-3 w-3 ml-1" />غير نشط</>}
+                            <h1 className="text-2xl font-bold tracking-tight">{raw.name ?? "بدون اسم"}</h1>
+                            <Badge className={raw.isActive ? "bg-emerald-500/10 text-emerald-600 border-0" : "bg-muted text-muted-foreground border-0"}>
+                                {raw.isActive ? <><CircleCheck className="h-3 w-3 ml-1" />نشط</> : <><CircleX className="h-3 w-3 ml-1" />غير نشط</>}
                             </Badge>
                         </div>
                         {primaryPhone && (
@@ -67,19 +98,28 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
                         )}
                     </div>
                 </div>
-                <CustomerSheet customer={customer} trigger={
-                    <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-medium">
-                        تعديل البيانات
-                    </button>
-                } />
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/customers"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-medium"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        رجوع
+                    </Link>
+                    <CustomerSheet customer={customerForForm as any} trigger={
+                        <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-sm font-medium">
+                            تعديل البيانات
+                        </button>
+                    } />
+                </div>
             </div>
 
             {/* Stats */}
             <div className="grid gap-4 md:grid-cols-3">
                 {[
                     { label: "إجمالي الطلبات", value: totalOrders, icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-500/10" },
-                    { label: "إجمالي المشتريات", value: `${totalAmount.toLocaleString("ar")} ر.ي`, icon: Wallet, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-                    { label: "تاريخ الانضمام", value: new Date(customer.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "long" }), icon: Calendar, color: "text-violet-600", bg: "bg-violet-500/10" },
+                    { label: "إجمالي المشتريات", value: `${totalAmount.toLocaleString("ar")}`, icon: Wallet, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+                    { label: "تاريخ الانضمام", value: new Date(raw.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "long" }), icon: Calendar, color: "text-violet-600", bg: "bg-violet-500/10" },
                 ].map((stat, i) => (
                     <div key={i} className="rounded-2xl border bg-card p-5 flex items-center gap-4 shadow-sm">
                         <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
@@ -99,7 +139,7 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
                     <h2 className="font-semibold flex items-center gap-2 text-sm">
                         <Phone className="h-4 w-4 text-primary" /> معلومات الاتصال
                     </h2>
-                    {customer.contacts?.length > 0 ? customer.contacts.map((c: any) => {
+                    {raw.contacts?.length > 0 ? raw.contacts.map((c: any) => {
                         const Icon = contactIcons[c.type] ?? Phone
                         return (
                             <div key={c.id} className="flex items-center gap-3">
@@ -121,16 +161,16 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
                     <h2 className="font-semibold flex items-center gap-2 text-sm">
                         <Tag className="h-4 w-4 text-primary" /> تفاصيل إضافية
                     </h2>
-                    {customer.source && (
+                    {raw.source && (
                         <div className="flex gap-2">
                             <Users className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                            <p className="text-sm">المصدر: {customer.source}</p>
+                            <p className="text-sm">المصدر: {raw.source}</p>
                         </div>
                     )}
-                    {customer.tags?.length > 0 && (
+                    {raw.tags?.length > 0 && (
                         <div className="flex gap-2 flex-wrap">
                             <Tag className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                            {customer.tags.map((pt: any) => {
+                            {raw.tags.map((pt: any) => {
                                 const name = pt.tag?.name ?? pt
                                 return (
                                     <Badge key={name} className="bg-muted text-muted-foreground border-0 text-xs">{name}</Badge>
@@ -138,29 +178,49 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
                             })}
                         </div>
                     )}
-                    {customer.priceLabel && (
+                    {raw.priceLabel && (
                         <div className="flex gap-2 flex-wrap">
                             <Wallet className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                            <Badge className="bg-indigo-500/10 text-indigo-700 border-0 text-xs">{customer.priceLabel.name}</Badge>
-                            {customer.priceLabel.customerType && (
-                                <span className="text-xs text-muted-foreground self-center">{customer.priceLabel.customerType}</span>
+                            <Badge className="bg-indigo-500/10 text-indigo-700 border-0 text-xs">{raw.priceLabel.name}</Badge>
+                            {raw.priceLabel.customerType && (
+                                <span className="text-xs text-muted-foreground self-center">{raw.priceLabel.customerType}</span>
                             )}
                         </div>
                     )}
+                    {!raw.source && !raw.tags?.length && !raw.priceLabel && (
+                        <p className="text-sm text-muted-foreground">لا توجد تفاصيل إضافية</p>
+                    )}
                 </div>
 
-
+                {/* Currencies */}
+                <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+                    <h2 className="font-semibold flex items-center gap-2 text-sm">
+                        <Coins className="h-4 w-4 text-primary" /> عملات التعامل
+                    </h2>
+                    {resolvedCurrencies.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {resolvedCurrencies.map((c: any) => (
+                                <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                    <span className="font-bold text-amber-700 dark:text-amber-400 text-sm">{c.symbol}</span>
+                                    <span className="text-xs text-muted-foreground">{c.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">لم تُحدَّد عملات</p>
+                    )}
+                </div>
             </div>
 
             {/* Orders */}
-            {customer.orders?.length > 0 && (
+            {orders.length > 0 && (
                 <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
                     <div className="p-5 border-b border-border/50 flex items-center gap-2">
                         <ShoppingCart className="h-4 w-4 text-primary" />
                         <h2 className="font-semibold text-sm">آخر الطلبات</h2>
                     </div>
                     <div className="divide-y divide-border/50">
-                        {customer.orders.map((order: any) => {
+                        {orders.map((order: any) => {
                             const status = statusLabels[order.status] ?? { label: order.status, className: "bg-muted text-muted-foreground" }
                             return (
                                 <div key={order.id} className="px-5 py-3 flex items-center justify-between gap-4">

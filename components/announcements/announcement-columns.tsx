@@ -20,7 +20,7 @@ export type AnnouncementRow = {
     scheduledAt: Date | string
     status: string
     sentAt: Date | string | null
-    customerFilters: unknown
+    personFilters: unknown
     productFilters: unknown
     createdAt: Date | string
 }
@@ -86,7 +86,7 @@ export const announcementColumns: ColumnDef<AnnouncementRow>[] = [
         id: "audience",
         header: "الجمهور",
         cell: ({ row }) => {
-            const pf = row.original.customerFilters as any
+            const pf = row.original.personFilters as any
             const prf = row.original.productFilters as any
             const customerLabel = pf?.all ? "الكل" :
                 pf?.manualIds?.length > 0 ? `${pf.manualIds.length} عميل` : "فلتر"

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { notFound } from "next/navigation"
 import { getProductById } from "@/lib/actions/inventory"
 import { ProductDetailsClient } from "@/components/inventory/product-details-client"

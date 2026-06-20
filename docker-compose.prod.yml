@@ -1,14 +1,16 @@
 
 services:
 
-  nextjs:
+  web:
     build:
       context: .
       target: production
-    container_name: nawaat_nextjs_prod
-    restart: always
+    image: nawaat_nextjs:${APP_VERSION:-latest}
+    container_name: nawaat_nextjs
+    init: true
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -16,11 +18,13 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - next_public_uploads:/app/public/uploads
+      - ${UPLOADS_DIR:-./uploads}:/app/public/uploads:rw
+      - next_cache:/app/.next/cache
     env_file:
       - .env.production
     networks:
       - nawaat_net
+    
 
     depends_on:
       postgres:
@@ -31,8 +35,8 @@ services:
 
   postgres:
     image: postgres:15
-    container_name: nawaat_postgres_prod
-    restart: always
+    container_name: nawaat_postgres
+    restart: unless-stopped
     env_file:
       - .env.production
     volumes:
@@ -40,17 +44,20 @@ services:
     networks:
       - nawaat_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d evo"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   rabbitmq:
-    image: rabbitmq:3-alpine
-    container_name: nawaat_rabbitmq_prod
-    restart: always
+    image: rabbitmq:3-management
+    container_name: nawaat_rabbitmq
+    hostname: nawaat-rabbit
+    restart: unless-stopped
     env_file:
       - .env.production
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - nawaat_net
     healthcheck:
@@ -61,11 +68,12 @@ services:
 
 volumes:
   postgres_data:
-    name: nawaat_postgres_data_prod
-  next_public_uploads:
-    name: nawaat_uploads_prod
-
+    name: nawaat_postgres_data
+  rabbitmq_data:
+    name: nawaat_rabbitmq_data
+  next_cache:
+    name: nawaat_next_cache
 
 networks:
   nawaat_net:
-    name: nawaat_network_prod
+    name: nawaat_network

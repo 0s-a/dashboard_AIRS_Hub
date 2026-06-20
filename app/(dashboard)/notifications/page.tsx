@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { Bell, PackageX, SearchX, CheckCheck, Trash2, Clock, Phone, Package, ExternalLink, X, SlidersHorizontal, User, CheckCircle2, Link2, Archive, ArchiveRestore, Search, Check, RotateCcw, Trash } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -34,7 +33,6 @@ import {
     unarchiveNotification,
 } from "@/lib/actions/notifications"
 import { toggleProductAvailability, addAlternativeNameToProduct, getProducts } from "@/lib/actions/inventory"
-
 function timeAgo(date: Date | string) {
     const now = new Date()
     const d = new Date(date)
@@ -44,24 +42,20 @@ function timeAgo(date: Date | string) {
     if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} س`
     return `منذ ${Math.floor(diff / 86400)} ي`
 }
-
 function groupNotificationsByDate(notifications: any[]) {
     const groups: { [key: string]: any[] } = {
         "اليوم": [],
         "الأمس": [],
         "سابقاً": []
     }
-
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
-
     notifications.forEach(n => {
         const d = new Date(n.createdAt)
         d.setHours(0, 0, 0, 0)
-
         if (d.getTime() === today.getTime()) {
             groups["اليوم"].push(n)
         } else if (d.getTime() === yesterday.getTime()) {
@@ -70,10 +64,8 @@ function groupNotificationsByDate(notifications: any[]) {
             groups["سابقاً"].push(n)
         }
     })
-
     return groups
 }
-
 export default function NotificationsPage() {
     const [notifications, setNotifications] = useState<any[]>([])
     const [stats, setStats] = useState({ total: 0, unread: 0, outOfStock: 0, notFound: 0, archived: 0 })
@@ -88,14 +80,12 @@ export default function NotificationsPage() {
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [isSelectionMode, setIsSelectionMode] = useState(false)
-
     // Link-product dialog state
     const [linkDialog, setLinkDialog] = useState<{ open: boolean; notifId: string; searchQuery: string } | null>(null)
     const [allProducts, setAllProducts] = useState<any[]>([])
     const [productSearch, setProductSearch] = useState("")
     const [linkingProductId, setLinkingProductId] = useState<string | null>(null)
     const [isLinking, setIsLinking] = useState(false)
-
     const loadData = useCallback(async () => {
         const [notifRes, archivedRes, statsRes] = await Promise.all([
             getNotifications({
@@ -113,9 +103,7 @@ export default function NotificationsPage() {
         setSelectedIds(new Set())
         setIsSelectionMode(false)
     }, [filterType, filterRead])
-
     useEffect(() => { loadData() }, [loadData])
-
     const handleArchive = async (id: string, reason: string) => {
         const res = await archiveNotification(id, reason)
         if (res.success) {
@@ -123,7 +111,6 @@ export default function NotificationsPage() {
             loadData()
         }
     }
-
     const handleUnarchive = async (id: string) => {
         const res = await unarchiveNotification(id)
         if (res.success) {
@@ -131,7 +118,6 @@ export default function NotificationsPage() {
             loadData()
         }
     }
-
     const handleMarkAllRead = async () => {
         const res = await markAllAsRead()
         if (res.success) {
@@ -139,8 +125,6 @@ export default function NotificationsPage() {
             loadData()
         }
     }
-
-
     const handleDelete = async (id: string) => {
         const res = await deleteNotification(id)
         if (res.success) {
@@ -148,7 +132,6 @@ export default function NotificationsPage() {
             loadData()
         }
     }
-
     const handleClearOld = async () => {
         const res = await clearOldNotifications(30)
         if (res.success) {
@@ -156,7 +139,6 @@ export default function NotificationsPage() {
             loadData()
         }
     }
-
     const toggleSelection = (id: string) => {
         const next = new Set(selectedIds)
         if (next.has(id)) next.delete(id)
@@ -164,18 +146,15 @@ export default function NotificationsPage() {
         setSelectedIds(next)
         setIsSelectionMode(next.size > 0)
     }
-
     const selectAll = () => {
         const ids = processedNotifications.map(n => n.id)
         setSelectedIds(new Set(ids))
         setIsSelectionMode(true)
     }
-
     const deselectAll = () => {
         setSelectedIds(new Set())
         setIsSelectionMode(false)
     }
-
     const handleBulkArchive = async () => {
         if (selectedIds.size === 0) return
         const ids = Array.from(selectedIds)
@@ -190,7 +169,6 @@ export default function NotificationsPage() {
             setLoading(false)
         }
     }
-
     const handleBulkDelete = async () => {
         if (selectedIds.size === 0) return
         const ids = Array.from(selectedIds)
@@ -206,7 +184,6 @@ export default function NotificationsPage() {
             setLoading(false)
         }
     }
-
     // ── Data Processing ──
     const processedNotifications = useMemo(() => {
         let items = activeTab === "inbox" ? notifications : archivedNotifications
@@ -224,11 +201,9 @@ export default function NotificationsPage() {
         
         return items
     }, [notifications, archivedNotifications, activeTab, searchQuery])
-
     const groupedNotifications = useMemo(() => {
         return groupNotificationsByDate(processedNotifications)
     }, [processedNotifications])
-
     // ── Quick Action: Toggle product availability ──
     const handleToggleAvailability = async (notif: any) => {
         if (!notif.product?.id || togglingId) return
@@ -246,7 +221,6 @@ export default function NotificationsPage() {
             setTogglingId(null)
         }
     }
-
     // ── Quick Action: Open link-product dialog ──
     const handleOpenLinkDialog = async (notif: any) => {
         setLinkDialog({ open: true, notifId: notif.id, searchQuery: notif.searchQuery })
@@ -258,7 +232,6 @@ export default function NotificationsPage() {
             if (res.success && res.data) setAllProducts(res.data)
         }
     }
-
     const filteredProducts = useMemo(() => {
         if (!productSearch.trim()) return allProducts.slice(0, 20)
         const q = productSearch.toLowerCase()
@@ -268,7 +241,6 @@ export default function NotificationsPage() {
             p.brand?.toLowerCase().includes(q)
         ).slice(0, 20)
     }, [allProducts, productSearch])
-
     const handleLinkProduct = async () => {
         if (!linkDialog || !linkingProductId) return
         setIsLinking(true)
@@ -286,7 +258,6 @@ export default function NotificationsPage() {
             setIsLinking(false)
         }
     }
-
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
@@ -318,7 +289,6 @@ export default function NotificationsPage() {
                         </button>
                     )}
                 </div>
-
                 <div className="flex items-center gap-2">
                     {stats.unread > 0 && (
                         <Button variant="outline" size="sm" onClick={handleMarkAllRead} className="gap-2 rounded-xl">
@@ -332,7 +302,6 @@ export default function NotificationsPage() {
                     </Button>
                 </div>
             </div>
-
             {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-4">
                 <div className="glass-panel rounded-xl p-5 border border-border/50">
@@ -380,7 +349,6 @@ export default function NotificationsPage() {
                     </div>
                 </div>
             </div>
-
             {/* Tabs */}
             <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/30 border border-border/40 w-fit">
                 <button
@@ -414,7 +382,6 @@ export default function NotificationsPage() {
                     )}
                 </button>
             </div>
-
             {/* Selection Bar */}
             {isSelectionMode && (
                 <div className="sticky top-4 z-50 flex items-center justify-between p-3 px-6 rounded-2xl bg-primary text-primary-foreground shadow-2xl animate-in slide-in-from-top-8 duration-300">
@@ -464,7 +431,6 @@ export default function NotificationsPage() {
                     </div>
                 </div>
             )}
-
             {/* Filters — only on inbox tab */}
             {activeTab === "inbox" && (
             <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-border/50 bg-muted/20 backdrop-blur-sm">
@@ -512,7 +478,6 @@ export default function NotificationsPage() {
                 </Button>
             </div>
             )}
-
             {/* Notifications List — grouped by date */}
             {(activeTab === "inbox" || activeTab === "archive") && (
             <div className="space-y-8 pb-20">
@@ -579,12 +544,10 @@ export default function NotificationsPage() {
                                                     <Check className="h-3.5 w-3.5 stroke-4" />
                                                 </div>
                                             </div>
-
                                             {/* Unread indicator */}
                                             {!notif.isRead && !notif.isArchived && (
                                                 <div className="absolute top-4 left-4 size-2.5 rounded-full bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)] animate-pulse" />
                                             )}
-
                                             {/* Type icon */}
                                             <div className={cn(
                                                 "size-12 rounded-2xl flex items-center justify-center shrink-0 mt-0.5 transition-transform group-hover:scale-110 duration-500",
@@ -597,7 +560,6 @@ export default function NotificationsPage() {
                                                     <SearchX className="size-6 text-red-600" />
                                                 )}
                                             </div>
-
                                             {/* Content */}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -632,14 +594,12 @@ export default function NotificationsPage() {
                                                         {timeAgo(notif.createdAt)}
                                                     </span>
                                                 </div>
-
                                                 <p className={cn(
                                                     "text-[15px] font-bold mt-1 leading-tight transition-colors",
                                                     notif.isArchived ? "text-muted-foreground" : "text-foreground"
                                                 )}>
                                                     بحث عن: <span className={cn("inline-block px-1.5 py-0.5 rounded bg-primary/5", !notif.isArchived && "text-primary")}>"{notif.searchQuery}"</span>
                                                 </p>
-
                                                 <div className="flex items-center gap-4 mt-3 flex-wrap">
                                                     {notif.customer && (
                                                         <div className="flex items-center gap-1.5">
@@ -679,7 +639,6 @@ export default function NotificationsPage() {
                                                         </div>
                                                     )}
                                                 </div>
-
                                                 {/* ── Quick Action Buttons (Inbox only) ── */}
                                                 {!notif.isArchived && (
                                                     <div className="flex items-center gap-2 mt-4 flex-wrap">
@@ -720,7 +679,6 @@ export default function NotificationsPage() {
                                                     </div>
                                                 )}
                                             </div>
-
                                             {/* Actions */}
                                             <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 shrink-0 self-center">
                                                 {!notif.isArchived && (
@@ -773,9 +731,6 @@ export default function NotificationsPage() {
                 )}
             </div>
             )}
-
-
-
             {/* ── Link Product Dialog ── */}
             <Dialog open={!!linkDialog?.open} onOpenChange={(open) => !open && setLinkDialog(null)}>
                 <DialogContent className="sm:max-w-md rounded-2xl">
@@ -786,7 +741,6 @@ export default function NotificationsPage() {
                             اختر المنتج الصحيح لإضافة هذه التسمية كاسم بديل.
                         </DialogDescription>
                     </DialogHeader>
-
                     <div className="space-y-3 py-2">
                         <Input
                             placeholder="ابحث عن منتج بالاسم أو الرقم..."
@@ -794,7 +748,6 @@ export default function NotificationsPage() {
                             onChange={e => setProductSearch(e.target.value)}
                             className="rounded-xl"
                         />
-
                         <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-border/50 p-1">
                             {filteredProducts.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-4">لا توجد نتائج</p>
@@ -823,7 +776,6 @@ export default function NotificationsPage() {
                             )}
                         </div>
                     </div>
-
                     <DialogFooter className="gap-2">
                         <Button variant="ghost" onClick={() => setLinkDialog(null)} className="rounded-xl">
                             إلغاء

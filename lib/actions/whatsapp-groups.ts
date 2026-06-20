@@ -45,7 +45,7 @@ function getPrimaryPhone(contacts: { type: string; value: string }[]) {
 async function notifyN8n(group: Awaited<ReturnType<typeof prisma.whatsappGroup.findUniqueOrThrow>> & {
     customer: { name: string | null; contacts: { type: string; value: string }[] }
     supervisors: { supervisor: { name: string; contacts: { type: string; value: string }[] } }[]
-}) {
+}, isManualResend: boolean = false) {
     const webhookUrl = process.env.N8N_WHATSAPP_WEBHOOK_URL
     if (!webhookUrl) return
 
@@ -54,19 +54,33 @@ async function notifyN8n(group: Awaited<ReturnType<typeof prisma.whatsappGroup.f
         .map(s => getPrimaryPhone(s.supervisor.contacts))
         .filter(Boolean) as string[]
 
+    const suffix = process.env.NEXT_PUBLIC_WHATSAPP_GROUP_SUFFIX || " | بيوتفي"
+
     const params = new URLSearchParams({
         groupId:      group.id,
+        groupCode:    group.code,
         groupName:    group.name,
+        groupSuffix:  suffix,
         groupNumber:  group.groupNumber ?? '',
         customerName: group.customer.name ?? '',
         customerPhone:    customerPhone ?? '',
         supervisorPhones: supervisorPhones.join(','),
         allMemberPhones:  [...new Set([customerPhone, ...supervisorPhones].filter(Boolean))].join(','),
+        ...(isManualResend && { resent: 'true' })
     })
 
-    // fire-and-forget — فشل الـ webhook لا يؤثر على العملية الرئيسية
-    fetch(`${webhookUrl}?${params.toString()}`, { method: 'GET' })
-        .catch(err => console.warn('[WhatsappGroup] Webhook failed:', err?.message))
+    const finalUrl = `${webhookUrl}?${params.toString()}`
+    console.log('[WhatsappGroup] Sending to n8n:', finalUrl)
+    
+    if (isManualResend) {
+        // في حال الإرسال اليدوي ننتظر النتيجة لنتمكن من عرض خطأ إن لزم
+        const response = await fetch(finalUrl, { method: 'GET', cache: 'no-store', signal: AbortSignal.timeout(10_000) })
+        if (!response.ok) throw new Error(`Webhook failed: ${response.status}`)
+    } else {
+        // fire-and-forget عند الإنشاء
+        fetch(finalUrl, { method: 'GET', cache: 'no-store' })
+            .catch(err => console.warn('[WhatsappGroup] Webhook failed:', err?.message))
+    }
 }
 
 // ── Read ─────────────────────────────────────────────────────────────
@@ -74,8 +88,10 @@ async function notifyN8n(group: Awaited<ReturnType<typeof prisma.whatsappGroup.f
 export async function getWhatsappGroups(options?: {
     activeOnly?: boolean
     search?: string
+    page?: number
+    pageSize?: number
 }) {
-    const { activeOnly = false, search } = options ?? {}
+    const { activeOnly = false, search, page = 1, pageSize = 100 } = options ?? {}
 
     return safeAction(async () => {
         const where: any = {
@@ -94,22 +110,61 @@ export async function getWhatsappGroups(options?: {
                 where,
                 include: GROUP_INCLUDE,
                 orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
             }),
             prisma.whatsappGroup.count({ where }),
         ])
 
-        return { groups, total }
+        const suffix = process.env.NEXT_PUBLIC_WHATSAPP_GROUP_SUFFIX || " | بيوتفي"
+        const mappedGroups = groups.map(g => ({
+            ...g,
+            name: `${g.customer?.name || 'بدون عميل'}${suffix}`
+        }))
+
+        return { groups: mappedGroups, total, page, pageSize }
     }, 'تعذّر جلب المجموعات')
+}
+
+export async function getWhatsappGroupStats() {
+    return safeAction(async () => {
+        const [total, active, inactive] = await Promise.all([
+            prisma.whatsappGroup.count(),
+            prisma.whatsappGroup.count({ where: { isActive: true } }),
+            prisma.whatsappGroup.count({ where: { isActive: false } }),
+        ])
+        return { total, active, inactive }
+    }, 'تعذّر جلب إحصائيات المجموعات')
 }
 
 export async function getWhatsappGroupById(id: string) {
     return safeAction(
-        () => prisma.whatsappGroup.findUniqueOrThrow({
-            where: { id },
-            include: GROUP_INCLUDE,
-        }),
+        async () => {
+            const group = await prisma.whatsappGroup.findUniqueOrThrow({
+                where: { id },
+                include: GROUP_INCLUDE,
+            })
+            const suffix = process.env.NEXT_PUBLIC_WHATSAPP_GROUP_SUFFIX || " | بيوتفي"
+            return {
+                ...group,
+                name: `${group.customer?.name || 'بدون عميل'}${suffix}`
+            }
+        },
         'تعذّر جلب بيانات المجموعة'
     )
+}
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+async function generateUniqueGroupCode(): Promise<string> {
+    for (let i = 0; i < 10; i++) {
+        let code = ''
+        for (let j = 0; j < 3; j++) {
+            code += ALPHABET.charAt(Math.floor(Math.random() * ALPHABET.length))
+        }
+        const existing = await prisma.whatsappGroup.findUnique({ where: { code } })
+        if (!existing) return code
+    }
+    throw new Error('تعذّر توليد كود مميز للمجموعة')
 }
 
 // ── Create ───────────────────────────────────────────────────────────
@@ -119,9 +174,21 @@ export async function createWhatsappGroup(data: WhatsappGroupFormData) {
         async () => {
             await requireAuth()
 
+            const customer = await prisma.customer.findUnique({ 
+                where: { id: data.customerId }, 
+                select: { name: true } 
+            })
+            if (!customer) throw new Error('العميل غير موجود')
+
+            const suffix = process.env.NEXT_PUBLIC_WHATSAPP_GROUP_SUFFIX || " | بيوتفي"
+            const groupName = `${customer.name}${suffix}`
+            
+            const groupCode = await generateUniqueGroupCode()
+
             const group = await prisma.whatsappGroup.create({
                 data: {
-                    name:        data.name.trim(),
+                    code:        groupCode,
+                    name:        groupName,
                     groupNumber: data.groupNumber?.trim() || null,
                     notes:       data.notes?.trim() || null,
                     isActive:    data.isActive ?? true,
@@ -150,10 +217,21 @@ export async function updateWhatsappGroup(id: string, data: Partial<WhatsappGrou
         async () => {
             await requireAuth()
 
+            let groupName = data.name?.trim()
+            const currentGroup = await prisma.whatsappGroup.findUnique({ where: { id }, select: { customerId: true } })
+            if (currentGroup) {
+                const targetCustomerId = data.customerId || currentGroup.customerId
+                const customer = await prisma.customer.findUnique({ where: { id: targetCustomerId }, select: { name: true } })
+                if (customer) {
+                    const suffix = process.env.NEXT_PUBLIC_WHATSAPP_GROUP_SUFFIX || " | بيوتفي"
+                    groupName = `${customer.name}${suffix}`
+                }
+            }
+
             return prisma.whatsappGroup.update({
                 where: { id },
                 data: {
-                    ...(data.name !== undefined      && { name: data.name.trim() }),
+                    ...(groupName !== undefined      && { name: groupName }),
                     ...(data.groupNumber !== undefined && { groupNumber: data.groupNumber?.trim() || null }),
                     ...(data.notes !== undefined     && { notes: data.notes?.trim() || null }),
                     ...(data.isActive !== undefined  && { isActive: data.isActive }),
@@ -241,43 +319,15 @@ export async function resendWhatsappGroupWebhook(id: string) {
     return safeAction(async () => {
         await requireAuth()
 
-        const webhookUrl = process.env.N8N_WHATSAPP_WEBHOOK_URL
-        if (!webhookUrl) throw new Error('N8N_WHATSAPP_WEBHOOK_URL غير مضبوط في متغيرات البيئة')
-
         const group = await prisma.whatsappGroup.findUniqueOrThrow({
             where: { id },
             include: GROUP_INCLUDE,
         })
 
-        const customerPhone = getPrimaryPhone(group.customer.contacts)
-        const supervisorPhones = group.supervisors
-            .map(s => getPrimaryPhone(s.supervisor.contacts))
-            .filter(Boolean) as string[]
+        // نستخدم نفس الدالة الموحدة
+        await notifyN8n(group as any, true) // نمرر true كدليل أنه طلب يدوي إذا لزم
 
-        const allPhones = [...new Set([customerPhone, ...supervisorPhones].filter(Boolean))]
-
-        const params = new URLSearchParams({
-            groupId:         group.id,
-            groupName:       group.name,
-            groupNumber:     group.groupNumber ?? '',
-            customerName:    group.customer.name ?? '',
-            customerPhone:   customerPhone ?? '',
-            supervisorPhones: supervisorPhones.join(','),
-            allMemberPhones:  allPhones.join(','),
-            resent:          'true',
-        })
-
-        // ننتظر الرد لنُبلّغ المستخدم بنتيجة الإرسال
-        const response = await fetch(`${webhookUrl}?${params.toString()}`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(10_000),
-        })
-
-        if (!response.ok) {
-            throw new Error(`فشل الإرسال — رمز الاستجابة: ${response.status}`)
-        }
-
-        return { sent: true, memberCount: allPhones.length }
+        return { sent: true, memberCount: group.supervisors.length + 1 }
     }, 'تعذّر إعادة إرسال الطلب إلى n8n')
 }
 

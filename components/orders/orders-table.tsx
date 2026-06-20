@@ -7,11 +7,12 @@ interface Props {
     orders: any[]
     customers: any[]
     products: any[]
+    defaultSymbol?: string
     onRefresh?: () => void | Promise<void>
 }
 
-export function OrdersTable({ orders, customers, products, onRefresh }: Props) {
-    const columns = getOrderColumns(customers, products)
+export function OrdersTable({ orders, customers, products, defaultSymbol = "", onRefresh }: Props) {
+    const columns = getOrderColumns(customers, products, defaultSymbol)
 
     return (
         <DataTable

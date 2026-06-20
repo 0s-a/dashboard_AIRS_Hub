@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -22,9 +21,7 @@ import {
     seedDefaultTemplates,
 } from "@/lib/actions/message-templates"
 import { TemplateEditor } from "@/components/announcements/template-editor"
-
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 interface TemplateRow {
     id:           string
     name:         string
@@ -37,19 +34,14 @@ interface TemplateRow {
     createdAt:    Date | string
     _count?:      { announcements: number }
 }
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formatDate(d: Date | string) {
     return new Date(d).toLocaleDateString("ar", { day: "numeric", month: "short", year: "numeric" })
 }
-
 function templatePreview(t: TemplateRow) {
     return t.bodyTemplate.replace(/\{\{.*?\}\}/g, "…").replace(/\n+/g, " ").trim().substring(0, 90)
 }
-
 // ─── Template Card ────────────────────────────────────────────────────────────
-
 function TemplateCard({
     t, isActive, viewMode,
     onEdit, onDelete, onSetDefault,
@@ -59,7 +51,6 @@ function TemplateCard({
 }) {
     const TypeIcon  = t.type === "text_image" ? ImageIcon : FileText
     const usageCount = t._count?.announcements ?? 0
-
     if (viewMode === "list") return (
         <div className={cn(
             "group flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all duration-200",
@@ -74,7 +65,6 @@ function TemplateCard({
             )}>
                 <TypeIcon className="size-4.5" />
             </div>
-
             {/* Info */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -98,13 +88,11 @@ function TemplateCard({
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{templatePreview(t)}</p>
             </div>
-
             {/* Meta */}
             <div className="hidden sm:flex items-center gap-4 text-[11px] text-muted-foreground shrink-0">
                 <span className="flex items-center gap-1"><Package className="size-3" /> {usageCount} إعلان</span>
                 <span className="flex items-center gap-1"><Clock className="size-3" /> {formatDate(t.createdAt)}</span>
             </div>
-
             {/* Actions */}
             <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                 {!t.isDefault && (
@@ -124,7 +112,6 @@ function TemplateCard({
             </div>
         </div>
     )
-
     // Grid card
     return (
         <div className={cn(
@@ -139,7 +126,6 @@ function TemplateCard({
                     <CheckCircle2 className="size-4 text-primary" />
                 </div>
             )}
-
             {/* Top */}
             <div className="flex items-start gap-3">
                 <div className={cn(
@@ -170,12 +156,10 @@ function TemplateCard({
                     </div>
                 </div>
             </div>
-
             {/* Preview text */}
             <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 border-t border-border/20 pt-3">
                 {templatePreview(t)}…
             </p>
-
             {/* Footer */}
             <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
@@ -202,12 +186,9 @@ function TemplateCard({
         </div>
     )
 }
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function TemplatesPage() {
     const router = useRouter()
-
     const [templates,  setTemplates]  = useState<TemplateRow[]>([])
     const [loading,    setLoading]    = useState(true)
     const [editId,     setEditId]     = useState<string | null>(null)
@@ -215,7 +196,6 @@ export default function TemplatesPage() {
     const [saving,     setSaving]     = useState(false)
     const [search,     setSearch]     = useState("")
     const [viewMode,   setViewMode]   = useState<"grid" | "list">("grid")
-
     // Editor state
     const [editName,         setEditName]         = useState("")
     const [editType,         setEditType]         = useState<"text" | "text_image">("text")
@@ -223,7 +203,6 @@ export default function TemplatesPage() {
     const [editBodyTemplate, setEditBodyTemplate] = useState("")
     const [editProductBlock, setEditProductBlock] = useState("")
     const [editSeparator,    setEditSeparator]    = useState("\n---\n")
-
     // ── Load ──────────────────────────────────────────────────────────────────
     const load = useCallback(async () => {
         setLoading(true)
@@ -232,15 +211,12 @@ export default function TemplatesPage() {
         if (res.success && res.data) setTemplates(res.data as TemplateRow[])
         setLoading(false)
     }, [])
-
     useEffect(() => { load() }, [load])
-
     // ── Filtered list ─────────────────────────────────────────────────────────
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase()
         return q ? templates.filter(t => t.name.toLowerCase().includes(q)) : templates
     }, [templates, search])
-
     // ── Stats ─────────────────────────────────────────────────────────────────
     const stats = useMemo(() => ({
         total:      templates.length,
@@ -248,7 +224,6 @@ export default function TemplatesPage() {
         perProduct: templates.filter(t => t.sendMode === "per_product").length,
         inUse:      templates.filter(t => (t._count?.announcements ?? 0) > 0).length,
     }), [templates])
-
     // ── Open / Close editor ───────────────────────────────────────────────────
     const openEdit = (t: TemplateRow) => {
         setEditId(t.id)
@@ -262,7 +237,6 @@ export default function TemplatesPage() {
         // Scroll editor into view on mobile
         setTimeout(() => document.getElementById("editor-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100)
     }
-
     const openCreate = () => {
         setEditId(null)
         setCreating(true)
@@ -274,9 +248,7 @@ export default function TemplatesPage() {
         setEditSeparator("\n---\n")
         setTimeout(() => document.getElementById("editor-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100)
     }
-
     const closeEditor = () => { setEditId(null); setCreating(false) }
-
     // ── Save ──────────────────────────────────────────────────────────────────
     const handleSave = async () => {
         if (!editName.trim()) { toast.error("اسم القالب مطلوب"); return }
@@ -300,7 +272,6 @@ export default function TemplatesPage() {
             setSaving(false)
         }
     }
-
     // ── Delete ────────────────────────────────────────────────────────────────
     const handleDelete = async (t: TemplateRow) => {
         if (!confirm(`حذف القالب "${t.name}"؟`)) return
@@ -313,20 +284,16 @@ export default function TemplatesPage() {
             toast.error((res as any).error)
         }
     }
-
     // ── Set default ───────────────────────────────────────────────────────────
     const handleSetDefault = async (t: TemplateRow) => {
         const res = await updateMessageTemplate(t.id, { isDefault: true })
         if (res.success) { toast.success("تم تعيين القالب الافتراضي"); await load() }
         else toast.error((res as any).error)
     }
-
     const editingTemplate = editId ? templates.find(t => t.id === editId) : null
     const isEditorOpen    = creating || !!editId
-
     return (
         <div className="max-w-6xl mx-auto space-y-6 pb-20">
-
             {/* ── Page Header ── */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
@@ -350,7 +317,6 @@ export default function TemplatesPage() {
                     قالب جديد
                 </Button>
             </div>
-
             {/* ── Stats Bar ── */}
             {!loading && templates.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -372,16 +338,13 @@ export default function TemplatesPage() {
                     ))}
                 </div>
             )}
-
             {/* ── Main Layout ── */}
             <div className={cn(
                 "grid gap-6",
                 isEditorOpen ? "grid-cols-1 lg:grid-cols-[1fr_420px]" : "grid-cols-1"
             )}>
-
                 {/* ── Left: Templates List ── */}
                 <div className="space-y-4 min-w-0">
-
                     {/* Toolbar */}
                     <div className="flex items-center gap-3 flex-wrap">
                         {/* Search */}
@@ -400,14 +363,12 @@ export default function TemplatesPage() {
                                 </button>
                             )}
                         </div>
-
                         {/* Results count */}
                         {search && (
                             <span className="text-xs text-muted-foreground shrink-0">
                                 {filtered.length} نتيجة
                             </span>
                         )}
-
                         {/* View toggle */}
                         <div className="flex rounded-xl border border-border/60 overflow-hidden bg-muted/20 h-9 shrink-0">
                             {([
@@ -424,14 +385,12 @@ export default function TemplatesPage() {
                             ))}
                         </div>
                     </div>
-
                     {/* Loading */}
                     {loading && (
                         <div className="flex items-center justify-center py-20 text-muted-foreground">
                             <Loader2 className="size-6 animate-spin" />
                         </div>
                     )}
-
                     {/* Empty search result */}
                     {!loading && filtered.length === 0 && templates.length > 0 && (
                         <div className="flex flex-col items-center justify-center py-16 rounded-2xl border border-dashed border-border/50 text-center gap-3">
@@ -446,7 +405,6 @@ export default function TemplatesPage() {
                             </button>
                         </div>
                     )}
-
                     {/* Truly empty */}
                     {!loading && templates.length === 0 && (
                         <div
@@ -461,7 +419,6 @@ export default function TemplatesPage() {
                             </div>
                         </div>
                     )}
-
                     {/* Grid view */}
                     {!loading && filtered.length > 0 && viewMode === "grid" && (
                         <div className={cn(
@@ -478,7 +435,6 @@ export default function TemplatesPage() {
                             ))}
                         </div>
                     )}
-
                     {/* List view */}
                     {!loading && filtered.length > 0 && viewMode === "list" && (
                         <div className="space-y-2">
@@ -493,12 +449,10 @@ export default function TemplatesPage() {
                         </div>
                     )}
                 </div>
-
                 {/* ── Right: Editor Panel ── */}
                 {isEditorOpen && (
                     <div id="editor-panel" className="min-w-0">
                         <div className="sticky top-6 rounded-2xl border border-primary/25 bg-card shadow-xl shadow-primary/5 overflow-hidden">
-
                             {/* Editor Header */}
                             <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 bg-primary/3">
                                 <div className="flex items-center gap-2">
@@ -522,7 +476,6 @@ export default function TemplatesPage() {
                                     <X className="size-3.5" />
                                 </button>
                             </div>
-
                             {/* Editor Body */}
                             <div className="p-6 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto">
                                 {/* Template name */}
@@ -535,7 +488,6 @@ export default function TemplatesPage() {
                                         placeholder="مثال: عرض منتجات مع صور"
                                     />
                                 </div>
-
                                 {/* Editor */}
                                 <TemplateEditor
                                     type={editType}
@@ -549,7 +501,6 @@ export default function TemplatesPage() {
                                     onProductBlockChange={setEditProductBlock}
                                     onSeparatorChange={setEditSeparator}
                                 />
-
                                 {/* Save */}
                                 <Button
                                     onClick={handleSave}
@@ -565,7 +516,6 @@ export default function TemplatesPage() {
                         </div>
                     </div>
                 )}
-
                 {/* Placeholder when editor is closed */}
                 {!isEditorOpen && !loading && templates.length > 0 && (
                     <div className="hidden lg:flex" />

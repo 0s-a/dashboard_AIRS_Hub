@@ -46,7 +46,6 @@ export async function login(username: string, password: string): Promise<ActionR
             userId: user.id,
             username: user.username,
             name: user.name,
-            role: user.role,
             color: user.color,
         } as JwtPayload)
             .setProtectedHeader({ alg: 'HS256' })
@@ -102,7 +101,6 @@ export async function getCurrentUser(): Promise<ActionResult<JwtPayload | null>>
                 userId:   payload.userId   as string,
                 username: payload.username as string,
                 name:     payload.name     as string,
-                role:     (payload.role     as string) || 'user',
                 color:    (payload.color    as string) || '#6366f1',
             },
         }

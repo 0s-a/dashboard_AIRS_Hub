@@ -1,12 +1,10 @@
 
 services:
- 
-  nextjs:
+  web:
     build:
       context: .
       target: development
     restart: unless-stopped
-      
     container_name: nawaat_nextjs_dev
     ports:
       - "3000:3000"
@@ -14,7 +12,6 @@ services:
       - .:/app
       - /app/node_modules
       - /home/husam/Pictures/nawaat-uploads:/app/public/uploads:rw
-   
     environment:
       - WATCHPACK_POLLING=true 
     env_file:
@@ -79,3 +76,5 @@ volumes:
 networks:
   nawaat_net:
     name: nawaat_network_dev
+    external: true
+    

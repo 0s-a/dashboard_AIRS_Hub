@@ -1,9 +1,7 @@
 "use client"
-
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { Plus, Bookmark, Package, Search, RotateCcw, Loader2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-
 import { Button }    from "@/components/ui/button"
 import { Input }     from "@/components/ui/input"
 import { DataTable } from "@/components/ui/data-table"
@@ -12,9 +10,7 @@ import { buildColumns } from "@/components/brands/columns"
 import { getBrands }    from "@/lib/actions/brands"
 import { cn } from "@/lib/utils"
 import type { BrandRow } from "@/lib/types/brand"
-
 // ─── Types ─────────────────────────────────────────────────────
-
 interface StatCard {
     label: string
     value: number
@@ -22,37 +18,27 @@ interface StatCard {
     color: string
     bg:    string
 }
-
 // ─── Page ──────────────────────────────────────────────────────
-
 export default function BrandsPage() {
     const [brands,    setBrands]    = useState<BrandRow[]>([])
     const [loading,   setLoading]   = useState(true)
     const [search,    setSearch]    = useState("")
     const [sheetOpen, setSheetOpen] = useState(false)
-
     // ── Data fetching ───────────────────────────────────────────
-
     const load = useCallback(async () => {
         setLoading(true)
         const res = await getBrands()
         if (res.success && res.data) setBrands(res.data as BrandRow[])
         setLoading(false)
     }, [])
-
     useEffect(() => { load() }, [load])
-
     // ── Sheet handler ───────────────────────────────────────────
-
     function handleSheetChange(open: boolean) {
         setSheetOpen(open)
         if (!open) load()   // refresh after closing
     }
-
     // ── Derived state ───────────────────────────────────────────
-
     const columns = useMemo(() => buildColumns(load), [load])
-
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase()
         if (!q) return brands
@@ -61,7 +47,6 @@ export default function BrandsPage() {
             b.code.toLowerCase().includes(q)
         )
     }, [brands, search])
-
     const stats: StatCard[] = [
         {
             label: "إجمالي البراندات",
@@ -78,12 +63,9 @@ export default function BrandsPage() {
             bg:    "bg-violet-500/10",
         },
     ]
-
     // ── Render ──────────────────────────────────────────────────
-
     return (
         <div className="space-y-6">
-
             {/* ── Page Header ── */}
             <div className="flex items-center justify-between gap-4">
                 <div>
@@ -94,7 +76,6 @@ export default function BrandsPage() {
                         إدارة براندات المنتجات وربطها بالمخزون
                     </p>
                 </div>
-
                 <Button
                     onClick={() => setSheetOpen(true)}
                     className="gap-2 rounded-xl shadow-md shadow-primary/20"
@@ -103,7 +84,6 @@ export default function BrandsPage() {
                     إضافة براند
                 </Button>
             </div>
-
             {/* ── Stat Cards ── */}
             <div className="grid gap-4 sm:grid-cols-2">
                 {stats.map(card => (
@@ -121,10 +101,8 @@ export default function BrandsPage() {
                     </div>
                 ))}
             </div>
-
             {/* ── Search + Table ── */}
             <div className="glass-panel rounded-xl border border-border/50 p-6 space-y-4">
-
                 {/* Search bar */}
                 <div className="flex items-center gap-3">
                     <div className="relative flex-1 max-w-xs">
@@ -136,7 +114,6 @@ export default function BrandsPage() {
                             className="pr-9 h-9 rounded-xl border-border/50"
                         />
                     </div>
-
                     {search && (
                         <Button
                             variant="ghost" size="sm"
@@ -147,10 +124,8 @@ export default function BrandsPage() {
                             مسح
                         </Button>
                     )}
-
                     {loading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                 </div>
-
                 {/* Skeleton while loading empty state */}
                 {loading && brands.length === 0 ? (
                     <div className="space-y-2 animate-pulse">
@@ -170,10 +145,8 @@ export default function BrandsPage() {
                     />
                 )}
             </div>
-
             {/* ── Add Brand Sheet ── */}
             <BrandSheet open={sheetOpen} onOpenChange={handleSheetChange} />
-
         </div>
     )
 }

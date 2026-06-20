@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { WelcomeSection } from "@/components/dashboard/welcome-section"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { ActivityChart } from "@/components/dashboard/activity-chart"

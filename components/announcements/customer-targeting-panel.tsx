@@ -12,6 +12,7 @@ interface Customer     { id: string; name: string | null }
 interface CustomerTargetingPanelProps {
     value: { mode: "all" | "filter" | "manual" | "builder"; filters: CustomerFilters; manualIds: string[] }
     onChange: (v: CustomerTargetingPanelProps["value"]) => void
+    customers: Customer[]
     customerTags?:  string[]
     previewCount?: number
 }
@@ -54,6 +55,10 @@ export function CustomerTargetingPanel({
     }
 
     const builderGroups = (filters.filterGroups as FilterGroup[]) ?? []
+
+    const filteredCustomers = customers.filter(c =>
+        !search || c.name?.toLowerCase().includes(search.toLowerCase())
+    )
 
     return (
         <div className="space-y-3">

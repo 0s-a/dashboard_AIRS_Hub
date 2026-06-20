@@ -1,12 +1,10 @@
 "use client"
-
 /**
  * app/(dashboard)/announcements/[id]/logs/page.tsx
  *
  * Send History — full log of every message delivery attempt.
  * Sourced from AnnouncementLog written by n8n callback.
  */
-
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
@@ -20,9 +18,7 @@ import { Badge }   from "@/components/ui/badge"
 import { cn }      from "@/lib/utils"
 import { toast }   from "sonner"
 import { getAnnouncementMessages, getAnnouncementProgress, getAnnouncement } from "@/lib/actions/announcements"
-
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 interface LogEntry {
     id:           string
     customerId:     string | null
@@ -34,18 +30,14 @@ interface LogEntry {
     messageIndex: number
     sentAt:       string | Date
 }
-
 type FilterStatus = "all" | "sent" | "failed"
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formatTime(d: string | Date) {
     return new Date(d).toLocaleString("ar-SA", {
         month: "short", day: "numeric",
         hour: "2-digit", minute: "2-digit",
     })
 }
-
 function exportCSV(items: LogEntry[], title: string) {
     const header = "الاسم,رقم الواتساب,الحالة,سبب الفشل,الوقت,رقم الرسالة"
     const rows = items.map(r =>
@@ -65,13 +57,10 @@ function exportCSV(items: LogEntry[], title: string) {
     a.href = url; a.download = `${title}-logs.csv`; a.click()
     URL.revokeObjectURL(url)
 }
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function AnnouncementLogsPage() {
     const { id }   = useParams<{ id: string }>()
     const router   = useRouter()
-
     const [title,    setTitle]    = useState<string>("")
     const [items,    setItems]    = useState<LogEntry[]>([])
     const [stats,    setStats]    = useState<{ sent: number; failed: number; total: number; pending: number } | null>(null)
@@ -81,7 +70,6 @@ export default function AnnouncementLogsPage() {
     const [page,     setPage]     = useState(1)
     const [total,    setTotal]    = useState(0)
     const PAGE_SIZE = 50
-
     const load = useCallback(async (f: FilterStatus, p: number) => {
         setLoading(true)
         const statusFilter = f === "all" ? undefined : f
@@ -110,18 +98,15 @@ export default function AnnouncementLogsPage() {
         }
         setLoading(false)
     }, [id])
-
     useEffect(() => {
         getAnnouncement(id).then(res => {
             if (res.success && res.data) setTitle((res.data as any).title ?? "")
         })
         load("all", 1)
     }, [id, load])
-
     const handleFilter = (f: FilterStatus) => {
         setFilter(f); setPage(1); load(f, 1)
     }
-
     // Client-side search filter
     const displayed = search
         ? items.filter(r =>
@@ -129,14 +114,11 @@ export default function AnnouncementLogsPage() {
             (r.whatsapp   ?? "").includes(search)
         )
         : items
-
     const successRate = stats && stats.total > 0
         ? Math.round((stats.sent / stats.total) * 100)
         : 0
-
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-16">
-
             {/* Header */}
             <div className="flex items-center gap-3">
                 <Button variant="ghost" size="icon" onClick={() => router.push(`/announcements/${id}`)}
@@ -153,7 +135,6 @@ export default function AnnouncementLogsPage() {
                     تحديث
                 </Button>
             </div>
-
             {/* Stats cards */}
             {stats && (
                 <div className="grid grid-cols-3 gap-3">
@@ -171,10 +152,6 @@ export default function AnnouncementLogsPage() {
                     </div>
                 </div>
             )}
-
-
-
-
             {/* Controls */}
             <div className="flex items-center gap-3 flex-wrap">
                 <div className="relative flex-1 min-w-48">
@@ -186,7 +163,6 @@ export default function AnnouncementLogsPage() {
                         className="pr-9 h-9 rounded-xl text-sm"
                     />
                 </div>
-
                 <div className="flex rounded-xl border border-border/50 overflow-hidden">
                     {(["all", "sent", "failed"] as FilterStatus[]).map(f => (
                         <button key={f} type="button"
@@ -206,7 +182,6 @@ export default function AnnouncementLogsPage() {
                         </button>
                     ))}
                 </div>
-
                 <Button variant="outline" size="sm"
                     onClick={() => exportCSV(displayed, title)}
                     className="gap-2 rounded-xl h-9"
@@ -215,7 +190,6 @@ export default function AnnouncementLogsPage() {
                     تصدير CSV
                 </Button>
             </div>
-
             {/* Table */}
             <div className="glass-panel rounded-2xl border border-border/50 overflow-hidden">
                 {loading ? (
@@ -283,7 +257,6 @@ export default function AnnouncementLogsPage() {
                         </tbody>
                     </table>
                 )}
-
                 {/* Pagination */}
                 {total > PAGE_SIZE && (
                     <div className="flex items-center justify-between px-4 py-3 border-t border-border/30 text-xs text-muted-foreground">

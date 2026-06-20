@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { getGalleryImages, getGalleryStats } from "@/lib/actions/gallery"
 import { GalleryClient } from "./gallery-client"
 

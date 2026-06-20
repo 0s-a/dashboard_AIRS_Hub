@@ -88,6 +88,9 @@ export async function getCustomerById(id: string) {
             include: {
                 contacts: true,
                 priceLabel: { select: { id: true, name: true, customerType: true } },
+                customerCurrencies: {
+                    include: { currency: { select: { id: true, name: true, code: true, symbol: true } } },
+                },
                 orders: {
                     orderBy: { createdAt: 'desc' },
                     take: 20,
@@ -96,8 +99,6 @@ export async function getCustomerById(id: string) {
                             include: {
                                 product: { select: { id: true, name: true, itemNumber: true } },
                                 variant: { select: { id: true, name: true, hex: true } },
-                                currency: { select: { id: true, symbol: true, code: true } },
-                                priceLabel: { select: { id: true, name: true } },
                             },
                         },
                     },
@@ -106,6 +107,19 @@ export async function getCustomerById(id: string) {
         }),
         'تعذّر جلب بيانات العميل'
     )
+}
+
+export async function getCustomerStats() {
+    return safeAction(async () => {
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        const [total, newInWeek, disabled] = await Promise.all([
+            prisma.customer.count(),
+            prisma.customer.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+            prisma.customer.count({ where: { isActive: false } }),
+        ])
+        return { total, newInWeek, disabled }
+    }, 'تعذّر جلب إحصائيات العملاء')
 }
 
 // ─── Create ──────────────────────────────────────────────────
@@ -189,6 +203,7 @@ export interface UpdateCustomerData {
 export async function updateCustomer(id: string, data: UpdateCustomerData) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             try {
                 return await prisma.customer.update({
                     where: { id },

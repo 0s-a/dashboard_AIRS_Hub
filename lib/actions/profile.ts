@@ -24,7 +24,7 @@ export async function updateProfile(data: { name?: string; color?: string }) {
             return prisma.user.update({
                 where: { id: currentUser.data.userId },
                 data: updateData,
-                select: { id: true, name: true, username: true, role: true, color: true },
+                select: { id: true, name: true, username: true, color: true },
             })
         },
         PATHS,

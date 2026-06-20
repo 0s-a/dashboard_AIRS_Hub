@@ -76,7 +76,7 @@ export function AnnouncementCard({ announcement: ann, onRefresh, compact = false
     const router = useRouter()
     const cfg = STATUS_CONFIG[ann.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending
 
-    const pFilters = ann.customerFilters as any
+    const pFilters = ann.personFilters as any
     const rFilters = ann.productFilters as any
     const customerLabel = pFilters?.all
         ? "الكل"

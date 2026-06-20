@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
 import Image from "next/image"
@@ -15,7 +14,6 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { getStoreSettings, updateStoreSettings, uploadStoreLogo, deleteStoreLogo } from "@/lib/actions/store-settings"
-
 type StoreFormData = {
     name: string
     description: string
@@ -27,14 +25,12 @@ type StoreFormData = {
     city: string
     country: string
 }
-
 type SocialLinks = {
     facebook: string
     instagram: string
     twitter: string
     tiktok: string
 }
-
 const DAYS = [
     { key: "sat", label: "السبت" },
     { key: "sun", label: "الأحد" },
@@ -44,7 +40,6 @@ const DAYS = [
     { key: "thu", label: "الخميس" },
     { key: "fri", label: "الجمعة" },
 ]
-
 export default function SettingsPage() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -61,9 +56,7 @@ export default function SettingsPage() {
         })
         return defaults
     })
-
     const { register, handleSubmit, reset, formState: { errors } } = useForm<StoreFormData>()
-
     useEffect(() => {
         const load = async () => {
             const res = await getStoreSettings()
@@ -92,11 +85,9 @@ export default function SettingsPage() {
         }
         load()
     }, [reset])
-
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-
         setUploadingLogo(true)
         const formData = new FormData()
         formData.append("file", file)
@@ -111,7 +102,6 @@ export default function SettingsPage() {
         // Reset input
         if (logoInputRef.current) logoInputRef.current.value = ""
     }
-
     const handleLogoDelete = async () => {
         if (!confirm("هل تريد حذف الشعار؟")) return
         const res = await deleteStoreLogo()
@@ -122,7 +112,6 @@ export default function SettingsPage() {
             toast.error(res.error || "فشل حذف الشعار")
         }
     }
-
     const onSubmit = async (data: StoreFormData) => {
         setSaving(true)
         const res = await updateStoreSettings({
@@ -137,7 +126,6 @@ export default function SettingsPage() {
         }
         setSaving(false)
     }
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -145,7 +133,6 @@ export default function SettingsPage() {
             </div>
         )
     }
-
     return (
         <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
@@ -158,7 +145,6 @@ export default function SettingsPage() {
                     إدارة معلومات المتجر الأساسية والهوية البصرية
                 </p>
             </div>
-
             {/* ── Store Identity Preview ── */}
             <div className="glass-panel rounded-2xl border border-border/50 p-8">
                 <div className="flex items-center gap-6">
@@ -197,7 +183,6 @@ export default function SettingsPage() {
                                 </div>
                             )}
                         </div>
-
                         {logoUrl && (
                             <button
                                 type="button"
@@ -208,7 +193,6 @@ export default function SettingsPage() {
                             </button>
                         )}
                     </div>
-
                     {/* Store Preview Info */}
                     <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-center gap-3">
@@ -248,7 +232,6 @@ export default function SettingsPage() {
                     </div>
                 </div>
             </div>
-
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                 {/* ── Section 1: Basic Info ── */}
                 <div className="glass-panel rounded-2xl border border-border/50 p-8 space-y-6">
@@ -261,9 +244,7 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted-foreground">اسم المتجر والوصف العام</p>
                         </div>
                     </div>
-
                     <Separator />
-
                     <div className="grid gap-5">
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold">اسم المتجر *</Label>
@@ -274,7 +255,6 @@ export default function SettingsPage() {
                             />
                             {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
                                 <FileText className="size-3.5 text-muted-foreground" />
@@ -288,7 +268,6 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
-
                 {/* ── Section 2: Contact Info ── */}
                 <div className="glass-panel rounded-2xl border border-border/50 p-8 space-y-6">
                     <div className="flex items-center gap-3">
@@ -300,9 +279,7 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted-foreground">أرقام الهاتف والبريد الإلكتروني</p>
                         </div>
                     </div>
-
                     <Separator />
-
                     <div className="grid gap-5 md:grid-cols-2">
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
@@ -316,7 +293,6 @@ export default function SettingsPage() {
                                 {...register("phone")}
                             />
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
                                 <MessageCircle className="size-3.5 text-emerald-600" />
@@ -329,7 +305,6 @@ export default function SettingsPage() {
                                 {...register("whatsapp")}
                             />
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
                                 <Mail className="size-3.5 text-blue-600" />
@@ -343,7 +318,6 @@ export default function SettingsPage() {
                                 {...register("email")}
                             />
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
                                 <Globe className="size-3.5 text-indigo-600" />
@@ -358,7 +332,6 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
-
                 {/* ── Section 3: Address ── */}
                 <div className="glass-panel rounded-2xl border border-border/50 p-8 space-y-6">
                     <div className="flex items-center gap-3">
@@ -370,9 +343,7 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted-foreground">عنوان المتجر الفعلي</p>
                         </div>
                     </div>
-
                     <Separator />
-
                     <div className="grid gap-5">
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold">العنوان التفصيلي</Label>
@@ -394,7 +365,6 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
-
                 {/* ── Section 4: Working Hours ── */}
                 <div className="glass-panel rounded-2xl border border-border/50 p-8 space-y-6">
                     <div className="flex items-center gap-3">
@@ -406,9 +376,7 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted-foreground">أوقات العمل الأسبوعية</p>
                         </div>
                     </div>
-
                     <Separator />
-
                     <div className="space-y-3">
                         {DAYS.map(day => {
                             const h = workingHours[day.key]
@@ -420,7 +388,6 @@ export default function SettingsPage() {
                                     }`}
                                 >
                                     <span className="text-sm font-bold w-20 shrink-0">{day.label}</span>
-
                                     <button
                                         type="button"
                                         onClick={() => setWorkingHours(prev => ({
@@ -435,7 +402,6 @@ export default function SettingsPage() {
                                     >
                                         {h?.closed ? "مغلق" : "مفتوح"}
                                     </button>
-
                                     {!h?.closed && (
                                         <div className="flex items-center gap-2 mr-auto">
                                             <Input
@@ -464,7 +430,6 @@ export default function SettingsPage() {
                         })}
                     </div>
                 </div>
-
                 {/* ── Section 5: Social Links ── */}
                 <div className="glass-panel rounded-2xl border border-border/50 p-8 space-y-6">
                     <div className="flex items-center gap-3">
@@ -476,9 +441,7 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted-foreground">حسابات التواصل الاجتماعي</p>
                         </div>
                     </div>
-
                     <Separator />
-
                     <div className="grid gap-5 md:grid-cols-2">
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
@@ -493,7 +456,6 @@ export default function SettingsPage() {
                                 onChange={e => setSocialLinks(p => ({ ...p, facebook: e.target.value }))}
                             />
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
                                 <Instagram className="size-3.5 text-pink-600" />
@@ -507,7 +469,6 @@ export default function SettingsPage() {
                                 onChange={e => setSocialLinks(p => ({ ...p, instagram: e.target.value }))}
                             />
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
                                 <Twitter className="size-3.5 text-sky-500" />
@@ -521,7 +482,6 @@ export default function SettingsPage() {
                                 onChange={e => setSocialLinks(p => ({ ...p, twitter: e.target.value }))}
                             />
                         </div>
-
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold flex items-center gap-2">
                                 <svg className="size-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -539,7 +499,6 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
-
                 {/* Save Button */}
                 <div className="flex items-center justify-end gap-3 pb-8">
                     <Button

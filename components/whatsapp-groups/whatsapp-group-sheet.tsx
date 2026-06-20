@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
-    Loader2, Save, MessageSquare, X, Users, User, Plus,
+    Loader2, Save, MessageSquare, X, Users, User, Plus, Settings, Send
 } from "lucide-react"
 import {
     Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
@@ -24,7 +24,7 @@ import {
     Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover"
 import { toast } from "sonner"
-import { createWhatsappGroup, updateWhatsappGroup } from "@/lib/actions/whatsapp-groups"
+import { createWhatsappGroup, updateWhatsappGroup, resendWhatsappGroupWebhook } from "@/lib/actions/whatsapp-groups"
 import { whatsappGroupSchema } from "@/lib/validations/whatsapp-groups"
 import type { WhatsappGroupRow } from "@/lib/types/whatsapp-groups"
 import type { z } from "zod"
@@ -109,6 +109,8 @@ export function WhatsappGroupSheet({
         try {
             const payload = {
                 ...data,
+                name:          data.name || "",
+                isActive:      data.isActive ?? true,
                 groupNumber:   data.groupNumber?.trim() || null,
                 notes:         data.notes?.trim() || null,
                 supervisorIds: selectedSupervisorIds,
@@ -136,144 +138,159 @@ export function WhatsappGroupSheet({
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId)
     const selectedSupervisors = supervisors.filter(s => selectedSupervisorIds.includes(s.id))
     const isActive = watch("isActive")
+    
+    const [isSendingN8n, setIsSendingN8n] = useState(false)
+    const handleResendN8n = async () => {
+        if (!group?.id) return
+        setIsSendingN8n(true)
+        try {
+            const res = await resendWhatsappGroupWebhook(group.id)
+            if (res.success) {
+                toast.success("تم إرسال بيانات المجموعة إلى n8n بنجاح")
+            } else {
+                toast.error((res as any).error ?? "حدث خطأ أثناء الإرسال")
+            }
+        } catch {
+            toast.error("حدث خطأ غير متوقع")
+        } finally {
+            setIsSendingN8n(false)
+        }
+    }
+    
+    // حساب اسم المجموعة تلقائياً للعرض
+    const suffix = process.env.NEXT_PUBLIC_WHATSAPP_GROUP_SUFFIX || " | بيوتفي"
+    const autoGroupName = selectedCustomer ? `${selectedCustomer.name}${suffix}` : (isEditing ? group!.name : "")
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="left" className="w-full sm:max-w-lg overflow-y-auto">
                 <SheetHeader className="pb-4 border-b border-border/50">
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                            <MessageSquare className="size-5 text-emerald-600" />
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="size-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                                <MessageSquare className="size-5 text-emerald-600" />
+                            </div>
+                            <div>
+                                <SheetTitle className="text-xl font-bold">
+                                    {isEditing ? "تعديل المجموعة" : "إنشاء مجموعة واتساب"}
+                                </SheetTitle>
+                                <SheetDescription className="text-xs">
+                                    {isEditing ? "عدّل بيانات مجموعة الواتساب" : "أدخل بيانات المجموعة الجديدة"}
+                                </SheetDescription>
+                            </div>
                         </div>
-                        <div>
-                            <SheetTitle className="text-xl font-bold">
-                                {isEditing ? "تعديل المجموعة" : "إنشاء مجموعة واتساب"}
-                            </SheetTitle>
-                            <SheetDescription className="text-xs">
-                                {isEditing ? "عدّل بيانات مجموعة الواتساب" : "أدخل بيانات المجموعة الجديدة"}
-                            </SheetDescription>
-                        </div>
+                        {isEditing && (
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-9 gap-2 bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+                                onClick={handleResendN8n}
+                                disabled={isSendingN8n}
+                            >
+                                {isSendingN8n ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                                إرسال لـ n8n
+                            </Button>
+                        )}
                     </div>
                 </SheetHeader>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-5 px-1">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-5 px-1 pb-10">
 
-                    {/* اسم المجموعة */}
-                    <div className="space-y-2">
-                        <Label htmlFor="grp-name" className="text-sm font-semibold">
-                            اسم المجموعة <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                            id="grp-name"
-                            placeholder="مثال: مجموعة أحمد محمد"
-                            className="h-10 rounded-xl"
-                            {...register("name")}
-                        />
-                        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-                    </div>
+                    {/* القسم الأول: البيانات الأساسية */}
+                    {isEditing && (
+                        <div className="p-5 rounded-2xl border border-border/50 bg-card shadow-sm space-y-5">
+                            <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                                <div className="size-6 rounded-md bg-emerald-500/10 flex items-center justify-center">
+                                    <MessageSquare className="size-3.5 text-emerald-600" />
+                                </div>
+                                <h3 className="font-bold text-sm">البيانات الأساسية</h3>
+                            </div>
 
-                    {/* رقم المجموعة */}
-                    <div className="space-y-2">
-                        <Label htmlFor="grp-number" className="text-sm font-semibold">
-                            رقم المجموعة
-                            <span className="text-muted-foreground text-xs font-normal mr-2">(اختياري)</span>
-                        </Label>
-                        <Input
-                            id="grp-number"
-                            placeholder="120363...@g.us"
-                            className="h-10 rounded-xl font-mono text-sm"
-                            dir="ltr"
-                            {...register("groupNumber")}
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                            المعرّف الفريد للمجموعة على واتساب — يُستخدم للتكامل مع البوت
-                        </p>
-                    </div>
+                            <div className="flex gap-4">
+                                {/* اسم المجموعة */}
+                                <div className="space-y-2 flex-1">
+                                    <Label htmlFor="grp-name" className="text-sm font-semibold">
+                                        اسم المجموعة
+                                    </Label>
+                                    <Input
+                                        id="grp-name"
+                                        value={autoGroupName}
+                                        readOnly
+                                        className="h-10 rounded-xl bg-muted text-muted-foreground select-none cursor-not-allowed"
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        يتم توليد اسم المجموعة تلقائياً بناءً على اسم العميل.
+                                    </p>
+                                </div>
 
-                    {/* اختيار العميل */}
-                    <div className="space-y-2">
-                        <Label className="text-sm font-semibold">
-                            العميل <span className="text-destructive">*</span>
-                        </Label>
-                        <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    type="button"
-                                    className={`w-full h-10 rounded-xl justify-between font-normal ${!selectedCustomer ? "text-muted-foreground" : ""}`}
-                                >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <User className="size-4 text-muted-foreground shrink-0" />
-                                        <span className="truncate">
-                                            {selectedCustomer?.name ?? "اختر عميلاً..."}
-                                        </span>
+                                {/* كود المجموعة */}
+                                <div className="space-y-2 w-24">
+                                    <Label className="text-sm font-semibold">الكود</Label>
+                                    <div className="h-10 rounded-xl bg-muted border border-border/50 flex items-center justify-center font-mono font-bold tracking-widest text-muted-foreground">
+                                        {group?.code || '---'}
                                     </div>
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-0 rounded-xl" align="start">
-                                <Command>
-                                    <CommandInput placeholder="ابحث عن عميل..." />
-                                    <CommandList>
-                                        <CommandEmpty>لا يوجد عملاء</CommandEmpty>
-                                        <CommandGroup>
-                                            {customers.map(c => (
-                                                <CommandItem
-                                                    key={c.id}
-                                                    value={c.name ?? c.id}
-                                                    onSelect={() => selectCustomer(c.id)}
-                                                    className="gap-2"
-                                                >
-                                                    <div className={`size-5 rounded-md flex items-center justify-center shrink-0 ${selectedCustomerId === c.id ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                                                        <User className="size-3" />
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="text-sm font-medium truncate">{c.name ?? "—"}</span>
-                                                        {c.contacts.find(x => x.type === "phone") && (
-                                                            <span className="text-[10px] text-muted-foreground font-mono" dir="ltr">
-                                                                {c.contacts.find(x => x.type === "phone")?.value}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                        {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
-                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                    {/* اختيار المشرفين */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
+                    {/* القسم الثاني: الارتباطات */}
+                    <div className="p-5 rounded-2xl border border-border/50 bg-card shadow-sm space-y-5">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                            <div className="size-6 rounded-md bg-blue-500/10 flex items-center justify-center">
+                                <Users className="size-3.5 text-blue-600" />
+                            </div>
+                            <h3 className="font-bold text-sm">الارتباطات</h3>
+                        </div>
+
+                        {/* اختيار العميل */}
+                        <div className="space-y-2">
                             <Label className="text-sm font-semibold">
-                                المشرفون <span className="text-destructive">*</span>
+                                العميل <span className="text-destructive">*</span>
                             </Label>
-                            <Popover open={supervisorOpen} onOpenChange={setSupervisorOpen}>
+                            <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm" type="button" className="h-7 gap-1 text-xs rounded-lg">
-                                        <Plus className="size-3" /> إضافة مشرف
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        type="button"
+                                        className={`w-full h-11 rounded-xl justify-between font-normal bg-background hover:bg-muted/50 transition-colors ${!selectedCustomer ? "text-muted-foreground" : ""}`}
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="size-6 rounded-md bg-muted flex items-center justify-center shrink-0">
+                                                <User className="size-3.5" />
+                                            </div>
+                                            <span className="truncate font-medium">
+                                                {selectedCustomer?.name ?? "اضغط لاختيار عميل..."}
+                                            </span>
+                                        </div>
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-72 p-0 rounded-xl" align="end">
+                                <PopoverContent className="w-80 p-0 rounded-xl border-border/50 shadow-lg" align="start">
                                     <Command>
-                                        <CommandInput placeholder="ابحث عن مشرف..." />
-                                        <CommandList>
-                                            <CommandEmpty>لا يوجد مشرفون</CommandEmpty>
+                                        <CommandInput placeholder="ابحث عن عميل..." className="h-10" />
+                                        <CommandList className="max-h-60">
+                                            <CommandEmpty className="py-6 text-sm text-center text-muted-foreground">لا يوجد عملاء مطابقين</CommandEmpty>
                                             <CommandGroup>
-                                                {supervisors.map(s => (
+                                                {customers.map(c => (
                                                     <CommandItem
-                                                        key={s.id}
-                                                        value={s.name}
-                                                        onSelect={() => toggleSupervisor(s.id)}
-                                                        className="gap-2"
+                                                        key={c.id}
+                                                        value={c.name ?? c.id}
+                                                        onSelect={() => selectCustomer(c.id)}
+                                                        className="gap-3 py-2 cursor-pointer"
                                                     >
-                                                        <div className={`size-5 rounded-md flex items-center justify-center shrink-0 transition-colors ${selectedSupervisorIds.includes(s.id) ? "bg-violet-500 text-white" : "bg-muted"}`}>
-                                                            <Users className="size-3" />
+                                                        <div className={`size-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${selectedCustomerId === c.id ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted"}`}>
+                                                            <User className="size-4" />
                                                         </div>
-                                                        <span className="text-sm">{s.name}</span>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="text-sm font-bold truncate">{c.name ?? "—"}</span>
+                                                            {c.contacts.find(x => x.type === "phone") && (
+                                                                <span className="text-[11px] text-muted-foreground font-mono mt-0.5" dir="ltr">
+                                                                    {c.contacts.find(x => x.type === "phone")?.value}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </CommandItem>
                                                 ))}
                                             </CommandGroup>
@@ -281,69 +298,113 @@ export function WhatsappGroupSheet({
                                     </Command>
                                 </PopoverContent>
                             </Popover>
+                            {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
                         </div>
 
-                        {/* قائمة المشرفين المختارين */}
-                        {selectedSupervisors.length > 0 ? (
-                            <div className="flex flex-wrap gap-2 p-3 rounded-xl border bg-muted/30">
-                                {selectedSupervisors.map(s => (
-                                    <Badge
-                                        key={s.id}
-                                        variant="secondary"
-                                        className="gap-1.5 pr-1 rounded-lg font-medium"
-                                    >
-                                        <Users className="size-3 text-violet-600" />
-                                        {s.name}
-                                        <button
-                                            type="button"
-                                            onClick={() => removeSupervisor(s.id)}
-                                            className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 p-0.5"
-                                        >
-                                            <X className="size-2.5" />
-                                        </button>
-                                    </Badge>
-                                ))}
+                        {/* اختيار المشرفين */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold">
+                                    المشرفون <span className="text-destructive">*</span>
+                                </Label>
+                                <Popover open={supervisorOpen} onOpenChange={setSupervisorOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="secondary" size="sm" type="button" className="h-8 gap-1.5 text-xs rounded-lg hover:bg-secondary/80">
+                                            <Plus className="size-3.5" /> إضافة مشرف
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-72 p-0 rounded-xl border-border/50 shadow-lg" align="end">
+                                        <Command>
+                                            <CommandInput placeholder="ابحث عن مشرف..." className="h-10" />
+                                            <CommandList className="max-h-60">
+                                                <CommandEmpty className="py-6 text-sm text-center text-muted-foreground">لا يوجد مشرفون</CommandEmpty>
+                                                <CommandGroup>
+                                                    {supervisors.map(s => (
+                                                        <CommandItem
+                                                            key={s.id}
+                                                            value={s.name}
+                                                            onSelect={() => toggleSupervisor(s.id)}
+                                                            className="gap-3 py-2 cursor-pointer"
+                                                        >
+                                                            <div className={`size-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${selectedSupervisorIds.includes(s.id) ? "bg-violet-500 text-white shadow-sm" : "bg-muted"}`}>
+                                                                <Users className="size-4" />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-bold">{s.name}</span>
+                                                            </div>
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
                             </div>
-                        ) : (
-                            <div className="p-3 rounded-xl border border-dashed bg-muted/20 text-center text-xs text-muted-foreground">
-                                لم يتم اختيار مشرفين بعد
+
+                            {/* قائمة المشرفين المختارين */}
+                            <div className="bg-background rounded-xl border border-border/50 overflow-hidden">
+                                {selectedSupervisors.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2 p-3 bg-muted/10">
+                                        {selectedSupervisors.map(s => (
+                                            <Badge
+                                                key={s.id}
+                                                variant="outline"
+                                                className="gap-2 pr-2 py-1.5 rounded-lg font-medium bg-background border-border/50 shadow-sm"
+                                            >
+                                                <div className="size-5 rounded-md bg-violet-500/10 flex items-center justify-center">
+                                                    <Users className="size-3 text-violet-600" />
+                                                </div>
+                                                {s.name}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeSupervisor(s.id)}
+                                                    className="ml-0.5 rounded-sm hover:bg-destructive hover:text-destructive-foreground transition-colors p-1"
+                                                >
+                                                    <X className="size-3" />
+                                                </button>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="p-4 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+                                        <Users className="size-6 text-muted-foreground/30" />
+                                        <span>لم يتم اختيار مشرفين بعد. أضف مشرفاً لإدارة المجموعة.</span>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                        {errors.supervisorIds && (
-                            <p className="text-xs text-destructive">{errors.supervisorIds.message}</p>
-                        )}
-                    </div>
-
-                    {/* ملاحظات */}
-                    <div className="space-y-2">
-                        <Label htmlFor="grp-notes" className="text-sm font-semibold">ملاحظات</Label>
-                        <Textarea
-                            id="grp-notes"
-                            placeholder="ملاحظات داخلية عن المجموعة..."
-                            className="rounded-xl resize-none min-h-[80px] text-sm"
-                            {...register("notes")}
-                        />
-                    </div>
-
-                    {/* الحالة */}
-                    <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
-                        <div>
-                            <p className="text-sm font-semibold">حالة المجموعة</p>
-                            <p className="text-xs text-muted-foreground">
-                                {isActive ? "المجموعة نشطة وتظهر في النظام" : "المجموعة معطّلة"}
-                            </p>
+                            {errors.supervisorIds && (
+                                <p className="text-xs text-destructive">{errors.supervisorIds.message}</p>
+                            )}
                         </div>
-                        <Switch
-                            checked={isActive ?? true}
-                            onCheckedChange={v => setValue("isActive", v)}
-                        />
+                    </div>
+
+                    {/* القسم الثالث: إعدادات إضافية */}
+                    <div className="p-5 rounded-2xl border border-border/50 bg-card shadow-sm space-y-5">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                            <div className="size-6 rounded-md bg-muted flex items-center justify-center">
+                                <Settings className="size-3.5 text-muted-foreground" />
+                            </div>
+                            <h3 className="font-bold text-sm">إعدادات إضافية</h3>
+                        </div>
+
+                        {/* ملاحظات */}
+                        <div className="space-y-2">
+                            <Label htmlFor="grp-notes" className="text-sm font-semibold">ملاحظات (اختياري)</Label>
+                            <Textarea
+                                id="grp-notes"
+                                placeholder="ملاحظات داخلية عن المجموعة..."
+                                className="rounded-xl resize-none min-h-[80px] text-sm bg-background"
+                                {...register("notes")}
+                            />
+                        </div>
+
                     </div>
 
                     {/* زر الحفظ */}
-                    <Button type="submit" disabled={isLoading} className="w-full h-11 rounded-xl font-bold gap-2">
+                    <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl font-bold gap-2 text-base shadow-md">
                         {isLoading
-                            ? <><Loader2 className="size-4 animate-spin" /> جاري الحفظ...</>
-                            : <><Save className="size-4" /> {isEditing ? "حفظ التعديلات" : "إنشاء المجموعة"}</>
+                            ? <><Loader2 className="size-5 animate-spin" /> جاري الحفظ...</>
+                            : <><Save className="size-5" /> {isEditing ? "حفظ التعديلات" : "إنشاء المجموعة"}</>
                         }
                     </Button>
                 </form>

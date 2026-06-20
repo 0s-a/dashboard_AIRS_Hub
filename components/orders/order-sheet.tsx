@@ -48,21 +48,24 @@ interface VariantOption {
 }
 
 interface PriceLabelOption {
+    productPriceId: string  // معرّف السعر الفعلي (ProductPrice.id) — يضمن اختيار العملة الصحيحة
     priceLabelId: string
     priceLabelName: string
     value: number
     currencySymbol: string
+    currencyId: string
 }
 
 interface OrderItemRow {
     productId: string
-    priceLabelId: string
+    productPriceId: string  // التسعيرة المختارة من قائمة العرض
     variantId: string
     quantity: number
     notes: string
-    // resolved from server:
-    unitPrice?: number
-    currencySymbol?: string
+    // معاينة السعر — تُجلب من الخادم عند اختيار المنتج
+    previewPrice?: number
+    previewSymbol?: string
+    previewLabelName?: string
     availablePriceLabels: PriceLabelOption[]
     availableVariants: VariantOption[]
     loadingPrices: boolean
@@ -74,6 +77,7 @@ interface Props {
     order?: any
     customers: any[]
     products: any[]
+    defaultSymbol?: string
     trigger?: React.ReactNode
 }
 
@@ -84,12 +88,10 @@ interface Props {
 function buildEditItem(it: any): OrderItemRow {
     return {
         productId: it.productId ?? "",
-        priceLabelId: it.priceLabelId ?? "",
+        productPriceId: "",
         variantId: it.variantId ?? "",
         quantity: it.quantity ?? 1,
         notes: it.notes ?? "",
-        unitPrice: it.unitPrice,
-        currencySymbol: it.currency?.symbol ?? "",
         availablePriceLabels: [],
         availableVariants: [],
         loadingPrices: false,
@@ -99,7 +101,7 @@ function buildEditItem(it: any): OrderItemRow {
 
 function emptyItem(): OrderItemRow {
     return {
-        productId: "", priceLabelId: "", variantId: "", quantity: 1, notes: "",
+        productId: "", productPriceId: "", variantId: "", quantity: 1, notes: "",
         availablePriceLabels: [], availableVariants: [],
         loadingPrices: false, loadingVariants: false,
     }
@@ -192,7 +194,7 @@ function ProductCombobox({ products, value, onChange, disabled }: {
 // Component
 // ──────────────────────────────────────────────────────────
 
-export function OrderSheet({ mode = "create", order, customers, products, trigger }: Props) {
+export function OrderSheet({ mode = "create", order, customers, products, defaultSymbol = "", trigger }: Props) {
     const isEdit = mode === "edit"
     const [open, setOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
@@ -207,21 +209,22 @@ export function OrderSheet({ mode = "create", order, customers, products, trigge
             : []
     )
 
-    // ── Auto-update items when customer changes ──
+    // ── Auto-update price preview when customer changes ──
     useEffect(() => {
         if (!customerId || customerId === "none" || isEdit) return
         const selectedCustomer = customers.find(p => p.id === customerId)
         if (!selectedCustomer?.priceLabelId) return
 
         setItems(prev => prev.map(item => {
-            if (item.productId && (!item.priceLabelId || item.priceLabelId === "") && item.availablePriceLabels.length > 0) {
+            if (item.productId && item.availablePriceLabels.length > 0) {
                 const match = item.availablePriceLabels.find(l => l.priceLabelId === selectedCustomer.priceLabelId)
                 if (match) {
                     return {
                         ...item,
-                        priceLabelId: match.priceLabelId,
-                        unitPrice: match.value,
-                        currencySymbol: match.currencySymbol
+                        productPriceId:   match.productPriceId,
+                        previewPrice:     match.value,
+                        previewSymbol:    match.currencySymbol,
+                        previewLabelName: match.priceLabelName,
                     }
                 }
             }
@@ -275,20 +278,18 @@ export function OrderSheet({ mode = "create", order, customers, products, trigge
         setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
     }
 
-    // When product changes → load price labels + variants
+    // When product changes → load price labels + variants, auto-select price from customer
     const onProductChange = useCallback(async (idx: number, productId: string) => {
-        // Prevent duplicate items (same product + variant)
         const exists = items.find((it, i) => i !== idx && it.productId === productId && it.variantId === "")
-        if (exists) {
-            toast.info("هذا المنتج موجود بالفعل في الطلب، تم تكراره")
-        }
+        if (exists) toast.info("هذا المنتج موجود بالفعل في الطلب")
 
         updateItem(idx, {
             productId,
-            priceLabelId: "",
+            productPriceId: "",
             variantId: "",
-            unitPrice: undefined,
-            currencySymbol: "",
+            previewPrice: undefined,
+            previewSymbol: "",
+            previewLabelName: "",
             loadingPrices: true,
             loadingVariants: true,
             availablePriceLabels: [],
@@ -302,75 +303,74 @@ export function OrderSheet({ mode = "create", order, customers, products, trigge
 
         const labels: PriceLabelOption[] = pricesRes.success && pricesRes.data
             ? pricesRes.data.map((pp: any) => ({
+                productPriceId: pp.id,
                 priceLabelId: pp.priceLabelId,
                 priceLabelName: pp.priceLabel?.name ?? "—",
                 value: pp.value,
                 currencySymbol: pp.currency?.symbol ?? "",
+                currencyId: pp.currencyId ?? pp.currency?.id ?? "",
             }))
             : []
 
-        // ── Auto-select price label based on customer ──
-        let autoPriceLabelId = ""
-        let autoUnitPrice = undefined
-        let autoCurrencySymbol = ""
+        // اختيار السعر تلقائياً بناءً على تسعيرة العميل
+        let autoProductPriceId = ""
+        let autoPreviewPrice: number | undefined = undefined
+        let autoPreviewSymbol = ""
+        let autoLabelName = ""
 
-        if (customerId && customerId !== "none") {
-            const selectedCustomer = customers.find(p => p.id === customerId)
-            if (selectedCustomer?.priceLabelId) {
-                const match = labels.find(l => l.priceLabelId === selectedCustomer.priceLabelId)
-                if (match) {
-                    autoPriceLabelId = match.priceLabelId
-                    autoUnitPrice = match.value
-                    autoCurrencySymbol = match.currencySymbol
-                }
+        const selectedCustomer = customerId && customerId !== "none"
+            ? customers.find(p => p.id === customerId)
+            : null
+
+        if (selectedCustomer?.priceLabelId) {
+            // تطابق تسعيرة العميل
+            const match = labels.find(l => l.priceLabelId === selectedCustomer.priceLabelId)
+            if (match) {
+                autoProductPriceId = match.productPriceId
+                autoPreviewPrice   = match.value
+                autoPreviewSymbol  = match.currencySymbol
+                autoLabelName      = match.priceLabelName
             }
+        }
+
+        // fallback → التسعيرة الافتراضية للنظام (أول عنصر في القائمة المُرتَّبة)
+        if (!autoProductPriceId && labels.length > 0) {
+            const first = labels[0]
+            autoProductPriceId = first.productPriceId
+            autoPreviewPrice   = first.value
+            autoPreviewSymbol  = first.currencySymbol
+            autoLabelName      = first.priceLabelName
         }
 
         const variants: VariantOption[] = variantsRes.success && variantsRes.data
             ? variantsRes.data.map((v: any) => ({
-                id: v.id,
-                name: v.name,
-                type: v.type,
-                hex: v.hex,
-                suffix: v.suffix,
+                id: v.id, name: v.name, type: v.type, hex: v.hex, suffix: v.suffix,
             }))
             : []
 
         updateItem(idx, {
-            priceLabelId: autoPriceLabelId,
-            unitPrice: autoUnitPrice,
-            currencySymbol: autoCurrencySymbol,
+            productPriceId: autoProductPriceId,
+            previewPrice:   autoPreviewPrice,
+            previewSymbol:  autoPreviewSymbol,
+            previewLabelName: autoLabelName,
             availablePriceLabels: labels,
             availableVariants: variants,
             loadingPrices: false,
             loadingVariants: false,
         })
-    }, [customerId, customers, items]) // Added dependencies
+    }, [customerId, customers, items])
 
-    // When priceLabel changes → set unit price preview
-    function onPriceLabelChange(idx: number, priceLabelId: string) {
-        const item = items[idx]
-        const pl = item.availablePriceLabels.find(p => p.priceLabelId === priceLabelId)
-        updateItem(idx, {
-            priceLabelId,
-            unitPrice: pl?.value,
-            currencySymbol: pl?.currencySymbol ?? "",
-        })
-    }
-
-    // ── Computed total ──
+    // ── Computed total preview ──
     const total = items.reduce((sum, it) => {
-        if (it.unitPrice && it.quantity) return sum + it.unitPrice * it.quantity
+        if (it.previewPrice && it.quantity) return sum + it.previewPrice * it.quantity
         return sum
     }, 0)
 
-    const firstCurrencySymbol = items.find(it => it.currencySymbol)?.currencySymbol ?? ""
-
-    // ── Submit ──
+    // ── Submit ── يُرسل productId + variantId + quantity + notes فقط
     async function handleSubmit(keepOpen = false) {
-        const validItems = items.filter(it => it.productId && it.priceLabelId && it.quantity > 0)
+        const validItems = items.filter(it => it.productId && it.quantity > 0)
         if (validItems.length === 0) {
-            toast.error("أضف منتجاً واحداً على الأقل مع تسعيرة")
+            toast.error("أضف منتجاً واحداً على الأقل")
             return
         }
 
@@ -379,7 +379,6 @@ export function OrderSheet({ mode = "create", order, customers, products, trigge
             notes: notes || null,
             items: validItems.map(it => ({
                 productId: it.productId,
-                priceLabelId: it.priceLabelId,
                 variantId: it.variantId || null,
                 quantity: it.quantity,
                 notes: it.notes || null,
@@ -606,35 +605,28 @@ export function OrderSheet({ mode = "create", order, customers, products, trigge
                                                     />
                                                 </div>
 
-                                                <div className="space-y-1">
-                                                    <Label className="text-[10px] font-bold text-muted-foreground/70">التسعيرة</Label>
-                                                    <Select
-                                                        value={item.priceLabelId}
-                                                        onValueChange={val => onPriceLabelChange(idx, val)}
-                                                        disabled={!item.productId || item.loadingPrices}
-                                                    >
-                                                        <SelectTrigger className="rounded-xl h-9 text-xs" id={`order-item-${idx}-price-label`}>
-                                                            {item.loadingPrices
-                                                                ? <span className="flex items-center gap-1.5 text-muted-foreground text-[10px]">
-                                                                    <Loader2 className="size-3 animate-spin" />تحميل...
+                                                {/* Price preview — auto-resolved from customer */}
+                                                {item.productId && (
+                                                    <div className="space-y-1">
+                                                        <Label className="text-[10px] font-bold text-muted-foreground/70">التسعيرة</Label>
+                                                        {item.loadingPrices ? (
+                                                            <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] h-9 px-3 rounded-xl border border-border bg-muted/20">
+                                                                <Loader2 className="size-3 animate-spin" />تحميل...
+                                                            </div>
+                                                        ) : item.previewPrice != null ? (
+                                                            <div className="flex items-center gap-2 h-9 px-3 rounded-xl border border-primary/20 bg-primary/5 text-xs">
+                                                                <span className="text-muted-foreground">{item.previewLabelName}</span>
+                                                                <span className="font-mono font-bold text-primary mr-auto">
+                                                                    {item.previewPrice.toLocaleString("ar-YE")} {item.previewSymbol || defaultSymbol}
                                                                 </span>
-                                                                : <SelectValue placeholder={item.productId ? "اختر التسعيرة..." : "المنتج أولاً"} />
-                                                            }
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {item.availablePriceLabels.map(pl => (
-                                                                <SelectItem key={pl.priceLabelId} value={pl.priceLabelId}>
-                                                                    <div className="flex items-center gap-2 w-full text-xs">
-                                                                        <span>{pl.priceLabelName}</span>
-                                                                        <span className="font-mono font-bold text-primary mr-auto">
-                                                                            {pl.value.toLocaleString("ar-YE")} {pl.currencySymbol}
-                                                                        </span>
-                                                                    </div>
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center h-9 px-3 rounded-xl border border-dashed border-border text-[10px] text-muted-foreground">
+                                                                لا تسعيرة متاحة
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Variant Row (if exists) */}
@@ -712,13 +704,13 @@ export function OrderSheet({ mode = "create", order, customers, products, trigge
                                                 </div>
 
                                                 <div className="flex flex-col items-end gap-0.5 pb-0.5">
-                                                    {item.unitPrice != null && (
+                                                    {item.previewPrice != null && (
                                                         <span className="text-[9px] text-muted-foreground font-mono">
-                                                            {item.unitPrice.toLocaleString("ar-YE")} {item.currencySymbol}
+                                                            {item.previewPrice.toLocaleString("ar-YE")} {item.previewSymbol || defaultSymbol}
                                                         </span>
                                                     )}
                                                     <div className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded-lg border border-primary/10">
-                                                        {((item.unitPrice || 0) * item.quantity).toLocaleString("ar-YE")} {item.currencySymbol}
+                                                        {((item.previewPrice || 0) * item.quantity).toLocaleString("ar-YE")} {defaultSymbol}
                                                     </div>
                                                 </div>
                                             </div>
@@ -744,16 +736,16 @@ export function OrderSheet({ mode = "create", order, customers, products, trigge
                                     <div className="flex flex-col gap-0.5">
                                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">الإجمالي الكلي</span>
                                         <span className="text-[10px] text-muted-foreground/60">
-                                            {items.filter(it => it.productId && it.priceLabelId).length} منتج
+                                            {items.filter(it => it.productId).length} منتج
                                         </span>
                                     </div>
                                     <div className="text-left">
                                         <span className="font-mono text-3xl font-bold text-primary tracking-tight">
                                             {total.toLocaleString("ar-YE")}
                                         </span>
-                                        {firstCurrencySymbol && (
+                                        {defaultSymbol && (
                                             <span className="text-sm font-semibold text-primary/70 mr-1.5">
-                                                {firstCurrencySymbol}
+                                                {defaultSymbol}
                                             </span>
                                         )}
                                     </div>

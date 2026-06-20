@@ -1,47 +1,60 @@
-import { getWhatsappGroups } from "@/lib/actions/whatsapp-groups"
+import { getWhatsappGroups, getWhatsappGroupStats } from "@/lib/actions/whatsapp-groups"
 import { getCustomers } from "@/lib/actions/customers"
 import { getSupervisors } from "@/lib/actions/supervisors"
-import { WhatsappGroupsTable } from "@/components/whatsapp-groups/whatsapp-groups-table"
-import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus, CheckCircle2, XCircle } from "lucide-react"
+import { WhatsappGroupsList } from "@/components/whatsapp-groups/whatsapp-groups-list"
+import { MessageSquare, CheckCircle2, XCircle } from "lucide-react"
 import { CreateGroupButton } from "./components/create-group-button"
 
 export const dynamic = "force-dynamic"
 
-export default async function WhatsappGroupsPage() {
-    const [groupsRes, customersRes, supervisorsRes] = await Promise.all([
-        getWhatsappGroups({ activeOnly: false }),
+export default async function WhatsappGroupsPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+    const page = Number(searchParams.page) || 1
+    const limit = Number(searchParams.limit) || 25
+    const search = typeof searchParams.search === 'string' ? searchParams.search : undefined
+
+    const [groupsRes, statsRes, customersRes, supervisorsRes] = await Promise.all([
+        getWhatsappGroups({ activeOnly: false, page, pageSize: limit, search }),
+        getWhatsappGroupStats(),
         getCustomers({ pageSize: 500 }),
         getSupervisors({ activeOnly: true, pageSize: 500 }),
     ])
 
-    const groups = (groupsRes.success && groupsRes.data ? (groupsRes.data as any).groups : []) as any[]
+    const groupsData = groupsRes.success && groupsRes.data ? (groupsRes.data as any) : { groups: [], total: 0, page: 1, pageSize: limit }
+    const groups = groupsData.groups || []
+    
+    const paginationMeta = {
+        page: groupsData.page || 1,
+        limit: groupsData.pageSize || limit,
+        total: groupsData.total || 0,
+        pages: Math.ceil((groupsData.total || 0) / (groupsData.pageSize || limit)),
+        hasPrev: (groupsData.page || 1) > 1,
+        hasNext: (groupsData.page || 1) < Math.ceil((groupsData.total || 0) / (groupsData.pageSize || limit))
+    }
+
     const customers = (customersRes.success && customersRes.data ? (customersRes.data as any).customers : []) as any[]
     const supervisors = (supervisorsRes.success && supervisorsRes.data ? (supervisorsRes.data as any).supervisors : []) as any[]
 
     // إحصائيات
-    const totalGroups   = groups.length
-    const activeGroups  = groups.filter((g: any) => g.isActive).length
-    const inactiveGroups = groups.filter((g: any) => !g.isActive).length
+    const statsData = statsRes.success && statsRes.data ? statsRes.data : { total: 0, active: 0, inactive: 0 }
 
     const stats = [
         {
-            label: "إجمالي المجموعات",
-            value: totalGroups,
+            label: "إجمالي",
+            value: statsData.total,
             icon: MessageSquare,
             color: "text-emerald-600",
             bgColor: "bg-emerald-500/10",
         },
         {
-            label: "مجموعات نشطة",
-            value: activeGroups,
+            label: "نشطة",
+            value: statsData.active,
             icon: CheckCircle2,
             color: "text-blue-600",
             bgColor: "bg-blue-500/10",
         },
         {
-            label: "مجموعات معطّلة",
-            value: inactiveGroups,
+            label: "معطّلة",
+            value: statsData.inactive,
             icon: XCircle,
             color: "text-muted-foreground",
             bgColor: "bg-muted/60",
@@ -49,45 +62,48 @@ export default async function WhatsappGroupsPage() {
     ]
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto">
 
             {/* Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border/50 pb-6">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-border/50 pb-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-l from-emerald-600 to-teal-400">
+                    <h1 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-l from-emerald-600 to-teal-400">
                         مجموعات الواتساب
                     </h1>
                     <p className="text-muted-foreground mt-1 text-sm">
-                        إدارة مجموعات الواتساب وربطها بالعملاء والمشرفين
+                        إدارة المجموعات والتواصل مع العملاء والمشرفين
                     </p>
                 </div>
-                <CreateGroupButton customers={customers} supervisors={supervisors} />
-            </div>
-
-            {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-3">
-                {stats.map((stat, i) => (
-                    <div
-                        key={i}
-                        className="rounded-2xl border bg-card p-5 shadow-sm flex items-center gap-4 transition-all hover:shadow-md hover:border-primary/20 group"
-                    >
-                        <div className={`p-3 rounded-xl ${stat.bgColor} ${stat.color} group-hover:scale-110 transition-transform`}>
-                            <stat.icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                            <h3 className="text-2xl font-bold font-mono tracking-tight">{stat.value}</h3>
-                        </div>
+                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                    {/* Compact Stats */}
+                    <div className="flex flex-1 sm:flex-none bg-card border border-border/50 rounded-xl p-1 shadow-sm h-10 items-center justify-between sm:justify-start">
+                        {stats.map((stat, i) => (
+                            <div key={i} className="flex items-center gap-2 px-3 border-l last:border-0 border-border/50">
+                                <div className={`size-5 rounded-md ${stat.bgColor} ${stat.color} flex items-center justify-center shrink-0`}>
+                                    <stat.icon className="size-3" />
+                                </div>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-xs text-muted-foreground hidden sm:inline-block">{stat.label}</span>
+                                    <span className="text-sm font-bold font-mono">{stat.value}</span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                ))}
+                    
+                    <div className="w-full sm:w-auto">
+                        <CreateGroupButton customers={customers} supervisors={supervisors} />
+                    </div>
+                </div>
             </div>
 
-            {/* Table */}
-            <main className="rounded-2xl border bg-card shadow-sm overflow-hidden p-1">
-                <WhatsappGroupsTable
+            {/* List */}
+            <main>
+                <WhatsappGroupsList
                     data={groups}
                     customers={customers}
                     supervisors={supervisors}
+                    pagination={paginationMeta}
+                    initialSearch={search}
                 />
             </main>
         </div>

@@ -6,7 +6,6 @@ import {
     safeAction,
     safeActionWithRevalidation,
     generateItemNumber,
-    resolveProductPrice,
 } from '@/lib/action-utils'
 import { validateOrderStatus, VALID_ORDER_STATUSES } from '@/lib/order-constants'
 import { ORDER_INCLUDE } from '@/lib/prisma-includes'
@@ -17,7 +16,6 @@ import { ORDER_INCLUDE } from '@/lib/prisma-includes'
 
 export interface OrderItemInput {
     productId: string
-    priceLabelId: string
     variantId?: string | null
     quantity: number
     notes?: string | null
@@ -36,45 +34,6 @@ export interface UpdateOrderData {
     items?: OrderItemInput[]
 }
 
-// ============================================================
-// Internal: Resolve items with prices
-// ============================================================
-
-interface ResolvedItem {
-    productId: string
-    priceLabelId: string
-    variantId: string | null
-    unitPrice: number
-    currencyId: string | null
-    quantity: number
-    notes: string | null
-}
-
-async function resolveItems(items: OrderItemInput[]): Promise<ResolvedItem[]> {
-    const resolved: ResolvedItem[] = []
-
-    for (const item of items) {
-        const pp = await resolveProductPrice(item.productId, item.priceLabelId)
-        if (!pp) {
-            throw new Error(`لا توجد تسعيرة مرتبطة بالمنتج المختار`)
-        }
-        resolved.push({
-            productId: item.productId,
-            priceLabelId: item.priceLabelId,
-            variantId: item.variantId ?? null,
-            unitPrice: Number(pp.value),
-            currencyId: pp.currencyId,
-            quantity: item.quantity,
-            notes: item.notes ?? null,
-        })
-    }
-
-    return resolved
-}
-
-function calcTotal(items: ResolvedItem[]): number {
-    return items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
-}
 
 // ============================================================
 // Read
@@ -149,20 +108,21 @@ export async function getOrderById(id: string) {
 export async function createOrder(data: CreateOrderData) {
     return safeActionWithRevalidation(
         async () => {
-            const resolvedItems = await resolveItems(data.items)
-            const totalAmount = calcTotal(resolvedItems)
-
-            // Wrap in transaction to prevent order number race condition
             return prisma.$transaction(async (tx) => {
                 const orderNumber = await generateItemNumber('order')
-
                 return tx.order.create({
                     data: {
                         orderNumber,
                         customerId: data.customerId ?? null,
                         notes: data.notes ?? null,
-                        totalAmount,
-                        items: { create: resolvedItems },
+                        items: {
+                            create: data.items.map(it => ({
+                                productId: it.productId,
+                                variantId: it.variantId ?? null,
+                                quantity: it.quantity,
+                                notes: it.notes ?? null,
+                            }))
+                        },
                     },
                 })
             })
@@ -179,25 +139,25 @@ export async function createOrder(data: CreateOrderData) {
 export async function updateOrder(id: string, data: UpdateOrderData) {
     return safeActionWithRevalidation(
         async () => {
-            // Validate status if provided
             if (data.status !== undefined) {
                 const valid = validateOrderStatus(data.status)
                 if (!valid) throw new Error(`حالة غير صالحة: ${data.status}`)
             }
 
-            let totalAmount: number | undefined
-            let itemsPayload: { deleteMany: Record<string, never>; create: ResolvedItem[] } | undefined
+            let itemsPayload: { deleteMany: Record<string, never>; create: any[] } | undefined
 
             if (data.items !== undefined) {
-                const resolvedItems = await resolveItems(data.items)
-                totalAmount = calcTotal(resolvedItems)
                 itemsPayload = {
                     deleteMany: {},
-                    create: resolvedItems,
+                    create: data.items.map(it => ({
+                        productId: it.productId,
+                        variantId: it.variantId ?? null,
+                        quantity: it.quantity,
+                        notes: it.notes ?? null,
+                    }))
                 }
             }
 
-            // Wrap in transaction so items delete + create is atomic
             return prisma.$transaction(async (tx) => {
                 return tx.order.update({
                     where: { id },
@@ -205,7 +165,6 @@ export async function updateOrder(id: string, data: UpdateOrderData) {
                         customerId: data.customerId !== undefined ? data.customerId ?? null : undefined,
                         notes: data.notes !== undefined ? data.notes ?? null : undefined,
                         status: data.status,
-                        totalAmount,
                         ...(itemsPayload && { items: itemsPayload }),
                     },
                 })
@@ -255,10 +214,22 @@ export async function deleteOrder(id: string) {
 export async function getProductPriceLabels(productId: string) {
     return safeAction(
         async () => {
-            const data = await prisma.productPrice.findMany({
-                where: { productId },
+            // أولاً: جلب تسعيرات العملة الافتراضية فقط
+            const defaultPrices = await prisma.productPrice.findMany({
+                where: { productId, currency: { isDefault: true } },
                 include: { priceLabel: true, currency: true },
+                orderBy: { priceLabel: { name: 'asc' } },
             })
+
+            // إذا لم توجد أسعار بالعملة الافتراضية → إرجاع جميع الأسعار كـ fallback
+            const data = defaultPrices.length > 0
+                ? defaultPrices
+                : await prisma.productPrice.findMany({
+                    where: { productId },
+                    include: { priceLabel: true, currency: true },
+                    orderBy: { priceLabel: { name: 'asc' } },
+                })
+
             // Serialize to convert Decimal → number for client components
             return JSON.parse(JSON.stringify(data))
         },

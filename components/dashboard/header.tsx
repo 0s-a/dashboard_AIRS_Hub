@@ -52,6 +52,7 @@ interface HeaderProps {
 const routeMap: Record<string, string> = {
     "/": "لوحة التحكم",
     "/inventory": "المخزون",
+    "/inventory/new-tags": "المنتجات الجديدة",
     "/categories": "التصنيفات",
     "/customers": "العملاء",
     "/customer-types": "أنواع العملاء",
@@ -82,7 +83,6 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
     const [recentNotifs, setRecentNotifs] = useState<any[]>([])
     const [userName, setUserName] = useState("")
     const [userColor, setUserColor] = useState("#6366f1")
-    const [userRole, setUserRole] = useState("user")
 
     const loadNotifications = useCallback(async () => {
         const [countRes, notifsRes] = await Promise.all([
@@ -100,7 +100,6 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
             if (res.success && res.data) {
                 setUserName(res.data.name)
                 setUserColor(res.data.color  || '#6366f1')
-                setUserRole(res.data.role    || 'user')
             }
         })
         // Poll every 30 seconds
@@ -350,7 +349,7 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
                                     <div className="flex flex-col space-y-0.5">
                                         <p className="text-sm font-bold leading-none">{userName || "جاري التحميل..."}</p>
                                         <p className="text-xs leading-none text-muted-foreground">
-                                            {userRole === 'admin' ? 'مدير النظام' : 'مستخدم'}
+                                            مستخدم
                                         </p>
                                     </div>
                                 </div>

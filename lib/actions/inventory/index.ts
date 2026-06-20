@@ -24,6 +24,7 @@ export {
     duplicateProduct,
     toggleProductAvailability,
     updateProductDescription,
+    toggleProductNewTag,
 } from './product.actions'
 
 // Price management

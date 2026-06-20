@@ -6,14 +6,32 @@
 // ─── Order ──────────────────────────────────────────────────
 
 export const ORDER_ITEM_INCLUDE = {
-    product: { select: { id: true, name: true, itemNumber: true } },
-    priceLabel: { select: { id: true, name: true } },
-    currency: { select: { id: true, name: true, symbol: true, code: true } },
-    variant: { select: { id: true, name: true, hex: true, type: true } },
+    product: {
+        select: {
+            id: true,
+            name: true,
+            itemNumber: true,
+            // جلب أسعار المنتج بالعملة الافتراضية فقط — لحساب السعر عند العرض
+            productPrices: {
+                where: { currency: { isDefault: true } },
+                include: {
+                    priceLabel: { select: { id: true, name: true, isDefault: true } },
+                    currency: { select: { id: true, symbol: true, code: true } },
+                },
+            },
+        },
+    },
+    variant: { select: { id: true, name: true, hex: true, type: true, suffix: true } },
 } as const
 
 export const ORDER_INCLUDE = {
-    customer: { select: { id: true, name: true } },
+    customer: {
+        select: {
+            id: true,
+            name: true,
+            priceLabelId: true,  // تسعيرة العميل — تُستخدم لاسترجاع السعر المناسب
+        },
+    },
     items: { include: ORDER_ITEM_INCLUDE },
 } as const
 

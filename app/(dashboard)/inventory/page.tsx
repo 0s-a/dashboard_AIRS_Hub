@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { InventoryTable } from "./inventory-table"
 import { getProductsPaginated, getProductFilterOptions } from "@/lib/actions/inventory"
 import { ProductSheet } from "@/components/inventory/product-sheet"

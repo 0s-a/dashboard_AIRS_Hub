@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -35,15 +34,12 @@ import { THROTTLE_PRESETS, calculateEta } from "@/lib/utils/throttle-presets"
 import { toast }  from "sonner"
 import { cn }     from "@/lib/utils"
 import type { AnnouncementRow } from "@/components/announcements/announcement-columns"
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function toLocalDatetime(d: Date | string) {
     const date   = new Date(d)
     const offset = date.getTimezoneOffset()
     return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16)
 }
-
 function formatDate(d: Date | string | null) {
     if (!d) return "—"
     return new Date(d).toLocaleDateString("ar-SA", {
@@ -51,9 +47,7 @@ function formatDate(d: Date | string | null) {
         hour: "2-digit", minute: "2-digit",
     })
 }
-
 // ─── Status Config ────────────────────────────────────────────────────────────
-
 const STATUS_MAP: Record<string, { label: string; color: string; dot?: string }> = {
     pending:   { label: "مسودة",           color: "bg-muted text-muted-foreground border-0" },
     queueing:  { label: "جاري النشر...",   color: "bg-primary/10 text-primary border-0",          dot: "bg-primary"     },
@@ -62,28 +56,21 @@ const STATUS_MAP: Record<string, { label: string; color: string; dot?: string }>
     cancelled: { label: "ملغى",            color: "bg-muted text-muted-foreground border-0" },
     failed:    { label: "فشل",             color: "bg-destructive/10 text-destructive border-0" },
 }
-
 type CustomerTarget  = { mode: "all"|"filter"|"manual"|"builder"; filters: CustomerFilters;  manualIds: string[] }
 type ProductTarget = { mode: "all"|"filter"|"manual"; filters: ProductFilters; manualIds: string[] }
-
 // ─── Tab Definition ───────────────────────────────────────────────────────────
-
 const TAB_IDS = ["info", "audience", "template", "settings"] as const
 type TabId = typeof TAB_IDS[number]
-
 const TABS: { id: TabId; label: string; icon: React.ComponentType<any> }[] = [
     { id: "info",     label: "المعلومات",  icon: FileText         },
     { id: "audience", label: "الجمهور",    icon: Users            },
     { id: "template", label: "القالب",     icon: Sparkles         },
     { id: "settings", label: "الإرسال",   icon: SlidersHorizontal },
 ]
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function AnnouncementDetailPage() {
     const { id }  = useParams<{ id: string }>()
     const router  = useRouter()
-
     const [ann, setAnn] = useState<(AnnouncementRow & {
         queueingProgress?: number
     }) | null>(null)
@@ -101,11 +88,9 @@ export default function AnnouncementDetailPage() {
     const [windowEnabled,     setWindowEnabled]     = useState(false)
     const [templateId,        setTemplateId]        = useState<string | null>(null)
     const [activeTab,         setActiveTab]         = useState<TabId>("info")
-
     const { register, handleSubmit, reset, formState: { errors } } = useForm<{
         title: string; description: string; scheduledAt: string
     }>()
-
     // ── Load ─────────────────────────────────────────────────────────────────
     useEffect(() => {
         Promise.all([getAnnouncement(id), getAnnouncementSheetData()]).then(([annRes, sdRes]) => {
@@ -118,12 +103,10 @@ export default function AnnouncementDetailPage() {
             if (a.sendWindowEnd)   { setSendWindowEnd(a.sendWindowEnd);     setWindowEnabled(true) }
             setTemplateId(a.templateId ?? null)
             reset({ title: a.title, description: a.description || "", scheduledAt: toLocalDatetime(a.scheduledAt) })
-
-            const pf   = a.customerFilters  as any
+            const pf   = a.personFilters  as any
             const rf   = a.productFilters as any
             const pIds = (pf?.manualIds as string[]) || []
             const rIds = (rf?.manualIds as string[]) || []
-
             setCustomerTarget({
                 mode:      pf?.all ? "all" : pIds.length > 0 ? "manual" : pf?.filterGroups ? "builder" : Object.keys(pf || {}).length > 0 ? "filter" : "all",
                 filters:   pf || {},
@@ -137,7 +120,6 @@ export default function AnnouncementDetailPage() {
             if (sdRes.success && sdRes.data) setSheetData(sdRes.data)
         })
     }, [id, reset, router])
-
     // ── Live preview ──────────────────────────────────────────────────────────
     useEffect(() => {
         const pf = customerTarget.mode  === "all" ? { all: true } : customerTarget.mode  === "filter" ? customerTarget.filters  : { manualIds: customerTarget.manualIds }
@@ -145,15 +127,12 @@ export default function AnnouncementDetailPage() {
         previewAudience(pf, rf)
             .then(res => { if (res.success && res.data) setPreview(res.data as any) })
     }, [customerTarget, productTarget])
-
-
     const buildPayload = (data: { title: string; description: string; scheduledAt: string }) => {
         const customerFilters =
             customerTarget.mode === "all"     ? { all: true } :
             customerTarget.mode === "filter"  ? customerTarget.filters :
             customerTarget.mode === "builder" ? customerTarget.filters : // contains filterGroups
             {}
-
         return {
             title:               data.title,
             description:         data.description,
@@ -166,8 +145,6 @@ export default function AnnouncementDetailPage() {
             sendWindowEnd:       windowEnabled ? sendWindowEnd   : null,
         }
     }
-
-
     const onSave = async (data: { title: string; description: string; scheduledAt: string }) => {
         setSaving(true)
         const res = await updateAnnouncement(id, buildPayload(data))
@@ -175,7 +152,6 @@ export default function AnnouncementDetailPage() {
         else             toast.error((res as any).error)
         setSaving(false)
     }
-
     // Opens the confirmation dialog (validates audience first)
     const onLaunch = (data: { title: string; description: string; scheduledAt: string }) => {
         if ((preview?.customerCount ?? 0) === 0) {
@@ -186,7 +162,6 @@ export default function AnnouncementDetailPage() {
         ;(window as any).__launchFormData = data
         setConfirmOpen(true)
     }
-
     // Called by LaunchConfirmDialog after user confirms
     const doLaunch = async () => {
         const data = (window as any).__launchFormData ?? {}
@@ -207,7 +182,6 @@ export default function AnnouncementDetailPage() {
         }
         setLaunching(false)
     }
-
     if (!ann) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -215,13 +189,11 @@ export default function AnnouncementDetailPage() {
             </div>
         )
     }
-
     const status    = ann.status as string
     const statusCfg = STATUS_MAP[status] ?? STATUS_MAP.pending
     const isActive  = ["queueing", "queued"].includes(status)
     const isDone    = status === "sent"
     const isDraft   = ["pending", "cancelled", "failed"].includes(status)
-
     const expectedBatches = preview ? preview.customerCount : 0
     const eta = preview ? calculateEta(preview.customerCount, {
         messagesPerMinute,
@@ -229,17 +201,14 @@ export default function AnnouncementDetailPage() {
         sendWindowStart: windowEnabled ? sendWindowStart : null,
         sendWindowEnd:   windowEnabled ? sendWindowEnd   : null,
     }) : null
-
     // ── Tab visibility ────────────────────────────────────────────────────────
     // Hide settings tab when active/done
     const visibleTabs = TABS.filter(t => {
         if (t.id === "settings") return isDraft
         return true
     })
-
     return (
         <div className="max-w-3xl mx-auto space-y-0 pb-24">
-
             {/* ── Header ── */}
             <div className="flex items-start gap-3 mb-6">
                 <Button variant="ghost" size="icon" onClick={() => router.push("/announcements")}
@@ -256,7 +225,6 @@ export default function AnnouncementDetailPage() {
                             <Badge className={statusCfg.color}>{statusCfg.label}</Badge>
                         </div>
                     </div>
-
                     {/* Summary strip */}
                     <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1">
@@ -280,7 +248,6 @@ export default function AnnouncementDetailPage() {
                     </div>
                 </div>
             </div>
-
             {/* ── Monitoring Panel (active or done) ── */}
             {(isActive || isDone) && (
                 <div className="glass-panel rounded-2xl border border-border/50 p-6 space-y-2 mb-5">
@@ -301,7 +268,6 @@ export default function AnnouncementDetailPage() {
                     />
                 </div>
             )}
-
             {/* ── Done: Success Banner + Quick Links ── */}
             {isDone && (
                 <div className="space-y-3 mb-5">
@@ -328,7 +294,6 @@ export default function AnnouncementDetailPage() {
                     </div>
                 </div>
             )}
-
             {/* ── Tabs Navigation ── */}
             {isDraft && (
                 <div className="glass-panel rounded-2xl border border-border/50 overflow-hidden">
@@ -355,10 +320,8 @@ export default function AnnouncementDetailPage() {
                             )
                         })}
                     </div>
-
                     {/* Tab content */}
                     <div className="p-6">
-
                         {/* ── Tab: المعلومات ── */}
                         {activeTab === "info" && (
                             <div className="space-y-5">
@@ -383,7 +346,6 @@ export default function AnnouncementDetailPage() {
                                 </div>
                             </div>
                         )}
-
                         {/* ── Tab: الجمهور ── */}
                         {activeTab === "audience" && (
                             <div className="space-y-6">
@@ -400,11 +362,8 @@ export default function AnnouncementDetailPage() {
                                         customers={sheetData.customers}
                                         customerTags={sheetData.customerTags ?? []}
                                         previewCount={preview?.customerCount} />
-
                                 </div>
-
                                 <Separator />
-
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
@@ -420,7 +379,6 @@ export default function AnnouncementDetailPage() {
                                 </div>
                             </div>
                         )}
-
                         {/* ── Tab: القالب ── */}
                         {activeTab === "template" && (
                             <TemplateSelector
@@ -428,11 +386,9 @@ export default function AnnouncementDetailPage() {
                                 onSelect={setTemplateId}
                             />
                         )}
-
                         {/* ── Tab: الإرسال ── */}
                         {activeTab === "settings" && (
                             <div className="space-y-5">
-
                                 {/* ── Throttle Presets ── */}
                                 <div className="space-y-2">
                                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
@@ -463,12 +419,9 @@ export default function AnnouncementDetailPage() {
                                         })}
                                     </div>
                                 </div>
-
                                 <Separator />
-
                                 {/* ── Rate + Delay ── */}
                                 <div className="grid grid-cols-2 gap-5">
-
                                     {/* Rate Limiter */}
                                     <div className="space-y-3">
                                         <Label className="text-sm font-semibold flex items-center gap-1.5">
@@ -507,7 +460,6 @@ export default function AnnouncementDetailPage() {
                                             ))}
                                         </div>
                                     </div>
-
                                     {/* Delay between messages */}
                                     <div className="space-y-3">
                                         <Label className="text-sm font-semibold flex items-center gap-1.5">
@@ -547,7 +499,6 @@ export default function AnnouncementDetailPage() {
                                         </div>
                                     </div>
                                 </div>
-
                                 {/* ── Send Window ── */}
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
@@ -585,7 +536,6 @@ export default function AnnouncementDetailPage() {
                                         </div>
                                     )}
                                 </div>
-
                                 {/* ── ETA Card ── */}
                                 {preview && preview.customerCount > 0 && (
                                     <div className={cn(
@@ -594,7 +544,6 @@ export default function AnnouncementDetailPage() {
                                             ? "border-orange-500/30 bg-orange-500/5"
                                             : "border-primary/15 bg-primary/5"
                                     )}>
-
                                         {/* Warning */}
                                         {eta?.exceedsWindow && (
                                             <div className="flex items-start gap-2 rounded-xl bg-orange-500/10 border border-orange-500/20 px-3 py-2">
@@ -604,7 +553,6 @@ export default function AnnouncementDetailPage() {
                                                 </p>
                                             </div>
                                         )}
-
                                         <p className="text-xs font-bold text-primary flex items-center gap-1.5">
                                             <Clock className="size-3.5" /> تقدير وقت الإرسال
                                         </p>
@@ -641,13 +589,11 @@ export default function AnnouncementDetailPage() {
                                         </p>
                                     </div>
                                 )}
-
                             </div>
                         )}
                     </div>
                 </div>
             )}
-
             {/* ── Campaign summary (active/done) ── */}
             {(isActive || isDone) && (
                 <div className="glass-panel rounded-2xl border border-border/50 p-5 mt-4">
@@ -676,7 +622,6 @@ export default function AnnouncementDetailPage() {
                     </div>
                 </div>
             )}
-
             {/* ── Sticky Footer (draft mode) ── */}
             {isDraft && (
                 <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-t border-border/50 px-6 py-4">
@@ -705,7 +650,6 @@ export default function AnnouncementDetailPage() {
                     </div>
                 </div>
             )}
-
             {/* ── Launch Confirmation Dialog ── */}
             <LaunchConfirmDialog
                 open={confirmOpen}

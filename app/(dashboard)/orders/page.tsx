@@ -2,13 +2,14 @@ import { OrderSheet } from "@/components/orders/order-sheet"
 import { OrdersTable } from "@/components/orders/orders-table"
 import { getOrders, getOrderStats } from "@/lib/actions/orders"
 import { getCustomers } from "@/lib/actions/customers"
+import { getDefaultCurrency } from "@/lib/actions/currencies"
 import { prisma } from "@/lib/prisma"
 import { ShoppingCart, Clock, CheckCircle2, XCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
 export default async function OrdersPage() {
-    const [ordersRes, statsRes, customersRes, products] = await Promise.all([
+    const [ordersRes, statsRes, customersRes, products, defaultCurrencyRes] = await Promise.all([
         getOrders({ page: 1, limit: 100 }),
         getOrderStats(),
         getCustomers(),
@@ -16,6 +17,7 @@ export default async function OrdersPage() {
             select: { id: true, name: true, itemNumber: true },
             orderBy: { name: "asc" },
         }),
+        getDefaultCurrency(),
     ])
 
     // Serialize to remove Decimal objects before passing to Client Components
@@ -25,6 +27,7 @@ export default async function OrdersPage() {
     const customers = JSON.parse(JSON.stringify(
         customersRes.success ? customersRes.data.customers : []
     ))
+    const defaultSymbol = defaultCurrencyRes.success ? (defaultCurrencyRes.data?.symbol ?? "") : ""
 
     // ── Stats — computed at database level ──
     const s = statsRes.success ? statsRes.data : { total: 0, pending: 0, delivered: 0, cancelled: 0 }
@@ -49,7 +52,7 @@ export default async function OrdersPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <OrderSheet customers={customers} products={products} />
+                    <OrderSheet customers={customers} products={products} defaultSymbol={defaultSymbol} />
                 </div>
             </div>
 
@@ -71,9 +74,8 @@ export default async function OrdersPage() {
                 ))}
             </div>
 
-            {/* Table */}
             <main className="rounded-2xl border bg-card shadow-sm overflow-hidden p-1">
-                <OrdersTable orders={orders} customers={customers} products={products} />
+                <OrdersTable orders={orders} customers={customers} products={products} defaultSymbol={defaultSymbol} />
             </main>
         </div>
     )

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
-import { resolveProductPrice, generateItemNumber } from '@/lib/action-utils'
+import { generateItemNumber } from '@/lib/action-utils'
 import { ORDER_INCLUDE } from '@/lib/prisma-includes'
 import { z } from 'zod'
 
@@ -11,7 +11,6 @@ import { z } from 'zod'
 
 const OrderItemSchema = z.object({
     productId: z.string().uuid(),
-    priceLabelId: z.string().uuid(),
     variantId: z.string().uuid().optional().nullable(),
     quantity: z.number().int().min(1).default(1),
     notes: z.string().optional().nullable(),
@@ -43,43 +42,6 @@ export async function POST(req: NextRequest) {
         }
 
         const { customerId, notes, items } = parsed.data
-        const resolvedCustomerId: string | null = customerId ?? null
-
-        // ── Resolve prices for each item ──
-        const resolvedItems: {
-            productId: string
-            priceLabelId: string
-            variantId: string | null
-            unitPrice: number
-            currencyId: string | null
-            quantity: number
-            notes: string | null
-        }[] = []
-
-        for (const item of items) {
-            const pp = await resolveProductPrice(item.productId, item.priceLabelId)
-            if (!pp) {
-                return apiError(
-                    `لا توجد تسعيرة للمنتج ${item.productId} مع التسعيرة ${item.priceLabelId}`,
-                    400,
-                    { code: 'PRICE_NOT_FOUND' }
-                )
-            }
-            resolvedItems.push({
-                productId: item.productId,
-                priceLabelId: item.priceLabelId,
-                variantId: item.variantId ?? null,
-                unitPrice: Number(pp.value),
-                currencyId: pp.currencyId,
-                quantity: item.quantity,
-                notes: item.notes ?? null,
-            })
-        }
-
-        // ── Calculate total ──
-        const totalAmount = resolvedItems.reduce(
-            (sum, i) => sum + i.unitPrice * i.quantity, 0
-        )
 
         // ── Create order in transaction (prevents order number race condition) ──
         const order = await prisma.$transaction(async (tx) => {
@@ -88,10 +50,16 @@ export async function POST(req: NextRequest) {
             return tx.order.create({
                 data: {
                     orderNumber,
-                    customerId: resolvedCustomerId,
+                    customerId: customerId ?? null,
                     notes: notes ?? null,
-                    totalAmount,
-                    items: { create: resolvedItems },
+                    items: {
+                        create: items.map(it => ({
+                            productId: it.productId,
+                            variantId: it.variantId ?? null,
+                            quantity: it.quantity,
+                            notes: it.notes ?? null,
+                        }))
+                    },
                 },
                 include: ORDER_INCLUDE,
             })

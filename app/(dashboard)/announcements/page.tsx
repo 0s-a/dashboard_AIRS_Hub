@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect, useCallback, useMemo } from "react"
 import {
     Plus, Megaphone, Send, FileText, AlertCircle,
@@ -13,9 +12,7 @@ import { getAnnouncements }  from "@/lib/actions/announcements"
 import { useRouter }         from "next/navigation"
 import { cn }                from "@/lib/utils"
 import type { AnnouncementRow } from "@/components/announcements/announcement-columns"
-
 // ─── Filter Chip ──────────────────────────────────────────────────────────────
-
 const STATUS_FILTERS = [
     { key: "all",     label: "الكل",          color: "bg-muted text-muted-foreground" },
     { key: "pending", label: "مسودة",          color: "bg-muted/80 text-muted-foreground" },
@@ -23,11 +20,8 @@ const STATUS_FILTERS = [
     { key: "sent",    label: "تم الإرسال",   color: "bg-emerald-500/10 text-emerald-600" },
     { key: "failed",  label: "فشل",           color: "bg-destructive/10 text-destructive" },
 ] as const
-
 type FilterKey = typeof STATUS_FILTERS[number]["key"]
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function AnnouncementsPage() {
     const router = useRouter()
     const [announcements, setAnnouncements] = useState<AnnouncementRow[]>([])
@@ -36,34 +30,28 @@ export default function AnnouncementsPage() {
     const [search,        setSearch]        = useState("")
     const [filter,        setFilter]        = useState<FilterKey>("all")
     const [viewMode,      setViewMode]      = useState<"grid" | "list">("grid")
-
     const loadAnnouncements = useCallback(async () => {
         const res = await getAnnouncements()
         if (res.success && res.data) setAnnouncements(res.data as AnnouncementRow[])
         setLoading(false)
     }, [])
-
     useEffect(() => {
         loadAnnouncements()
         window.addEventListener("refresh-announcements", loadAnnouncements)
         return () => window.removeEventListener("refresh-announcements", loadAnnouncements)
     }, [loadAnnouncements])
-
     const handleCreated = async (id: string) => {
         router.push(`/announcements/${id}`)
     }
-
     // ── Derived stats ─────────────────────────────────────────────────────────
     const sent      = announcements.filter(a => a.status === "sent")
     const failed    = announcements.filter(a => a.status === "failed")
     const drafts    = announcements.filter(a => a.status === "pending")
     const active    = announcements.filter(a => ["queued", "queueing"].includes(a.status))
-
     const totalReached = sent.length  // We no longer store sentCount — each sent row is one customer
     const successRate  = sent.length > 0
         ? Math.round((sent.length / (sent.length + failed.length || 1)) * 100)
         : 0
-
     const STATS = [
         {
             label: "إجمالي الإعلانات",
@@ -98,14 +86,12 @@ export default function AnnouncementsPage() {
             sub:   `${failed.length} فشل`,
         },
     ]
-
     // ── Filtering ─────────────────────────────────────────────────────────────
     const counts: Record<string, number> = useMemo(() => {
         const c: Record<string, number> = { all: announcements.length }
         for (const a of announcements) c[a.status] = (c[a.status] ?? 0) + 1
         return c
     }, [announcements])
-
     const filtered = useMemo(() => {
         let list = announcements
         if (filter !== "all") list = list.filter(a => a.status === filter)
@@ -115,10 +101,8 @@ export default function AnnouncementsPage() {
         }
         return list
     }, [announcements, filter, search])
-
     return (
         <div className="space-y-6">
-
             {/* ── Header ── */}
             <div className="flex items-center justify-between">
                 <div>
@@ -137,7 +121,6 @@ export default function AnnouncementsPage() {
                     إعلان جديد
                 </Button>
             </div>
-
             {/* ── Stats ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {STATS.map(({ label, value, icon: Icon, color, bg, sub }) => (
@@ -153,7 +136,6 @@ export default function AnnouncementsPage() {
                     </div>
                 ))}
             </div>
-
             {/* ── Toolbar: Search + Filter + View ── */}
             <div className="flex flex-col sm:flex-row gap-3">
                 {/* Search */}
@@ -166,7 +148,6 @@ export default function AnnouncementsPage() {
                         className="pr-9 rounded-xl h-10"
                     />
                 </div>
-
                 {/* View toggle */}
                 <div className="flex rounded-xl border border-border/60 overflow-hidden h-10 shrink-0">
                     <button
@@ -191,7 +172,6 @@ export default function AnnouncementsPage() {
                     </button>
                 </div>
             </div>
-
             {/* ── Status Filter Chips ── */}
             <div className="flex flex-wrap gap-2">
                 {STATUS_FILTERS.map(({ key, label, color }) => {
@@ -219,7 +199,6 @@ export default function AnnouncementsPage() {
                     )
                 })}
             </div>
-
             {/* ── Cards ── */}
             {loading ? (
                 <div className={cn(
@@ -277,7 +256,6 @@ export default function AnnouncementsPage() {
                     ))}
                 </div>
             )}
-
             {/* ── Quick Create ── */}
             <QuickCreateDialog
                 open={dialogOpen}

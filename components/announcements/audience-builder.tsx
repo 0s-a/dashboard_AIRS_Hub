@@ -85,14 +85,14 @@ function ConditionChip({
 // ─── Add Condition Dropdown ───────────────────────────────────────────────────
 
 function AddConditionButton({
-    onAdd, customerGroups, customerTags,
+    onAdd, customerTags,
 }: {
     onAdd:        (c: AudienceCondition) => void
 
     customerTags:   string[]
 }) {
     const [open,     setOpen]     = useState(false)
-    const [tab,      setTab]      = useState<ConditionType>("group")
+    const [tab,      setTab]      = useState<ConditionType>("tag")
     const [search,   setSearch]   = useState("")
 
     const allOptions: Record<ConditionType, ConditionOption[]> = {
@@ -196,7 +196,7 @@ function AddConditionButton({
 function FilterGroupCard({
     group, index, isLast,
     onUpdate, onRemove,
-    customerGroups, customerTags,
+    customerTags,
 }: {
     group:        FilterGroup
     index:        number

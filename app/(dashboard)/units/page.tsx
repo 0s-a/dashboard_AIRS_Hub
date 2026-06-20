@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { Plus, Package, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -7,21 +6,17 @@ import { UnitSheet } from "@/components/units/unit-sheet"
 import { UnitTable } from "@/components/units/unit-table"
 import { UnitRow } from "@/components/units/columns"
 import { getUnits } from "@/lib/actions/units"
-
 export default function UnitsPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
     const [selectedUnit, setSelectedUnit] = useState<UnitRow | undefined>()
     const [units, setUnits] = useState<UnitRow[]>([])
-
     useEffect(() => {
         loadUnits()
-
         const handleEdit = (e: Event) => {
             const customEvent = e as CustomEvent
             setSelectedUnit(customEvent.detail)
             setIsSheetOpen(true)
         }
-
         window.addEventListener("edit-unit", handleEdit)
         window.addEventListener("refresh-units", loadUnits)
         return () => {
@@ -29,20 +24,17 @@ export default function UnitsPage() {
             window.removeEventListener("refresh-units", loadUnits)
         }
     }, [])
-
     const loadUnits = async () => {
         const res = await getUnits()
         if (res.success && res.data) {
             setUnits(res.data as UnitRow[])
         }
     }
-
     const handleSheetClose = () => {
         setIsSheetOpen(false)
         setSelectedUnit(undefined)
         loadUnits()
     }
-
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -67,7 +59,6 @@ export default function UnitsPage() {
                     إضافة وحدة جديدة
                 </Button>
             </div>
-
             {/* Stats Cards */}
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 <div className="glass-panel rounded-xl p-6 border border-border/50">
@@ -82,7 +73,6 @@ export default function UnitsPage() {
                     </div>
                 </div>
             </div>
-
             {/* Table */}
             <div className="glass-panel rounded-2xl border border-border/50 p-1 sm:p-2 bg-background/40 shadow-xs">
                 {units.length === 0 ? (
@@ -107,7 +97,6 @@ export default function UnitsPage() {
                     <UnitTable data={units} onRefresh={loadUnits} />
                 )}
             </div>
-
             {/* Sheet */}
             <UnitSheet
                 open={isSheetOpen}

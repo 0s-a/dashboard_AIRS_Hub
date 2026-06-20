@@ -46,6 +46,7 @@ export const navigationGroups: NavigationGroup[] = [
         items: [
             { href: "/orders", label: "الطلبات", icon: ShoppingCart},
             { href: "/inventory",  label: "المخزون",     icon: Package  },
+            { href: "/inventory/new-tags", label: "المنتجات الجديدة", icon: Sparkles },
             { href: "/categories", label: "التصنيفات",  icon: Layers   },
             { href: "/brands",     label: "البراندات",   icon: Bookmark },
             { href: "/gallery", label: "معرض الصور", icon: Images },

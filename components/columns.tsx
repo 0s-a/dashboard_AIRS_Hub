@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import Link from "next/link"
 
+
 const formatPhoneNumber = (phone: string) => {
     const cleaned = phone.replace(/\D/g, '')
     if (cleaned.length === 10) {
@@ -102,6 +103,7 @@ export const columns: ColumnDef<Customer>[] = [
         maxSize: 320,
         cell: ({ row }) => {
             const name = row.getValue("name") as string
+            const id = (row.original as any).id as string
             const tags: string[] = ((row.original as any).tags || []).map((pt: any) => pt.tag?.name ?? pt)
             const initials = name ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : "??"
 
@@ -124,9 +126,14 @@ export const columns: ColumnDef<Customer>[] = [
                         </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-sm truncate max-w-[190px]" title={tags.length > 0 ? tags.join('، ') : undefined}>
+                        <Link
+                            href={`/customers/${id}`}
+                            className="font-semibold text-sm truncate max-w-[190px] hover:text-primary hover:underline underline-offset-2 transition-colors"
+                            title={name || undefined}
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             {name || "بدون اسم"}
-                        </span>
+                        </Link>
                         {tags.length > 0 && (
                             <span className="text-[10px] text-muted-foreground/60 truncate max-w-[190px]">
                                 {tags.slice(0, 2).join(' · ')}{tags.length > 2 ? ` +${tags.length - 2}` : ''}
@@ -436,6 +443,14 @@ export const columns: ColumnDef<Customer>[] = [
                                     إجراءات
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
+
+                                {/* View Profile */}
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/customers/${customer.id}`} className="flex items-center cursor-pointer">
+                                        <ExternalLink className="h-4 w-4 ml-2 text-violet-500" />
+                                        <span>عرض الملف الشخصي</span>
+                                    </Link>
+                                </DropdownMenuItem>
 
                                 {/* Edit */}
                                 <CustomerSheet

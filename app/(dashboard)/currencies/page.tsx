@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { Plus, Coins, CircleDollarSign, ArrowLeftRight, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -7,33 +6,26 @@ import { CurrencySheet } from "@/components/currencies/currency-sheet"
 import { CurrencyTable } from "@/components/currencies/currency-table"
 import { getCurrencies } from "@/lib/actions/currencies"
 import { Currency } from "@prisma/client"
-
 // exchangeRate comes back as string (serialized from Prisma Decimal)
 export type SerializedCurrency = Omit<Currency, 'exchangeRate'> & { exchangeRate: string | null }
-
 export default function CurrenciesPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
     const [selectedCurrency, setSelectedCurrency] = useState<SerializedCurrency | undefined>()
     const [currencies, setCurrencies] = useState<SerializedCurrency[]>([])
-
     useEffect(() => {
         loadCurrencies()
-
         const handleEdit = (e: Event) => {
             const customEvent = e as CustomEvent
             setSelectedCurrency(customEvent.detail)
             setIsSheetOpen(true)
         }
-
         window.addEventListener("edit-currency", handleEdit)
         return () => window.removeEventListener("edit-currency", handleEdit)
     }, [])
-
     const loadCurrencies = async () => {
         const res = await getCurrencies()
         if (res.success && res.data) setCurrencies(res.data)
     }
-
     const handleSheetClose = (open: boolean) => {
         if (!open) {
             setIsSheetOpen(false)
@@ -41,11 +33,9 @@ export default function CurrenciesPage() {
             loadCurrencies()
         }
     }
-
     const defaultCurrency   = currencies.find(c => c.isDefault)
     const withRate          = currencies.filter(c => !c.isDefault && c.exchangeRate != null)
     const missingRate       = currencies.filter(c => !c.isDefault && c.exchangeRate == null)
-
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -63,7 +53,6 @@ export default function CurrenciesPage() {
                     إضافة عملة
                 </Button>
             </div>
-
             {/* Stats Cards */}
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                 {/* Total */}
@@ -78,7 +67,6 @@ export default function CurrenciesPage() {
                         </div>
                     </div>
                 </div>
-
                 {/* Default */}
                 <div className="glass-panel rounded-xl p-6 border border-border/50">
                     <div className="flex items-center justify-between">
@@ -93,7 +81,6 @@ export default function CurrenciesPage() {
                         </div>
                     </div>
                 </div>
-
                 {/* Exchange rates */}
                 <div className="glass-panel rounded-xl p-6 border border-border/50">
                     <div className="flex items-center justify-between">
@@ -113,7 +100,6 @@ export default function CurrenciesPage() {
                     </div>
                 </div>
             </div>
-
             {/* Exchange Rate Summary — shown when at least 2 currencies have rates */}
             {withRate.length > 0 && defaultCurrency && (
                 <div className="glass-panel rounded-xl border border-border/50 p-5">
@@ -152,7 +138,6 @@ export default function CurrenciesPage() {
                                 </div>
                             )
                         })}
-
                         {/* Placeholder cards for currencies missing rates */}
                         {missingRate.map(c => (
                             <div key={c.id}
@@ -174,12 +159,10 @@ export default function CurrenciesPage() {
                     </div>
                 </div>
             )}
-
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
                 <CurrencyTable data={currencies} onRefresh={loadCurrencies} />
             </div>
-
             {/* Sheet */}
             <CurrencySheet
                 open={isSheetOpen}

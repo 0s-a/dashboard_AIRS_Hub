@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { Plus, Tag, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -7,40 +6,32 @@ import { PriceLabelSheet } from "@/components/price-labels/price-label-sheet"
 import { PriceLabelTable } from "@/components/price-labels/price-label-table"
 import { getPriceLabels } from "@/lib/actions/price-labels"
 import { PriceLabel } from "@prisma/client"
-
 export default function PriceLabelsPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
     const [selectedLabel, setSelectedLabel] = useState<PriceLabel | undefined>()
     const [labels, setLabels] = useState<PriceLabel[]>([])
-
     useEffect(() => {
         loadLabels()
-
         const handleEdit = (e: Event) => {
             const customEvent = e as CustomEvent
             setSelectedLabel(customEvent.detail)
             setIsSheetOpen(true)
         }
-
         window.addEventListener("edit-price-label", handleEdit)
         return () => window.removeEventListener("edit-price-label", handleEdit)
     }, [])
-
     const loadLabels = async () => {
         const res = await getPriceLabels()
         if (res.success && res.data) {
             setLabels(res.data)
         }
     }
-
     const handleSheetClose = () => {
         setIsSheetOpen(false)
         setSelectedLabel(undefined)
         loadLabels()
     }
-
     const defaultLabel = labels.find(l => l.isDefault)
-
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -64,7 +55,6 @@ export default function PriceLabelsPage() {
                     إضافة تسعيرة
                 </Button>
             </div>
-
             {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-2">
                 <div className="glass-panel rounded-xl p-6 border border-border/50">
@@ -78,7 +68,6 @@ export default function PriceLabelsPage() {
                         </div>
                     </div>
                 </div>
-
                 <div className="glass-panel rounded-xl p-6 border border-border/50">
                     <div className="flex items-center justify-between">
                         <div>
@@ -93,12 +82,10 @@ export default function PriceLabelsPage() {
                     </div>
                 </div>
             </div>
-
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
                 <PriceLabelTable data={labels} onRefresh={loadLabels} />
             </div>
-
             {/* Sheet */}
             <PriceLabelSheet
                 open={isSheetOpen}

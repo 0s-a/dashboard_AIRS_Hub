@@ -1,12 +1,10 @@
 "use client"
-
 /**
  * app/(dashboard)/announcements/[id]/analytics/page.tsx
  *
  * Analytics Dashboard — KPIs + fail reasons breakdown.
  * Sourced entirely from AnnouncementLog via getAnnouncementLogStats.
  */
-
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
@@ -17,9 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Badge }  from "@/components/ui/badge"
 import { cn }     from "@/lib/utils"
 import { getAnnouncementProgress, getAnnouncementMessages, getAnnouncement } from "@/lib/actions/announcements"
-
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
-
 function KpiCard({
     label, value, sub, icon: Icon, color, bg,
 }: {
@@ -39,9 +35,7 @@ function KpiCard({
         </div>
     )
 }
-
 // ─── Mini Bar Chart ───────────────────────────────────────────────────────────
-
 function FailReasonBar({ reason, count, max }: { reason: string; count: number; max: number }) {
     const pct = max > 0 ? (count / max) * 100 : 0
     return (
@@ -59,11 +53,8 @@ function FailReasonBar({ reason, count, max }: { reason: string; count: number; 
         </div>
     )
 }
-
 // ─── Hourly Timeline ──────────────────────────────────────────────────────────
-
 interface HourBucket { hour: string; sent: number; failed: number }
-
 function buildTimeline(items: any[]): HourBucket[] {
     const map = new Map<string, { sent: number; failed: number }>()
     for (const r of items) {
@@ -74,11 +65,9 @@ function buildTimeline(items: any[]): HourBucket[] {
     }
     return Array.from(map.entries()).map(([hour, v]) => ({ hour, ...v }))
 }
-
 function TimelineChart({ buckets }: { buckets: HourBucket[] }) {
     if (buckets.length === 0) return null
     const maxVal = Math.max(...buckets.map(b => b.sent + b.failed), 1)
-
     return (
         <div className="space-y-3">
             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
@@ -124,19 +113,15 @@ function TimelineChart({ buckets }: { buckets: HourBucket[] }) {
         </div>
     )
 }
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function AnnouncementAnalyticsPage() {
     const { id }  = useParams<{ id: string }>()
     const router  = useRouter()
-
     const [title,    setTitle]    = useState("")
     const [stats,    setStats]    = useState<any>(null)
     const [timeline, setTimeline] = useState<HourBucket[]>([])
     const [topFail,  setTopFail]  = useState<any[]>([])
     const [loading,  setLoading]  = useState(true)
-
     useEffect(() => {
         Promise.all([
             getAnnouncement(id),
@@ -169,7 +154,6 @@ export default function AnnouncementAnalyticsPage() {
             setLoading(false)
         })
     }, [id])
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -177,14 +161,11 @@ export default function AnnouncementAnalyticsPage() {
             </div>
         )
     }
-
     const successRate = stats?.total > 0 ? Math.round((stats.sent / stats.total) * 100) : 0
     const failRate    = stats?.total > 0 ? Math.round((stats.failed / stats.total) * 100) : 0
     const maxReason   = stats?.byReason?.[0]?.count ?? 1
-
     return (
         <div className="max-w-3xl mx-auto space-y-6 pb-16">
-
             {/* Header */}
             <div className="flex items-center gap-3">
                 <Button variant="ghost" size="icon"
@@ -203,7 +184,6 @@ export default function AnnouncementAnalyticsPage() {
                     سجل الإرسال
                 </Button>
             </div>
-
             {/* Data missing notice */}
             {(!stats || stats.total === 0) && (
                 <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
@@ -213,7 +193,6 @@ export default function AnnouncementAnalyticsPage() {
                     </p>
                 </div>
             )}
-
             {/* KPIs */}
             {stats && (
                 <div className="grid grid-cols-2 gap-3">
@@ -250,14 +229,12 @@ export default function AnnouncementAnalyticsPage() {
                     />
                 </div>
             )}
-
             {/* Timeline */}
             {timeline.length > 0 && (
                 <div className="glass-panel rounded-2xl border border-border/50 p-5">
                     <TimelineChart buckets={timeline} />
                 </div>
             )}
-
             {/* Fail reasons */}
             {stats?.byReason?.length > 0 && (
                 <div className="glass-panel rounded-2xl border border-border/50 p-5 space-y-4">
@@ -271,7 +248,6 @@ export default function AnnouncementAnalyticsPage() {
                     </div>
                 </div>
             )}
-
             {/* Top failed */}
             {topFail.length > 0 && (
                 <div className="glass-panel rounded-2xl border border-border/50 overflow-hidden">

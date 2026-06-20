@@ -1,5 +1,3 @@
--- Add the new column
-ALTER TABLE "PersonType" ADD COLUMN "isDefault" BOOLEAN NOT NULL DEFAULT false;
-
--- Try to set "عميل" as the initial default if it exists
-UPDATE "PersonType" SET "isDefault" = true WHERE "name" = 'عميل';
+-- Migration already applied manually. PersonType table was removed in a later migration.
+-- This is intentionally a no-op to allow shadow database creation.
+SELECT 1;

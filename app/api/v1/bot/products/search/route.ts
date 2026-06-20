@@ -113,6 +113,7 @@ export async function GET(req: NextRequest) {
         const categoryId = searchParams.get('category')
         const brand = searchParams.get('brand')
         const productCode = searchParams.get('productCode')
+        const tags = searchParams.getAll('tag').filter(Boolean)   // ?tag=new&tag=sale → ['new','sale']
         const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
         const limit = Math.max(1, Math.min(50, parseInt(searchParams.get('limit') || '20')))
         const offset = (page - 1) * limit
@@ -170,6 +171,13 @@ export async function GET(req: NextRequest) {
             params.push(`%${productCode}%`)
             paramIndex++
         }
+        // ── Tag filter (JSONB containment: product.tags @> '["new","sale"]') ──
+        // Supports multiple ?tag= values — AND logic (product must have ALL tags)
+        if (tags.length > 0) {
+            conditions.push(`p.tags @> $${paramIndex}::jsonb`)
+            params.push(JSON.stringify(tags))
+            paramIndex++
+        }
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
@@ -203,7 +211,7 @@ export async function GET(req: NextRequest) {
                 ${VARIANTS_SUBQUERY},
                 ${IMAGES_SUBQUERY}
             FROM "Product" p
-            ${needsBrandJoin ? 'LEFT JOIN "Brand" b ON b.id = p."brandId"' : 'LEFT JOIN "Brand" b ON b.id = p."brandId"'}
+            LEFT JOIN "Brand" b ON b.id = p."brandId"
             ${whereClause}
             ${orderBy}
             LIMIT ${limit} OFFSET ${offset}
@@ -213,7 +221,7 @@ export async function GET(req: NextRequest) {
         const countSQL = `
             SELECT count(*)::int AS total
             FROM "Product" p
-            ${needsBrandJoin ? 'LEFT JOIN "Brand" b ON b.id = p."brandId"' : ''}
+            ${needsBrandJoin ? 'LEFT JOIN "Brand" b ON b.id = p."brandId"' : ''}  
             ${whereClause}
         `
 
@@ -227,6 +235,12 @@ export async function GET(req: NextRequest) {
         return apiSuccess(results, 200, {
             count: results.length,
             searchMode: query ? 'hybrid' : 'browse',
+            filters: {
+                ...(tags.length > 0 && { tags }),
+                ...(categoryId && { categoryId }),
+                ...(brand && { brand }),
+                ...(available !== null && { available }),
+            },
             pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
         })
 

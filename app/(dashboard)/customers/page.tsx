@@ -1,4 +1,4 @@
-import { getCustomers } from "@/lib/actions/customers"
+import { getCustomers, getCustomerStats } from "@/lib/actions/customers"
 import { Users, UserPlus, UserX } from "lucide-react"
 import { CustomerSheet } from "@/components/customers/customer-sheet"
 import { Button } from "@/components/ui/button"
@@ -14,23 +14,23 @@ export default async function CRMPage({
     const params = await searchParams
     const page = parseInt(params.page ?? "1", 10)
 
-    const result = await getCustomers({ page, pageSize: 100, search: params.search })
-    const { customers: rawCustomers = [], total = 0 } = (result.success ? result.data : { customers: [], total: 0 }) as any
+    const [result, statsResult] = await Promise.all([
+        getCustomers({ page, pageSize: 100, search: params.search }),
+        getCustomerStats(),
+    ])
+
+    const { customers: rawCustomers = [] } = (result.success ? result.data : { customers: [] }) as any
+    const { total = 0, newInWeek = 0, disabled = 0 } = (statsResult.success ? statsResult.data : {}) as any
 
     const customers = rawCustomers.map((p: any) => ({
         ...p,
         resolvedCurrencies: (p.customerCurrencies || []).map((pc: any) => pc.currency).filter(Boolean)
     }))
 
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const latestMembers = customers.filter((p: any) => new Date(p.createdAt) >= sevenDaysAgo).length
-    const disabledCustomers = customers.filter((p: any) => !p.isActive).length
-
     const stats = [
         { label: "إجمالي العملاء", value: total, icon: Users, color: "text-blue-600", bgColor: "bg-blue-500/10" },
-        { label: "أعضاء جدد (٧ أيام)", value: latestMembers, icon: UserPlus, color: "text-violet-600", bgColor: "bg-violet-500/10" },
-        { label: "عملاء معطّلون", value: disabledCustomers, icon: UserX, color: "text-red-500", bgColor: "bg-red-500/10" },
+        { label: "أعضاء جدد (٧ أيام)", value: newInWeek, icon: UserPlus, color: "text-violet-600", bgColor: "bg-violet-500/10" },
+        { label: "عملاء معطّلون", value: disabled, icon: UserX, color: "text-red-500", bgColor: "bg-red-500/10" },
     ]
 
     return (

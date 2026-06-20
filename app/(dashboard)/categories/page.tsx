@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { Plus, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -7,38 +6,31 @@ import { CategorySheet } from "@/components/categories/category-sheet"
 import { CategoryTable } from "@/components/categories/category-table"
 import { getCategories } from "@/lib/actions/categories"
 import { Category } from "@prisma/client"
-
 export default function CategoriesPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
     const [selectedCategory, setSelectedCategory] = useState<Category | undefined>()
     const [categories, setCategories] = useState<Category[]>([])
-
     useEffect(() => {
         loadCategories()
-
         const handleEdit = (e: Event) => {
             const customEvent = e as CustomEvent
             setSelectedCategory(customEvent.detail)
             setIsSheetOpen(true)
         }
-
         window.addEventListener("edit-category", handleEdit)
         return () => window.removeEventListener("edit-category", handleEdit)
     }, [])
-
     const loadCategories = async () => {
         const res = await getCategories()
         if (res.success && res.data) {
             setCategories(res.data)
         }
     }
-
     const handleSheetClose = () => {
         setIsSheetOpen(false)
         setSelectedCategory(undefined)
         loadCategories()
     }
-
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -62,7 +54,6 @@ export default function CategoriesPage() {
                     إضافة تصنيف
                 </Button>
             </div>
-
             {/* Stats Card */}
             <div className="glass-panel rounded-xl p-6 border border-border/50 w-fit min-w-48">
                 <div className="flex items-center justify-between gap-8">
@@ -75,12 +66,10 @@ export default function CategoriesPage() {
                     </div>
                 </div>
             </div>
-
             {/* Table */}
             <div className="glass-panel rounded-xl border border-border/50 p-6">
                 <CategoryTable data={categories} onRefresh={loadCategories} />
             </div>
-
             {/* Sheet */}
             <CategorySheet
                 open={isSheetOpen}

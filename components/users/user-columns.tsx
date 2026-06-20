@@ -24,7 +24,6 @@ export type UserRow = {
     id: string
     name: string
     username: string
-    role: string
     color: string
     isActive: boolean
     lastLogin: Date | string | null
@@ -64,44 +63,10 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
                 <div className="flex flex-col">
                     <div className="flex items-center gap-1.5">
                         <span className="font-bold text-sm truncate max-w-[160px]">{row.original.name}</span>
-                        {row.original.role === "admin" && (
-                            <ShieldCheck className="size-3.5 text-primary shrink-0" />
-                        )}
                     </div>
                     <span className="text-[11px] text-muted-foreground font-mono">@{row.original.username}</span>
                 </div>
             </div>
-        ),
-    },
-    {
-        accessorKey: "role",
-        enableColumnFilter: true,
-        meta: {
-            filterType: 'select' as const,
-            filterOptions: [
-                { label: 'مدير', value: 'admin' },
-                { label: 'مستخدم', value: 'user' },
-            ],
-        },
-        filterFn: (row: any, _columnId: string, filterValue: string) => {
-            return row.original.role === filterValue
-        },
-        header: "الدور",
-        size: 120,
-        minSize: 100,
-        maxSize: 150,
-        cell: ({ row }) => (
-            row.original.role === "admin" ? (
-                <Badge className="bg-primary/10 text-primary border-0 gap-1 font-semibold">
-                    <ShieldCheck className="size-3" />
-                    مدير
-                </Badge>
-            ) : (
-                <Badge className="bg-muted text-muted-foreground border-0 gap-1 font-semibold">
-                    <User className="size-3" />
-                    مستخدم
-                </Badge>
-            )
         ),
     },
     // ── الحالة ───────────────────────────────────────────────

@@ -8,140 +8,281 @@ import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type { SerializedPrice, ProductUnitEntry, SerializedCategory } from '@/lib/types/product'
+import type { SerializedSKC, SerializedSKU } from '@/lib/types/skc'
+import { flatColorFields, mapColorRef } from '@/lib/types/skc'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
-import { PRODUCT_CODE_CONFIG } from '@/lib/config/product-code.config'
+import { parseSkcAttributes } from '@/lib/utils/skc-attributes'
+import { PRODUCT_NUMBER_CONFIG } from '@/lib/config/product-number.config'
 
 export { prisma, Prisma }
 
-// ── Item number format: 3 segments separated by dashes (e.g. 001-BF-483) ──
-export const ITEM_NUMBER_REGEX = /^\S+-\S+-\S+$/
+export function normalizeProductNumber(input: string): string {
+    return input.trim().toUpperCase()
+}
 
-// ── Generate composite product code: CAT-BR-SEQN ─────────────────────────
+export function validateProductNumber(
+    input: string
+): { ok: true; value: string } | { ok: false; error: string } {
+    const value = normalizeProductNumber(input)
+    if (value.length !== PRODUCT_NUMBER_CONFIG.length) {
+        return { ok: false, error: `رقم المنتج يجب أن يكون ${PRODUCT_NUMBER_CONFIG.length} خانات` }
+    }
+    if (!PRODUCT_NUMBER_CONFIG.regex.test(value)) {
+        return { ok: false, error: 'رقم المنتج: 3 أحرف أو أرقام إنجليزية فقط' }
+    }
+    return { ok: true, value }
+}
 
-/**
- * Generate a composite product code: CAT-BR-SEQN
- * Example: ELC-AP-0001
- *
- * Uses ProductCodeSequence table for atomic counter management.
- * Numbers are NEVER reused — even after product deletion.
- */
-export async function generateProductCode(
-    categoryCode: string | null,
-    brandCode: string | null,
+export function sizeSuffix(label: string | null | undefined): string | null {
+    if (!label?.trim()) return null
+    const s = label.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+    return s || 'SZ'
+}
+
+export function buildSkuCode(productNumber: string, colorCode: string, sizeLabel?: string | null): string {
+    const size = sizeSuffix(sizeLabel)
+    if (size) return `${productNumber}-${colorCode}-${size}`
+    return `${productNumber}-${colorCode}`
+}
+
+export const COLOR_SELECT = {
+    id: true,
+    code: true,
+    name: true,
+    hexCode: true,
+} as const
+
+export async function getDefaultColorId(
     tx?: Prisma.TransactionClient
 ): Promise<string> {
     const db = tx ?? prisma
-    const config = PRODUCT_CODE_CONFIG
-
-    const catCode = categoryCode || config.category.fallbackCode
-    const brCode  = brandCode || config.brand.fallbackCode
-    const sep     = config.separator
-
-    // Atomic upsert: increment counter for this combo
-    const seq = await db.productCodeSequence.upsert({
-        where: {
-            categoryCode_brandCode: { categoryCode: catCode, brandCode: brCode }
-        },
-        update: { lastSequence: { increment: 1 } },
-        create: { categoryCode: catCode, brandCode: brCode, lastSequence: 1 },
-    })
-
-    const seqStr = String(seq.lastSequence)
-        .padStart(config.sequence.length, config.sequence.padChar)
-
-    // Safety check: ensure we haven't exceeded max
-    if (seq.lastSequence > config.maxPerCombo) {
-        throw new Error(
-            `تم استنفاذ جميع الأرقام المتاحة للتركيبة ${catCode}${sep}${brCode} ` +
-            `(الحد الأقصى: ${config.maxPerCombo})`
-        )
-    }
-
-    return `${catCode}${sep}${brCode}${sep}${seqStr}`
+    const color = await db.color.findUnique({ where: { code: 'ST' }, select: { id: true } })
+    if (!color) throw new Error('اللون الافتراضي (ST) غير موجود — شغّل db:seed')
+    return color.id
 }
 
-// ── Standard include for all product queries ──────────────────────────────
+export async function findNextAvailableProductNumber(
+    tx?: Prisma.TransactionClient
+): Promise<string | null> {
+    const db = tx ?? prisma
+    const used = new Set(
+        (await db.product.findMany({ select: { productNumber: true } }))
+            .map(p => p.productNumber.toUpperCase())
+    )
+
+    for (let i = 1; i <= 999; i++) {
+        const num = String(i).padStart(3, '0')
+        if (!used.has(num)) return num
+    }
+
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    for (const a of chars) {
+        for (const b of chars) {
+            for (const c of chars) {
+                const code = `${a}${b}${c}`
+                if (!used.has(code)) return code
+            }
+        }
+    }
+    return null
+}
+
+export async function rebuildProductSkuCodes(
+    productId: string,
+    productNumber: string,
+    tx?: Prisma.TransactionClient
+): Promise<void> {
+    const db = tx ?? prisma
+    const skcs = await db.sKC.findMany({
+        where: { productId },
+        include: { skus: true, color: { select: { code: true } } },
+    })
+
+    for (const skc of skcs) {
+        for (const sku of skc.skus) {
+            const skuCode = buildSkuCode(productNumber, skc.color.code, sku.sizeLabel)
+            await db.sKU.update({ where: { id: sku.id }, data: { skuCode } })
+        }
+    }
+}
+
+/** @deprecated Auto-generation removed — use validateProductNumber */
+export async function generateProductNumber(): Promise<never> {
+    throw new Error('generateProductNumber is deprecated — product number is entered manually')
+}
+
+/** @deprecated Use validateProductNumber */
+export const generateProductCode = generateProductNumber
+
+export const SKU_PRICE_INCLUDE = {
+    priceLabel: true,
+    currency: true,
+    unit: { select: { id: true, name: true, pluralName: true } },
+} as const
+
+export const SKU_INCLUDE = {
+    orderBy: { order: 'asc' as const },
+    include: {
+        productPrices: {
+            include: SKU_PRICE_INCLUDE,
+            orderBy: { createdAt: 'asc' as const },
+        },
+    },
+} as const
+
+export const SKC_INCLUDE = {
+    orderBy: { order: 'asc' as const },
+    include: {
+        color: { select: COLOR_SELECT },
+        images: { orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }] },
+        skus: SKU_INCLUDE,
+    },
+} as const
+
 export const PRODUCT_INCLUDE = {
     brandRef: true,
     category: true,
-    productImages: { include: { variants: { select: { id: true } } } },
-    variants: {
-        orderBy: { order: 'asc' as const },
-        include: { variantImages: true },
-    },
-    productPrices: {
-        include: {
-            priceLabel: true,
-            currency: true,
-            unit: { select: { id: true, name: true, pluralName: true } },
-        },
-        orderBy: { createdAt: 'asc' as const },
-    },
     productUnits: {
         include: { unit: true },
         orderBy: { order: 'asc' as const },
     },
+    skcs: SKC_INCLUDE,
 } as const
 
-// ── Serialize product from DB shape to client-safe shape ──────────────────
-export function serializeProduct(product: any) {
-    const mediaImages = (product.productImages || []).map((pi: any) => ({
-        id: pi.id,
-        url: toDisplayUrl(pi.url),
-        filename: pi.filename,
-        alt: pi.alt,
-        isPrimary: pi.isPrimary,
-        order: pi.order,
-        width: pi.width,
-        height: pi.height,
-        sizeBytes: pi.sizeBytes,
-        variantIds: (pi.variants || []).map((v: any) => v.id),
-    }))
+export const PRODUCT_LIST_INCLUDE = {
+    brandRef: { select: { id: true, name: true, code: true, logo: true } },
+    category: { select: { id: true, name: true, code: true, icon: true } },
+    productUnits: {
+        select: {
+            id: true,
+            unitId: true,
+            isBase: true,
+            conversionFactor: true,
+            barcode: true,
+            order: true,
+            unit: { select: { name: true } },
+        },
+        orderBy: { order: 'asc' as const },
+    },
+    skcs: {
+        orderBy: { order: 'asc' as const },
+        select: {
+            id: true,
+            colorId: true,
+            color: { select: COLOR_SELECT },
+            isDefault: true,
+            isAvailable: true,
+            images: {
+                where: { isPrimary: true },
+                take: 1,
+                select: { url: true },
+            },
+            _count: { select: { skus: true } },
+        },
+    },
+    _count: { select: { skcs: true } },
+} as const
 
-    const variants = (product.variants || []).map((v: any) => ({
-        id: v.id,
-        variantNumber: v.variantNumber,
-        suffix: v.suffix,
-        name: v.name,
-        type: v.type,
-        hex: v.hex,
-        order: v.order,
-        isDefault: v.isDefault,
-        price: v.price != null ? Number(v.price) : null,   // Decimal → number
-        imageCount: (v.variantImages || []).length,
-        images: (v.variantImages || []).map((vi: any) => ({
-            id: vi.id,
-            url: toDisplayUrl(vi.url),
-            filename: vi.filename,
-            alt: vi.alt,
-        })),
-    }))
+export const SKC_DETAIL_INCLUDE = {
+    color: { select: COLOR_SELECT },
+    images: { orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }] },
+    skus: SKU_INCLUDE,
+    product: {
+        include: {
+            brandRef: { select: { id: true, name: true, code: true } },
+            category: { select: { id: true, name: true, code: true } },
+            productUnits: {
+                include: { unit: true },
+                orderBy: { order: 'asc' as const },
+            },
+        },
+    },
+} as const
 
-    const productPrices: SerializedPrice[] = (product.productPrices || []).map((pp: any) => ({
+function serializePrices(prices: any[], productUnits: any[]): SerializedPrice[] {
+    return (prices || []).map((pp: any) => ({
         id: pp.id,
         priceLabelId: pp.priceLabelId,
         priceLabelName: pp.priceLabel.name,
         currencyId: pp.currencyId,
         currencySymbol: pp.currency.symbol,
         currencyName: pp.currency.name,
-        value: Number(pp.value),                            // Decimal → number
+        value: Number(pp.value),
         unitId: pp.unitId,
         unitName: pp.unit?.name ?? '',
         conversionFactor: Number(
-            (product.productUnits || []).find((pu: any) => pu.unitId === pp.unitId)?.conversionFactor ?? 1
+            (productUnits || []).find((pu: any) => pu.unitId === pp.unitId)?.conversionFactor ?? 1
         ),
         isAutoCalculated: pp.isAutoCalculated,
     }))
+}
 
-    const productUnits: ProductUnitEntry[] = (product.productUnits || []).map((pu: any) => ({
+export function serializeSKU(sku: any, productUnits: any[] = []): SerializedSKU {
+    return {
+        id: sku.id,
+        skuCode: sku.skuCode,
+        sizeLabel: sku.sizeLabel ?? null,
+        isAvailable: sku.isAvailable,
+        isDefault: sku.isDefault,
+        order: sku.order,
+        productPrices: serializePrices(sku.productPrices || [], productUnits),
+    }
+}
+
+export function serializeSKC(skc: any, productUnits: any[] = []): SerializedSKC {
+    const color = mapColorRef(skc.color)
+    return {
+        id: skc.id,
+        color,
+        ...flatColorFields(color),
+        itemNumber: skc.itemNumber ?? null,
+        attributes: parseSkcAttributes(skc.attributes),
+        isDefault: skc.isDefault,
+        isAvailable: skc.isAvailable,
+        order: skc.order,
+        productId: skc.productId,
+        images: (skc.images || []).map((pi: any) => ({
+            id: pi.id,
+            url: toDisplayUrl(pi.url),
+            filename: pi.filename,
+            alt: pi.alt,
+            isPrimary: pi.isPrimary,
+            order: pi.order,
+            width: pi.width,
+            height: pi.height,
+            sizeBytes: pi.sizeBytes,
+        })),
+        skus: (skc.skus || []).map((s: any) => serializeSKU(s, productUnits)),
+        skuCount: skc._count?.skus ?? (skc.skus || []).length,
+    }
+}
+
+export function serializeProductUnits(productUnits: any[]): ProductUnitEntry[] {
+    return (productUnits || []).map((pu: any) => ({
         id: pu.id,
         unitId: pu.unitId,
         unitName: pu.unit?.name ?? '',
-        conversionFactor: Number(pu.conversionFactor ?? 1),  // Decimal → number
+        conversionFactor: Number(pu.conversionFactor ?? 1),
         barcode: pu.barcode || null,
         isBase: pu.isBase,
         order: pu.order,
     }))
+}
+
+/** Product is available when at least one SKC is marked available */
+export function deriveProductAvailability(
+    skcs: Array<{ isAvailable?: boolean }> | undefined
+): boolean {
+    return (skcs ?? []).some(s => s.isAvailable)
+}
+
+export const PRODUCT_WITH_AVAILABLE_SKC = {
+    skcs: { some: { isAvailable: true } },
+} satisfies Prisma.ProductWhereInput
+
+export function serializeProduct(product: any) {
+    const productUnits = serializeProductUnits(product.productUnits || [])
+    const skcs = (product.skcs || []).map((s: any) => serializeSKC(s, productUnits))
 
     const brandRef = product.brandRef
         ? {
@@ -161,49 +302,109 @@ export function serializeProduct(product: any) {
           }
         : null
 
-    // Build a clean plain object — never spread raw Prisma models
+    const allPrices = skcs.flatMap((skc: SerializedSKC) => skc.skus.flatMap((sku: SerializedSKU) => sku.productPrices))
+    const primarySkc = skcs.find((s: SerializedSKC) => s.isDefault) || skcs[0]
+    const mediaImages = primarySkc?.images ?? []
+
     return {
         id:               product.id,
-        productCode:      product.productCode,
-        itemNumber:       product.itemNumber ?? null,
+        productNumber:    product.productNumber,
+        slug:             product.slug,
         name:             product.name,
         brandId:          product.brandId ?? null,
         description:      product.description ?? null,
-        isAvailable:      product.isAvailable,
-        // Normalize JSON fields: always return arrays, never null
-        // This prevents .map()/.length errors in client components
         alternativeNames: Array.isArray(product.alternativeNames) ? product.alternativeNames : [],
         tags:             Array.isArray(product.tags) ? product.tags : [],
         categoryId:       product.categoryId ?? null,
+        skuSpecKind:      product.skuSpecKind ?? 'free',
         createdAt:        product.createdAt instanceof Date
                               ? product.createdAt.toISOString()
                               : product.createdAt,
         updatedAt:        product.updatedAt instanceof Date
                               ? product.updatedAt.toISOString()
                               : product.updatedAt,
-        // ── serialized relations ──
         brandRef,
         category,
         mediaImages,
-        variants,
-        productPrices,
+        skcs,
+        skcCount: product._count?.skcs ?? skcs.length,
+        productPrices: allPrices,
         productUnits,
+        // legacy alias for gradual UI migration
+        variants: skcs.map((skc: SerializedSKC) => ({
+            id: skc.id,
+            variantNumber: skc.skus[0]?.skuCode ?? `${product.productNumber}-${skc.colorCode}`,
+            suffix: skc.colorCode,
+            name: skc.colorName,
+            type: 'color',
+            hex: skc.hexCode,
+            order: skc.order,
+            isDefault: skc.isDefault,
+            price: null,
+            imageCount: skc.images.length,
+            images: skc.images,
+        })),
     }
 }
 
-// ── Fetch a raw product by id — throws if not found ──────────────────────
+export async function getProductIdFromSkuId(skuId: string): Promise<string | null> {
+    const sku = await prisma.sKU.findUnique({
+        where: { id: skuId },
+        select: { skc: { select: { productId: true } } },
+    })
+    return sku?.skc.productId ?? null
+}
+
+export async function productHasPricesAndUnits(productId: string): Promise<boolean> {
+    const [unitsCount, pricesCount] = await Promise.all([
+        prisma.productUnit.count({ where: { productId } }),
+        prisma.productPrice.count({
+            where: { sku: { skc: { productId } } },
+        }),
+    ])
+    return unitsCount > 0 && pricesCount > 0
+}
+
 export async function requireProduct(id: string, tx?: Prisma.TransactionClient): Promise<any> {
     const db = tx ?? prisma
     const product = await db.product.findUnique({
         where: { id },
-        include: PRODUCT_INCLUDE,
+        include: PRODUCT_INCLUDE as any,
     })
     if (!product) throw new Error('المنتج غير موجود')
     return product
 }
 
-// ── Revalidate product-related paths ─────────────────────────────────────
 export function revalidateProduct(id: string) {
+    revalidatePath('/products')
     revalidatePath('/inventory')
-    revalidatePath(`/inventory/${id}`)
+    revalidatePath('/items')
+    revalidatePath(`/items`)
+}
+
+export function revalidateSkc(skcId: string, productId?: string) {
+    revalidatePath('/items')
+    if (productId) revalidateProduct(productId)
+}
+
+export function revalidateSku(skuId: string, productId?: string) {
+    revalidatePath('/items')
+    revalidatePath(`/items/${skuId}`)
+    if (productId) revalidateProduct(productId)
+}
+
+export function revalidateItem(itemId: string, productId?: string) {
+    revalidateSku(itemId, productId)
+}
+
+export async function revalidateAllSkusForSkc(skcId: string, productId?: string) {
+    revalidatePath('/items')
+    const skus = await prisma.sKU.findMany({
+        where: { skcId },
+        select: { id: true },
+    })
+    for (const s of skus) {
+        revalidatePath(`/items/${s.id}`)
+    }
+    if (productId) revalidateProduct(productId)
 }

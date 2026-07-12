@@ -23,7 +23,7 @@ services:
     #     condition: service_healthy 
     #   rabbitmq:
     #     condition: service_healthy 
-    command: sh -c "npx prisma generate && npx prisma db push --accept-data-loss && npm run dev"
+    command: sh -c "npx prisma generate && npm run dev"
 
   postgres:
     image: postgres:15
@@ -65,11 +65,29 @@ services:
     #   timeout: 5s
     #   retries: 5
 
+  meilisearch:
+    image: getmeili/meilisearch:v1.9
+    container_name: nawaat_meilisearch_dev
+    restart: unless-stopped
+    env_file:
+      - .env.development
+    environment:
+      - MEILI_MASTER_KEY=nawaat-meili-dev-key-2024
+      - MEILI_NO_ANALYTICS=true
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    networks:
+      - nawaat_net
+
 volumes:
   postgres_data:
     name: nawaat_postgres_data_dev
   rabbitmq_data:
     name: nawaat_rabbitmq_data_dev
+  meilisearch_data:
+    name: nawaat_meilisearch_data_dev
 
 
 

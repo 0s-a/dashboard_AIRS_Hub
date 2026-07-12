@@ -21,13 +21,15 @@ import { useRouter } from "next/navigation"
 import { Category } from "@prisma/client"
 import { Loader2, FolderTree, Tag, Info, List, Component } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { PRODUCT_CODE_CONFIG } from "@/lib/config/product-code.config"
+
+const categoryCodeLength = PRODUCT_CODE_CONFIG.category.length
 
 const formSchema = z.object({
     code: z
         .string()
-        .min(3, { message: "الكود يجب أن يكون 3 خانات بالضبط" })
-        .max(3, { message: "الكود يجب أن يكون 3 خانات فقط" })
-        .regex(/^[A-Za-z0-9]{3}$/, { message: "الكود يجب أن يحتوي على أحرف إنجليزية أو أرقام فقط" }),
+        .length(categoryCodeLength, { message: "الكود يجب أن يكون حرفين بالضبط" })
+        .regex(/^[A-Za-z0-9]{2}$/, { message: "الكود يجب أن يحتوي على أحرف إنجليزية أو أرقام فقط" }),
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     description: z.string().nullable().optional(),
     icon: z.string().nullable().optional(),
@@ -96,8 +98,8 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
                                         <FormLabel className="flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" />كود التصنيف *</FormLabel>
                                         <FormControl>
                                             <Input
-                                                placeholder="مثال: ELC"
-                                                maxLength={3}
+                                                placeholder="مثال: EL"
+                                                maxLength={2}
                                                 className="font-mono uppercase tracking-widest text-center text-lg w-full md:w-32 focus-visible:ring-primary/20"
                                                 {...field}
                                                 onChange={(e) =>
@@ -106,7 +108,7 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
                                             />
                                         </FormControl>
                                         <FormDescription className="text-xs">
-                                            3 أحرف إنجليزية أو أرقام
+                                            حرفين إنجليزية أو أرقام
                                         </FormDescription>
                                         <FormMessage />
                                     </FormItem>

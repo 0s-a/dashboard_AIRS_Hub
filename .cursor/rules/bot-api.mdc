@@ -1,0 +1,29 @@
+---
+description: أنماط Bot API في app/api/v1/bot
+globs: app/api/v1/bot/**
+alwaysApply: false
+---
+
+# Bot API Routes
+
+## النمط الإلزامي
+
+```typescript
+const authError = validateApiKey(req)
+if (authError) return authError
+
+const parsed = Schema.safeParse(body)
+if (!parsed.success) {
+  return apiError('Missing or invalid fields', 400, { code: 'VALIDATION_ERROR', details: parsed.error.flatten() })
+}
+
+return apiSuccess(data)
+```
+
+## قواعد
+
+- كل route يبدأ بـ `validateApiKey` من `lib/api-utils.ts`
+- تحقق من المدخلات بـ Zod
+- استخدم `normalizePhonePatterns()` لبحث العملاء بالهاتف
+- استخدم `apiSuccess` / `apiError` — لا `{ error }` مباشرة
+- أضف `code` للأخطاء الآلية (مثل `NOT_FOUND`, `UNAUTHORIZED`)

@@ -1,20 +1,13 @@
-export const dynamic = "force-dynamic"
+import { redirect } from "next/navigation"
+import { prisma } from "@/lib/prisma"
 
-import { notFound } from "next/navigation"
-import { getProductById } from "@/lib/actions/inventory"
-import { ProductDetailsClient } from "@/components/inventory/product-details-client"
-import type { SerializedProduct } from "@/lib/actions/inventory"
-
-export default async function ProductDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InventoryIdRedirect({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
-    const result = await getProductById(id)
-
-    if (!result.success || !result.data) {
-        notFound()
-    }
-
-    // serializeProduct() already returns a clean plain object
-    const product = result.data as SerializedProduct
-
-    return <ProductDetailsClient product={product} />
+    const sku = await prisma.sKU.findFirst({
+        where: { skc: { productId: id } },
+        orderBy: [{ skc: { order: "asc" } }, { order: "asc" }],
+        select: { id: true },
+    })
+    if (sku) redirect(`/items/${sku.id}`)
+    redirect(`/items?productId=${id}`)
 }

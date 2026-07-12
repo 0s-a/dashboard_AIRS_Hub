@@ -11,12 +11,13 @@ import {
     Bell,
     UsersRound,
     Store,
-    Megaphone,
     Ruler,
     Sparkles,
     Bookmark,
     ShieldCheck,
-    MessageSquare,
+    Search,
+    SlidersHorizontal,
+    Palette,
     LucideIcon
 } from "lucide-react"
 
@@ -24,6 +25,7 @@ export interface NavigationItem {
     href: string;
     label: string;
     icon: LucideIcon;
+    keywords?: string;
     disabled?: boolean;
     hidden?: boolean;
     badge?: string;
@@ -38,43 +40,44 @@ export const navigationGroups: NavigationGroup[] = [
     {
         title: "الرئيسية",
         items: [
-            { href: "/", label: "لوحة التحكم", icon: LayoutDashboard },
+            { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, keywords: "dashboard home الرئيسية" },
         ]
     },
     {
-        title: "المبيعات والمخزون",
+        title: "المبيعات والمنتجات",
         items: [
-            { href: "/orders", label: "الطلبات", icon: ShoppingCart},
-            { href: "/inventory",  label: "المخزون",     icon: Package  },
-            { href: "/inventory/new-tags", label: "المنتجات الجديدة", icon: Sparkles },
-            { href: "/categories", label: "التصنيفات",  icon: Layers   },
-            { href: "/brands",     label: "البراندات",   icon: Bookmark },
-            { href: "/gallery", label: "معرض الصور", icon: Images },
+            { href: "/orders", label: "الطلبات", icon: ShoppingCart, keywords: "orders sales طلبات مبيعات فاتورة" },
+            { href: "/products", label: "المنتجات", icon: Package, keywords: "products spu منتجات مخزون" },
+            { href: "/items", label: "الأصناف", icon: Layers, keywords: "items skc sku أصناف" },
+            { href: "/inventory/new-tags", label: "المنتجات الجديدة", icon: Sparkles, keywords: "new tags جديد" },
+            { href: "/inventory/search-engine", label: "محرك البحث", icon: Search, keywords: "search meilisearch بحث" },
+            { href: "/categories", label: "التصنيفات", icon: Layers, keywords: "categories تصنيفات أقسام" },
+            { href: "/brands", label: "البراندات", icon: Bookmark, keywords: "brands براندات ماركات" },
+            { href: "/colors", label: "الألوان", icon: Palette, keywords: "colors ألوان" },
+            { href: "/product-attributes", label: "خصائص المنتجات", icon: SlidersHorizontal, keywords: "attributes خصائص صفات" },
+            { href: "/gallery", label: "معرض الصور", icon: Images, keywords: "gallery images صور معرض" },
         ]
     },
     {
         title: "العملاء والمشرفون",
         items: [
-            { href: "/customers", label: "العملاء", icon: Users },
-            { href: "/supervisors", label: "المشرفون", icon: ShieldCheck },
-            { href: "/whatsapp-groups", label: "مجموعات الواتساب", icon: MessageSquare },
+            { href: "/customers", label: "العملاء", icon: Users, keywords: "customers عملاء زبائن" },
+            { href: "/supervisors", label: "المشرفون", icon: ShieldCheck, keywords: "supervisors مشرفون" },
         ]
     },
     {
-        title: "الذكاء الاصطناعي والإشعارات",
+        title: "الإشعارات",
         items: [
-            { href: "/announcements",           label: "الإعلانات",   icon: Megaphone, disabled: true },
-            { href: "/announcements/templates",  label: "قوالب الرسائل", icon: Sparkles, disabled: true  },
-            { href: "/notifications",            label: "الإشعارات",   icon: Bell      },
+            { href: "/notifications", label: "الإشعارات", icon: Bell, keywords: "notifications alerts إشعارات تنبيهات" },
         ]
     },
     {
         title: "النظام والمالية",
         items: [
-            { href: "/users", label: "المستخدمين", icon: UsersRound },
-            { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag },
-            { href: "/currencies", label: "العملات", icon: Coins },
-            { href: "/units", label: "وحدات القياس", icon: Ruler },
+            { href: "/users", label: "المستخدمين", icon: UsersRound, keywords: "users admin مستخدمين" },
+            { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag, keywords: "price labels تسعيرات أسعار" },
+            { href: "/currencies", label: "العملات", icon: Coins, keywords: "currencies عملات صرف" },
+            { href: "/units", label: "وحدات القياس", icon: Ruler, keywords: "units وحدات قياس" },
         ]
     }
 ]
@@ -82,5 +85,6 @@ export const navigationGroups: NavigationGroup[] = [
 export const settingsNavigationItem: NavigationItem = {
     href: "/settings",
     label: "إعدادات المتجر",
-    icon: Store
+    icon: Store,
+    keywords: "settings store إعدادات متجر",
 }

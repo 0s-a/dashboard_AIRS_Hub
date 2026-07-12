@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation } from '@/lib/action-utils'
+import { requireAuth } from '@/lib/auth-utils'
 import { revalidatePath } from 'next/cache'
 
 const PATHS = '/units'
@@ -12,19 +13,25 @@ const PATHS = '/units'
 
 export async function getUnits() {
     return safeAction(
-        () => prisma.$queryRawUnsafe<any[]>(
+        async () => {
+            await requireAuth()
+            return prisma.$queryRawUnsafe<any[]>(
             `SELECT id, "itemNumber", name, "pluralName", notes, "createdAt", "updatedAt"
              FROM "Unit" ORDER BY name ASC`
-        ),
+            )
+        },
         'تعذّر جلب الوحدات'
     )
 }
 
 export async function getActiveUnits() {
     return safeAction(
-        () => prisma.$queryRawUnsafe<any[]>(
+        async () => {
+            await requireAuth()
+            return prisma.$queryRawUnsafe<any[]>(
             `SELECT id, "itemNumber", name, "pluralName" FROM "Unit" ORDER BY name ASC`
-        ),
+            )
+        },
         'تعذّر جلب الوحدات النشطة'
     )
 }
@@ -35,6 +42,7 @@ export async function createUnit(data: {
     notes?: string | null
 }) {
     try {
+        await requireAuth()
         // Atomic item number generation — safely ignores non-numeric characters in existing data
         const rows = await prisma.$queryRawUnsafe<{ id: string; itemNumber: string }[]>(
             `INSERT INTO "Unit" (id, "itemNumber", name, "pluralName", notes, "createdAt", "updatedAt")
@@ -66,6 +74,7 @@ export async function updateUnit(id: string, data: {
     notes?: string | null
 }) {
     try {
+        await requireAuth()
         const now = new Date()
 
         // Build SET clauses dynamically — only update provided fields
@@ -108,6 +117,7 @@ export async function updateUnit(id: string, data: {
 export async function deleteUnit(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             // Check both ProductPrice AND ProductUnit references
             const rows = await prisma.$queryRawUnsafe<any[]>(
                 `SELECT

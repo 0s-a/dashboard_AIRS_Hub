@@ -50,15 +50,15 @@ export function UnitsPanel({ productId, productUnits, sysUnits, onUnitsChange }:
         saveUnits(newUnits)
     }
 
-    const updateField = (unitId: string, field: 'conversionFactor' | 'barcode', value: any) => {
-        onUnitsChange(productUnits.map(u => u.unitId === unitId ? { ...u, [field]: value } : u))
+    const updateField = (rowId: string, field: 'conversionFactor' | 'barcode', value: string | number) => {
+        onUnitsChange(productUnits.map(u => u.id === rowId ? { ...u, [field]: value } : u))
     }
 
-    const setAsBase = (unitId: string) => {
+    const setAsBase = (rowId: string) => {
         const newUnits = productUnits.map(u => ({
             ...u,
-            isBase: u.unitId === unitId,
-            conversionFactor: u.unitId === unitId ? 1 : u.conversionFactor,
+            isBase: u.id === rowId,
+            conversionFactor: u.id === rowId ? 1 : u.conversionFactor,
         }))
         saveUnits(newUnits)
     }
@@ -169,8 +169,8 @@ export function UnitsPanel({ productId, productUnits, sysUnits, onUnitsChange }:
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/30">
-                                        {productUnits.sort((a, b) => (a.isBase ? -1 : 1)).map(pu => (
-                                            <tr key={pu.unitId} className={`group transition-colors ${pu.isBase ? 'bg-primary/[0.02]' : 'hover:bg-muted/20'}`}>
+                                        {[...productUnits].sort((a, b) => (a.isBase ? -1 : 1)).map(pu => (
+                                            <tr key={pu.id} className={`group transition-colors ${pu.isBase ? 'bg-primary/[0.02]' : 'hover:bg-muted/20'}`}>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className={`size-8 rounded-lg flex items-center justify-center font-bold text-sm ${pu.isBase ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-background border border-border/50 text-muted-foreground'}`}>
@@ -193,7 +193,7 @@ export function UnitsPanel({ productId, productUnits, sysUnits, onUnitsChange }:
                                                                 type="number" min="1"
                                                                 disabled={pu.isBase || isPending}
                                                                 value={pu.isBase ? 1 : pu.conversionFactor}
-                                                                onChange={(e) => updateField(pu.unitId, 'conversionFactor', parseInt(e.target.value) || 1)}
+                                                                onChange={(e) => updateField(pu.id, 'conversionFactor', parseInt(e.target.value) || 1)}
                                                                 className={`h-8 text-center font-bold font-mono bg-background/50 border-border/50 focus:border-primary/30 ${pu.isBase ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                             />
                                                             {pu.isBase && <div className="absolute inset-0 z-10 cursor-not-allowed" />}
@@ -206,7 +206,7 @@ export function UnitsPanel({ productId, productUnits, sysUnits, onUnitsChange }:
                                                             placeholder="0000000000"
                                                             disabled={isPending}
                                                             value={pu.barcode || ''}
-                                                            onChange={(e) => updateField(pu.unitId, 'barcode', e.target.value)}
+                                                            onChange={(e) => updateField(pu.id, 'barcode', e.target.value)}
                                                             className="h-8 font-mono text-xs bg-background/50 border-border/50 focus:border-primary/30 pr-8"
                                                         />
                                                         <Barcode className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground/40 group-focus-within/input:text-primary/50 transition-colors" />
@@ -215,7 +215,7 @@ export function UnitsPanel({ productId, productUnits, sysUnits, onUnitsChange }:
                                                 <td className="px-6 py-4 text-left">
                                                     {!pu.isBase && (
                                                         <button
-                                                            onClick={() => setAsBase(pu.unitId)}
+                                                            onClick={() => setAsBase(pu.id)}
                                                             className="text-[10px] font-bold text-primary hover:underline underline-offset-4 decoration-primary/30 transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             تعيين كأساسية

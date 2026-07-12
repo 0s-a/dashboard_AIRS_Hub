@@ -17,26 +17,40 @@ enum CustomerSource {
   api
 }
 
+enum OrderStatus {
+  pending
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+enum SkuSpecKind {
+  size
+  packaging
+  length
+  free
+}
+
 // ── Core Business Models ─────────────────────────────────────
 
 model Product {
   id               String                   @id @default(uuid())
-  productCode      String                   @unique // Auto-generated: "ELC-AP-0001"
-  itemNumber       String?                  @unique // Optional manual code
+  productNumber    String                   @unique // User-entered 3-char code e.g. "001"
   name             String
+  slug             String                   @unique
+  skuSpecKind      SkuSpecKind              @default(free)
   brandId          String?
   brandRef         Brand?                   @relation(fields: [brandId], references: [id], onDelete: SetNull)
   description      String?
-  isAvailable      Boolean                  @default(false)
   alternativeNames Json?
   tags             Json?
   categoryId       String?
   category         Category?                @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
-  productImages    ProductImage[]
-  variants         Variant[]
-  productPrices    ProductPrice[]
+  skcs             SKC[]
   productUnits     ProductUnit[]
   orderItems       OrderItem[]
   notifications    AiNotification[]
@@ -48,7 +62,7 @@ model Product {
 model Brand {
   id          String    @id @default(uuid())
   name        String    @unique
-  code        String    @unique // 2-letter code e.g. "SM" — used in item numbers
+  code        String    @unique // 1-char alphanumeric e.g. "S" — used in product numbers
   logo        String? // URL path to uploaded logo image
   description String?
   createdAt   DateTime  @default(now())
@@ -57,14 +71,43 @@ model Brand {
 }
 
 model Category {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  code        String    @unique // 3-char alphanumeric e.g. "ELC", "A12" — used in item numbers
+  id          String     @id @default(uuid())
+  name        String     @unique
+  code        String     @unique // 2-char alphanumeric e.g. "EL", "A1" — used in item numbers
+  slug        String     @unique
+  parentId    String?
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryHierarchy")
   description String?
   icon        String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
   products    Product[]
+}
+
+model ProductAttribute {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("ProductAttribute")
+}
+
+model Color {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String   @unique
+  hexCode   String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  skcs      SKC[]
+
+  @@map("Color")
 }
 
 // ── Customer (formerly Person) ───────────────────────────────
@@ -82,10 +125,8 @@ model Customer {
   priceLabelId         String?
   priceLabel           PriceLabel?           @relation(fields: [priceLabelId], references: [id], onDelete: SetNull)
   customerCurrencies   CustomerCurrency[]
-  orders               Order[]
-  notifications        AiNotification[]
-  announcementMessages AnnouncementMessage[]
-  whatsappGroup        WhatsappGroup?        // علاقة عكسية — مجموعة واتساب اختيارية
+  orders        Order[]
+  notifications AiNotification[]
 
   @@index([isActive])
   @@index([priceLabelId])
@@ -118,10 +159,9 @@ model Supervisor {
   name           String
   notes          String?
   isActive       Boolean                   @default(true)
-  contacts       Contact[]
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
-  whatsappGroups WhatsappGroupSupervisor[] // علاقة عكسية
+  contacts  Contact[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive])
   @@map("Supervisor")
@@ -168,9 +208,9 @@ model CustomerCurrency {
 // ── Product Images ───────────────────────────────────────────
 
 model ProductImage {
-  id        String  @id @default(uuid())
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid())
+  skcId   String
+  skc     SKC    @relation(fields: [skcId], references: [id], onDelete: Cascade)
 
   url       String
   filename  String
@@ -184,31 +224,46 @@ model ProductImage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  variants Variant[] @relation("VariantToProductImages")
-
-  @@unique([productId, url])
+  @@unique([skcId, url])
+  @@index([skcId])
 }
 
-// ── Variants ────────────────────────────────────────────────
+// ── SKC / SKU (SPU inventory hierarchy) ─────────────────────
 
-model Variant {
+model SKC {
+  id          String         @id @default(uuid())
+  itemNumber  String?        @unique // Optional manual item code (barcode)
+  attributes  Json?          @db.JsonB // { [ProductAttribute.code]: string }
+  colorId     String
+  color       Color          @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  isDefault   Boolean        @default(false)
+  order       Int            @default(0)
+  isAvailable Boolean        @default(true)
+  productId   String
+  product     Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  skus        SKU[]
+  images      ProductImage[]
+
+  @@unique([productId, colorId])
+}
+
+model SKU {
   id            String         @id @default(uuid())
-  variantNumber String         @unique
-  suffix        String
-  name          String
-  type          String         @default("color")
-  hex           String?
-  price         Decimal?       @db.Decimal(12, 2)
-  order         Int            @default(0)
+  skuCode       String         @unique
+  sizeLabel     String?
+  isAvailable   Boolean        @default(true)
   isDefault     Boolean        @default(false)
-  productId     String
-  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order         Int            @default(0)
+  skcId         String
+  skc           SKC            @relation(fields: [skcId], references: [id], onDelete: Cascade)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  variantImages ProductImage[] @relation("VariantToProductImages")
+  productPrices ProductPrice[]
   orderItems    OrderItem[]
 
-  @@unique([productId, suffix])
+  @@unique([skcId, sizeLabel])
 }
 
 // ── Pricing ──────────────────────────────────────────────────
@@ -222,6 +277,7 @@ model PriceLabel {
   isDefault     Boolean        @default(false)
   customers     Customer[]
   productPrices ProductPrice[]
+  orderItems    OrderItem[]    // علاقة عكسية — snapshot
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -236,14 +292,15 @@ model Currency {
   exchangeRate       Decimal?           @db.Decimal(18, 6)
   productPrices      ProductPrice[]
   customerCurrencies CustomerCurrency[]
+  orderItems         OrderItem[]        // علاقة عكسية — snapshot
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
 
 model ProductPrice {
   id               String     @id @default(uuid())
-  productId        String
-  product          Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  skuId            String
+  sku              SKU        @relation(fields: [skuId], references: [id], onDelete: Cascade)
   priceLabelId     String
   priceLabel       PriceLabel @relation(fields: [priceLabelId], references: [id], onDelete: Cascade)
   currencyId       String
@@ -255,7 +312,7 @@ model ProductPrice {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  @@unique([productId, priceLabelId, currencyId, unitId])
+  @@unique([skuId, priceLabelId, currencyId, unitId])
 }
 
 model ProductUnit {
@@ -283,20 +340,22 @@ model Unit {
 
   productPrices ProductPrice[]
   productUnits  ProductUnit[]
+  orderItems    OrderItem[]
 }
 
 // ── Orders ───────────────────────────────────────────────────
 
 model Order {
-  id          String      @id @default(uuid())
-  orderNumber String      @unique
-  customerId  String?
-  customer    Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  status      String      @default("pending")
-  notes       String?
-  items       OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id           String      @id @default(uuid())
+  orderNumber  String      @unique
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  status       OrderStatus @default(pending)
+  notes        String?
+  deliveryInfo String?     // معلومات التوصيل — نص حر (عنوان، كوريير، ملاحظات)
+  items        OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@index([customerId])
   @@index([status])
@@ -310,11 +369,24 @@ model OrderItem {
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String?
   product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variantId String?
-  variant   Variant?  @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  skuId     String?
+  sku       SKU?      @relation(fields: [skuId], references: [id], onDelete: SetNull)
+  unitId    String?
+  unit      Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
   quantity  Int       @default(1)
   notes     String?
+
+  // Snapshot — السعر المُثبَّت وقت إنشاء الطلب (لا يتأثر بتغيير الأسعار لاحقاً)
+  unitPrice    Decimal?    @db.Decimal(12, 2)
+  currencyId   String?
+  currency     Currency?   @relation(fields: [currencyId], references: [id], onDelete: SetNull)
+  priceLabelId String?
+  priceLabel   PriceLabel? @relation(fields: [priceLabelId], references: [id], onDelete: SetNull)
+
   createdAt DateTime  @default(now())
+
+  @@index([orderId])
+  @@index([unitId])
 }
 
 // ── Notifications ────────────────────────────────────────────
@@ -376,119 +448,4 @@ model StoreSettings {
   socialLinks  Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-}
-
-// ── Announcements ────────────────────────────────────────────
-
-model MessageTemplate {
-  id            String         @id @default(uuid())
-  name          String
-  type          String         @default("text")
-  sendMode      String         @default("combined")
-  bodyTemplate  String         @db.Text
-  productBlock  String         @db.Text
-  separator     String         @default("\n---\n")
-  isDefault     Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  announcements Announcement[]
-
-  @@index([isDefault])
-}
-
-model Announcement {
-  id                  String                @id @default(uuid())
-  title               String
-  description         String?
-  status              String                @default("pending")
-  scheduledAt         DateTime
-  sentAt              DateTime?
-  personFilters       Json
-  productFilters      Json
-  templateId          String?
-  template            MessageTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  delayBetweenSeconds Int                   @default(0)
-  sendWindowStart     String?
-  sendWindowEnd       String?
-  queueingProgress    Int                   @default(0)
-  createdBy           String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  messages            AnnouncementMessage[]
-}
-
-model AnnouncementMessage {
-  id             String       @id @default(uuid())
-  announcementId String
-  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  messageIndex   Int
-  customerId     String
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerName   String?
-  whatsappNumber String?
-  productIds     Json         @default("[]")
-  messageBody    String       @db.Text
-  imageUrls      Json         @default("[]")
-  status         String       @default("pending")
-  providerId     String?
-  errorReason    String?
-  retryCount     Int          @default(0)
-  queuedAt       DateTime     @default(now())
-  sentAt         DateTime?
-
-  @@unique([announcementId, customerId])
-  @@index([announcementId])
-  @@index([announcementId, status])
-  @@index([customerId])
-  @@index([announcementId, messageIndex])
-  @@index([status])
-}
-
-// ── Product Code Sequences ───────────────────────────────────
-
-model ProductCodeSequence {
-  id           String   @id @default(uuid())
-  categoryCode String
-  brandCode    String
-  lastSequence Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([categoryCode, brandCode])
-}
-
-// ── WhatsApp Groups ───────────────────────────────────────────────────
-
-// مجموعة واتساب — تربط عميلاً واحداً بمشرفين عدة
-model WhatsappGroup {
-  id          String   @id @default(uuid())
-  code        String   @unique // كود مكون من 3 حروف/أرقام
-  groupNumber String?  @unique // معرّف المجموعة على واتساب: "120363...@g.us"
-  name        String // اسم وصفي للمجموعة
-  notes       String? // ملاحظات داخلية
-  isActive    Boolean  @default(true)
-
-  // علاقة 1-to-1 مع العميل — عميل واحد فقط لكل مجموعة
-  customerId  String   @unique
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  // علاقة many-to-many مع المشرفين
-  supervisors WhatsappGroupSupervisor[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive])
-  @@map("WhatsappGroup")
-}
-
-// جدول وسيط بسيط — بدون حقول إضافية
-model WhatsappGroupSupervisor {
-  groupId      String
-  group        WhatsappGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  supervisorId String
-  supervisor   Supervisor    @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
-
-  @@id([groupId, supervisorId])
-  @@map("WhatsappGroupSupervisor")
 }

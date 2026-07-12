@@ -51,7 +51,9 @@ interface HeaderProps {
 
 const routeMap: Record<string, string> = {
     "/": "لوحة التحكم",
-    "/inventory": "المخزون",
+    "/products": "المنتجات",
+    "/items": "الأصناف",
+    "/inventory": "المنتجات",
     "/inventory/new-tags": "المنتجات الجديدة",
     "/categories": "التصنيفات",
     "/customers": "العملاء",
@@ -61,8 +63,6 @@ const routeMap: Record<string, string> = {
     "/gallery": "معرض الصور",
     "/orders": "الطلبات",
     "/notifications": "الإشعارات",
-    "/announcements":           "الإعلانات",
-    "/announcements/templates": "قوالب الرسائل",
     "/users": "المستخدمين",
     "/profile": "الملف الشخصي",
 }
@@ -121,13 +121,19 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
     const segments = pathname.split("/").filter(Boolean)
     const breadcrumbs = segments.map((segment, index) => {
         const url = `/${segments.slice(0, index + 1).join("/")}`
+        let label = routeMap[url] || segment
+        if (segments[0] === "items" && index === 1) {
+            label = "تفاصيل الصنف"
+        }
         return {
-            label: routeMap[url] || segment,
+            label,
             href: url,
         }
     })
 
-    const currentPageTitle = routeMap[pathname] || "لوحة التحكم"
+    const currentPageTitle = routeMap[pathname]
+        || (segments[0] === "items" && segments.length === 2 ? "تفاصيل الصنف" : null)
+        || "لوحة التحكم"
 
     return (
         <header className="sticky top-0 z-30 border-b glass-panel backdrop-blur-xl bg-background/60">

@@ -33,10 +33,10 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                         <tr>
                             <th className="px-4 py-3 font-medium text-right w-10">الحالة</th>
                             <th className="px-4 py-3 font-medium text-right min-w-[200px]">الاسم (name)</th>
-                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">رقم المنتج (itemNumber)</th>
-                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">كود الصنف (categoryCode)</th>
-                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">كود البرند (brandCode)</th>
-                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">كود المنتج (معاينة)</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[100px]">رقم المنتج</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">رقم الصنف (itemNumber)</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">كود التصنيف (categoryCode)</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[120px]">كود البرند (brandCode)</th>
                             <th className="px-4 py-3 font-medium text-right w-16">إجراء</th>
                         </tr>
                     </thead>
@@ -63,9 +63,18 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                                 </td>
                                 <td className="px-4 py-2">
                                     <Input
+                                        value={row.productNumber}
+                                        onChange={(e) => onRowChange(row._id, 'productNumber', e.target.value.toUpperCase())}
+                                        maxLength={3}
+                                        className={`h-8 font-mono text-xs uppercase ${!row.isValid && row.errors.some(e => e.includes('رقم المنتج')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                        dir="ltr"
+                                    />
+                                </td>
+                                <td className="px-4 py-2">
+                                    <Input
                                         value={row.itemNumber}
                                         onChange={(e) => onRowChange(row._id, 'itemNumber', e.target.value)}
-                                        className={`h-8 ${!row.isValid && row.errors.some(e => e.includes('رقم المنتج')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                        className={`h-8 ${!row.isValid && row.errors.some(e => e.includes('رقم الصنف')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                                     />
                                 </td>
                                 <td className="px-4 py-2">
@@ -85,9 +94,6 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                                         className={`h-8 font-mono text-xs ${!row.isValid && row.errors.some(e => e.includes('الماركة')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                                         placeholder="أدخل الكود..."
                                     />
-                                </td>
-                                <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                                    {row.productCodePreview}
                                 </td>
                                 <td className="px-4 py-2">
                                     <div className="flex gap-1">

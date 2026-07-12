@@ -26,7 +26,6 @@ export interface ProductSummary {
     itemNumber: string
     name: string
     brand: string | null
-    isAvailable: boolean
 }
 
 export interface CategorySummary {
@@ -112,26 +111,44 @@ export interface ProductPriceFull {
 export interface OrderItemFull {
     id: string
     productId: string | null
-    product: { id: string; name: string; itemNumber: string } | null
-    priceLabelId: string | null
-    priceLabel: PriceLabelSummary | null
-    variantId: string | null
-    variant: { id: string; name: string; hex: string | null; type: string } | null
-    unitPrice: number
-    currencyId: string | null
-    currency: CurrencySummary | null
+    product: {
+        id: string
+        name: string
+        productNumber: string
+        productPrices?: Array<{
+            priceLabelId: string
+            value: number
+            priceLabel?: { id: string; name: string; isDefault: boolean } | null
+            currency?: { id: string; symbol: string; code: string } | null
+        }>
+    } | null
+    skuId: string | null
+    sku: {
+        id: string
+        skuCode: string
+        sizeLabel: string | null
+        skc?: { id: string; color: { id: string; code: string; name: string; hexCode: string } } | null
+    } | null
+    unitId: string | null
+    unit: { id: string; name: string; pluralName: string | null } | null
     quantity: number
     notes: string | null
+    // Snapshot — السعر المُثبَّت وقت إنشاء الطلب
+    unitPrice:    number | null
+    currencyId:   string | null
+    currency:     { id: string; symbol: string; code: string } | null
+    priceLabelId: string | null
+    priceLabel:   { id: string; name: string } | null
 }
 
 export interface OrderFull {
     id: string
     orderNumber: string
     customerId: string | null
-    customer: CustomerSummary | null
+    customer: { id: string; name: string | null; priceLabelId: string | null } | null
     status: string
     notes: string | null
-    totalAmount: number | null
+    deliveryInfo: string | null
     items: OrderItemFull[]
     createdAt: Date | string
     updatedAt: Date | string
@@ -146,3 +163,4 @@ export type OrderStatus =
     | 'shipped'
     | 'delivered'
     | 'cancelled'
+

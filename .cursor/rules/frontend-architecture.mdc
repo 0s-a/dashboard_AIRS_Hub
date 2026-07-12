@@ -1,0 +1,45 @@
+---
+description: هيكل الصفحات — Server/Client، تخطيط ملفات، navigation
+globs: app/**/page.tsx,app/**/layout.tsx
+alwaysApply: false
+---
+
+# Frontend Architecture
+
+## Server vs Client
+
+- الصفحة **Server Component** افتراضياً — جلب البيانات عبر Server Actions في `page.tsx`
+- `"use client"` على **المكوّن** لا الصفحة عند الحاجة للتفاعل فقط (sheet، form، table)
+- لا منطق أعمال في components — استدعِ `lib/actions/` فقط
+
+## شجرة قرار الصفحة
+
+| الحالة | النمط |
+|--------|-------|
+| كتالوج صغير (< ~200 صف) | Server page + client `*-table.tsx` (مفضّل) |
+| قائمة كبيرة / pagination | Server page + client table + `ServerPagination` — نموذج: `products/`, `items/` |
+| تفاعل فقط | `"use client"` على المكوّن (sheet/form) لا الصفحة كاملة |
+
+## تخطيط الملفات
+
+```
+components/{domain}/columns.tsx
+components/{domain}/*-table.tsx
+components/{domain}/*-form.tsx
+components/{domain}/*-sheet.tsx
+```
+
+- **ممنوع:** `columns.tsx` داخل `app/` أو جذر `components/`
+- استثناء مؤقت: `components/columns.tsx` (عملاء) — يُنقل لاحقاً
+- نموذج CRUD: `components/colors/`
+
+## Dashboard Shell
+
+- Sidebar: `lib/navigation.ts` — مصدر الحقيقة الوحيد
+- `command-palette.tsx` يستورد من `lib/navigation.ts` — لا قوائم مكررة
+- صفحة dashboard جديدة: حدّث `lib/navigation.ts`
+- `export const dynamic = "force-dynamic"` للصفحات ذات البيانات الحية
+
+## استثناءات
+
+- `app/login/page.tsx` — خارج dashboard layout، نمط مستقل

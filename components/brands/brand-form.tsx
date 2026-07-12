@@ -27,8 +27,8 @@ const brandSchema = z.object({
 
     code: z
         .string()
-        .length(2, "الكود يجب أن يكون حرفين بالضبط")
-        .regex(/^[A-Za-z]{2}$/, "الكود يجب أن يحتوي على حروف إنجليزية فقط"),
+        .length(1, "الكود يجب أن يكون حرفاً أو رقماً واحداً")
+        .regex(/^[A-Za-z0-9]{1}$/, "الكود يجب أن يحتوي على حرف إنجليزي أو رقم فقط"),
 
     description: z
         .string()
@@ -135,16 +135,16 @@ export function BrandForm({ brand, onSuccess }: BrandFormProps) {
                                     <FormControl>
                                         <Input
                                             {...field}
-                                            placeholder="SM"
+                                            placeholder="S"
                                             dir="ltr"
-                                            maxLength={2}
-                                            className="font-mono uppercase w-24 tracking-widest focus-visible:ring-primary/20"
+                                            maxLength={1}
+                                            className="font-mono uppercase w-16 tracking-widest focus-visible:ring-primary/20"
                                             // Auto-uppercase as the user types
                                             onChange={e => field.onChange(e.target.value.toUpperCase())}
                                         />
                                     </FormControl>
                                     <FormDescription className="text-[11px]">
-                                        حرفان إنجليزيان — يُستخدم في تكوين رقم الصنف
+                                        حرف أو رقم إنجليزي واحد — يُستخدم في رقم المنتج
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>

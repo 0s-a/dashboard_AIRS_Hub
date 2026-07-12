@@ -16,14 +16,12 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import {
-    addProductImage,
+    addSkcImage,
     removeProductImage,
     setPrimaryProductImage,
     reorderProductImages,
-    toggleVariantForProductImage,
 } from "@/lib/actions/product-images"
 import type { ProductImageRecord } from "@/lib/actions/product-images"
-import type { VariantRecord } from "@/lib/actions/variants"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -45,9 +43,8 @@ interface UploadingImage {
 
 interface ImageGalleryUploadProps {
     images: ProductImageRecord[]
-    productId: string
+    skcId: string
     productItemNumber: string
-    variants?: VariantRecord[]
     maxImages?: number
     disabled?: boolean
     className?: string
@@ -58,9 +55,8 @@ interface ImageGalleryUploadProps {
 
 export function ImageGalleryUpload({
     images,
-    productId,
+    skcId,
     productItemNumber,
-    variants = [],
     maxImages = 10,
     disabled = false,
     className,
@@ -108,7 +104,7 @@ export function ImageGalleryUpload({
                     prev.map((u) => (u.id === item.id ? { ...u, progress: 30 } : u))
                 )
 
-                const result = await addProductImage(productId, item.file)
+                const result = await addSkcImage(skcId, item.file)
 
                 setUploading((prev) =>
                     prev.map((u) =>
@@ -140,7 +136,7 @@ export function ImageGalleryUpload({
                 prev.filter((u) => !newUploading.find((n) => n.id === u.id))
             )
         },
-        [images, uploading, productId, maxImages, onImagesChange]
+        [images, uploading, skcId, maxImages, onImagesChange]
     )
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -184,17 +180,6 @@ export function ImageGalleryUpload({
             onImagesChange?.()
         } else {
             toast.error('فشل حذف الصورة', { description: result.error })
-        }
-    }
-
-    const handleSetVariant = async (imageId: string, variantId: string) => {
-        setUpdatingVariantId(imageId)
-        const result = await toggleVariantForProductImage(imageId, variantId)
-        setUpdatingVariantId(null)
-        if (result.success) {
-            onImagesChange?.()
-        } else {
-            toast.error('فشل تحديث المتغير', { description: result.error })
         }
     }
 
@@ -252,7 +237,7 @@ export function ImageGalleryUpload({
                 </div>
                 {images.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                        رتب الصور أو اسحبها لتعيين العلاقة مع المتغيرات
+                        اسحب لإعادة الترتيب — انقر على النجمة للصورة الرئيسية
                     </p>
                 )}
             </div>
@@ -262,8 +247,6 @@ export function ImageGalleryUpload({
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {/* Existing images */}
                     {images.map((img, index) => {
-                        const linkedVariants = variants.filter(v => img.variantIds?.includes(v.id))
-                        
                         return (
                             <div
                                 key={img.id}
@@ -276,12 +259,10 @@ export function ImageGalleryUpload({
                                     "group relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-grab active:cursor-grabbing",
                                     img.isPrimary
                                         ? "border-primary shadow-md shadow-primary/20"
-                                        : linkedVariants.length > 0
-                                            ? "border-primary/40 shadow-sm"
-                                            : "border-border/50 hover:border-primary/40",
+                                        : "border-border/50 hover:border-primary/40",
                                     dragOverIndex === index && draggingIndex !== index && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[0.97]",
                                     draggingIndex === index && "opacity-40 scale-95 shadow-none",
-                                    (removingId === img.id || updatingVariantId === img.id) && "opacity-50 pointer-events-none"
+                                    (removingId === img.id) && "opacity-50 pointer-events-none"
                                 )}
                             >
                                 <Image
@@ -331,54 +312,7 @@ export function ImageGalleryUpload({
                                         </button>
                                     </div>
 
-                                    {/* Variant Selector Button */}
-                                    {variants.length > 0 && (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <button
-                                                    className={cn(
-                                                        "opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold shadow-sm whitespace-nowrap",
-                                                        linkedVariants.length > 0 
-                                                            ? "bg-primary text-white" 
-                                                            : "bg-white/90 text-foreground hover:bg-white"
-                                                    )}
-                                                >
-                                                    {updatingVariantId === img.id ? (
-                                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                                    ) : (
-                                                        <Tag className="h-3 w-3" />
-                                                    )}
-                                                    {linkedVariants.length > 0 ? `${linkedVariants.length} متغيرات` : "ربط بمتغير"}
-                                                </button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="center" className="w-48">
-                                                <DropdownMenuLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                                    اختر المتغير
-                                                </DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                {variants.map(v => (
-                                                    <DropdownMenuItem 
-                                                        key={v.id} 
-                                                        onClick={(e) => {
-                                                            e.preventDefault() // prevent closing menu
-                                                            handleSetVariant(img.id, v.id)
-                                                        }}
-                                                        className="flex items-center gap-2 cursor-pointer"
-                                                    >
-                                                        {v.hex ? (
-                                                            <div className="h-3 w-3 rounded-full border border-black/10" style={{ backgroundColor: v.hex }} />
-                                                        ) : (
-                                                            <div className="h-3 w-3 rounded-full bg-muted border border-border" />
-                                                        )}
-                                                        <span className="flex-1">{v.name}</span>
-                                                        <span className="text-[10px] font-mono text-muted-foreground">{v.suffix}</span>
-                                                        {img.variantIds?.includes(v.id) && <Check className="h-3 w-3 ml-auto text-primary" />}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    )}
-                                </div>
+                                    </div>
 
                                 {/* Persistent Badges (Always visible) */}
                                 <div className="absolute top-1 right-1 flex flex-col items-end gap-1 pointer-events-none">
@@ -390,15 +324,6 @@ export function ImageGalleryUpload({
                                         </div>
                                     )}
                                     
-                                    {/* Variant Badges */}
-                                    {linkedVariants.map(v => (
-                                        <div key={v.id} className="bg-background/90 backdrop-blur-sm text-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-border/50 shadow-sm flex items-center gap-1">
-                                            {v.hex && (
-                                                <div className="h-2 w-2 rounded-full border border-black/10" style={{ backgroundColor: v.hex }} />
-                                            )}
-                                            {v.name}
-                                        </div>
-                                    ))}
                                 </div>
 
                                 {/* Drag handle */}

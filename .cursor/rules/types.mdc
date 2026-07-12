@@ -1,0 +1,13 @@
+---
+description: أنواع TypeScript و Prisma schema
+globs: lib/types/**,prisma/schema.prisma
+alwaysApply: false
+---
+
+# Types & Schema
+
+- مصدر الحقيقة: `prisma/schema.prisma`
+- بعد تغيير schema: `npm run db:generate` + حدّث `lib/types/`
+- includes مشتركة: `lib/prisma-includes.ts`
+- Server Actions تُرجع `ActionResult<T>` من `lib/types`
+- لا تكرر أنواع Prisma — استخدم `@prisma/client` أو types مشتقة

@@ -1,0 +1,16 @@
+---
+description: معايير أساسية لمشروع Nawaat CRM
+alwaysApply: true
+---
+
+# Nawaat — Core Conventions
+
+- الواجهة عربية RTL؛ رسائل الخطأ والـ UI بالعربية
+- أقل diff ممكن — لا تعيد هيكلة ملفات غير مطلوبة
+- Server Actions في `lib/actions/` — لا منطق أعمال في components
+- استخدم الأنماط الموجودة قبل إنشاء abstractions جديدة
+- عند إضافة صفحة dashboard: حدّث `lib/navigation.ts`
+- لا تضع أسراراً في الملفات المُلتزَم بها
+- لا تعتمد على README للتقنيات — راجع `AGENTS.md` و `PROJECT.md`
+- أوامر npm: راجع جدول **أوامر التطوير** في `AGENTS.md`
+- قبل PR: Bugbot review + `npm run lint` + `npm run build`

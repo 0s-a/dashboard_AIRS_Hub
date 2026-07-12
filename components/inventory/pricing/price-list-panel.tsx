@@ -52,7 +52,7 @@ type EditingState = {
 } | null
 
 interface PriceListPanelProps {
-    productId: string
+    skuId: string
     prices: SerializedPrice[]
     productUnits: ProductUnitEntry[]
     priceLabels: { id: string; name: string; isDefault?: boolean }[]
@@ -61,7 +61,7 @@ interface PriceListPanelProps {
 }
 
 export function PriceListPanel({
-    productId, prices, productUnits, priceLabels, currencies, onPricesChange
+    skuId, prices, productUnits, priceLabels, currencies, onPricesChange
 }: PriceListPanelProps) {
     const [isPending, startTransition] = useTransition()
     const [editing, setEditing] = useState<EditingState>(null)
@@ -187,7 +187,7 @@ export function PriceListPanel({
                 {/* Smart pricing wizard */}
                 {!comparisonView && isAddingAuto && (
                     <SmartPricingWizard
-                        productId={productId}
+                        skuId={skuId}
                         productUnits={productUnits}
                         priceLabels={priceLabels}
                         currencies={currencies}
@@ -199,7 +199,7 @@ export function PriceListPanel({
                 {/* Single price form */}
                 {isAddingSingle && (
                     <SinglePriceForm
-                        productId={productId}
+                        skuId={skuId}
                         productUnits={productUnits}
                         priceLabels={priceLabels}
                         currencies={currencies}
@@ -374,7 +374,7 @@ export function PriceListPanel({
                     onConfirm={async (toLabelId, pct) => {
                         const { copyPriceLabelPrices } = await import('@/lib/actions/inventory')
                         startTransition(async () => {
-                            const res = await copyPriceLabelPrices(productId, copyDialog.fromLabelId, toLabelId, pct)
+                            const res = await copyPriceLabelPrices(skuId, copyDialog.fromLabelId, toLabelId, pct)
                             if (res.success && res.data) {
                                 onPricesChange((res.data as any).productPrices || [])
                                 toast.success("تم نسخ الأسعار بنجاح")

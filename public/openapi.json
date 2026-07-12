@@ -43,10 +43,6 @@
     {
       "name": "Notifications",
       "description": "إشعارات الذكاء الاصطناعي — تنبيهات بحث الزبائن عبر البوت"
-    },
-    {
-      "name": "Announcements",
-      "description": "استعراض الإعلانات المرسلة عبر النظام"
     }
   ],
   "paths": {
@@ -1162,182 +1158,126 @@
       }
     },
     "/api/v1/bot/orders": {
-      "post": {
-        "tags": [
-          "Orders"
+      "get": {
+        "tags": ["Orders"],
+        "summary": "قائمة / تفاصيل / طلب معلّق",
+        "description": "GET بدون id وبدون pending → قائمة. ?id=uuid → تفاصيل. ?pending=true&phone= → آخر طلب معلّق.",
+        "operationId": "getOrders",
+        "parameters": [
+          { "name": "pending", "in": "query", "schema": { "type": "boolean" }, "description": "true = آخر طلب معلّق (يتطلب customerId أو phone)" },
+          { "name": "id", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "UUID الطلب — تفاصيل" },
+          { "name": "customerId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "phone", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"] } },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "بحث برقم الطلب" },
+          { "name": "dateFrom", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "dateTo", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1, "minimum": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "minimum": 1, "maximum": 100 } }
         ],
+        "responses": {
+          "200": { "description": "نجاح", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": {}, "pagination": { "$ref": "#/components/schemas/PaginationMeta" } } } } } },
+          "400": { "description": "VALIDATION_ERROR" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Orders"],
         "summary": "إنشاء طلب جديد",
-        "description": "إنشاء طلب جديد بإرسال مصفوفة البنود `items` شاملة `productId` و `priceLabelId` لكل صنف. يدعم تحديد العميل بالـ `personId` أو `groupNumber`.\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X POST \"http://localhost:3000/api/v1/bot/orders\" \\\n  -H \"x-api-key: YOUR_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"personId\": \"uuid-person\", \"notes\": \"طلب من الواتساب\", \"items\": [{\"productId\": \"uuid-product-1\", \"priceLabelId\": \"uuid-price-label\", \"variantId\": \"uuid-variant\", \"quantity\": 2, \"notes\": \"ملاحظة على البند\"}]}'\n```\n",
+        "description": "إنشاء طلب فارغ (سلة واتساب) أو مع بنود. snapshot السعر يُحسب تلقائياً.",
         "operationId": "createOrder",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateOrderInput"
-              },
-              "example": {
-                "personId": "uuid-person",
-                "notes": "طلب من الواتساب",
-                "items": [
-                  {
-                    "productId": "uuid-product-1",
-                    "priceLabelId": "uuid-price-label",
-                    "variantId": "uuid-variant",
-                    "quantity": 2,
-                    "notes": "ملاحظة على البند"
-                  }
-                ]
-              }
+              "schema": { "$ref": "#/components/schemas/CreateOrderInput" }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "تم إنشاء الطلب بنجاح",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Order"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "بيانات غير صالحة أو تسعيرة مفقودة",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "بيانات غير صالحة"
-                    },
-                    "details": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
+          "201": { "description": "تم إنشاء الطلب", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Order" } } } } } },
+          "400": { "description": "VALIDATION_ERROR" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       },
-      "get": {
-        "tags": [
-          "Orders"
-        ],
-        "summary": "قائمة الطلبات",
-        "description": "جلب قائمة الطلبات مع دعم التصفية حسب العميل (personId أو groupNumber) والحالة (status) والصفحات.\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X GET \"http://localhost:3000/api/v1/bot/orders\" \\\n  -H \"x-api-key: YOUR_API_KEY\"\n```\n",
-        "operationId": "listOrders",
+      "patch": {
+        "tags": ["Orders"],
+        "summary": "تحديث طلب",
+        "operationId": "updateOrder",
+        "parameters": [{ "name": "id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateOrderInput" } } } },
+        "responses": {
+          "200": { "description": "تم التحديث" },
+          "400": { "description": "VALIDATION_ERROR" },
+          "409": { "description": "ORDER_NOT_MUTABLE" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "tags": ["Orders"],
+        "summary": "حذف طلب",
+        "operationId": "deleteOrder",
+        "parameters": [{ "name": "id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "تم الحذف" },
+          "400": { "description": "VALIDATION_ERROR" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/bot/orders/items": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "إضافة أو دمج بند",
+        "operationId": "addOrderItem",
+        "parameters": [{ "name": "orderId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrderItemInput" } } } },
+        "responses": {
+          "201": { "description": "بند جديد" },
+          "200": { "description": "تم دمج الكمية" },
+          "409": { "description": "ORDER_NOT_MUTABLE" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "put": {
+        "tags": ["Orders"],
+        "summary": "استبدال كامل للبنود",
+        "operationId": "replaceOrderItems",
+        "parameters": [{ "name": "orderId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReplaceOrderItemsInput" } } } },
+        "responses": {
+          "200": { "description": "تم الاستبدال" },
+          "409": { "description": "ORDER_NOT_MUTABLE" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "patch": {
+        "tags": ["Orders"],
+        "summary": "تعديل بند",
+        "operationId": "updateOrderItem",
         "parameters": [
-          {
-            "name": "personId",
-            "in": "query",
-            "description": "فلترة حسب UUID العميل",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "groupNumber",
-            "in": "query",
-            "description": "فلترة حسب رقم المجموعة (يبحث عن العميل تلقائياً)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "description": "فلترة حسب حالة الطلب",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "pending",
-                "confirmed",
-                "processing",
-                "shipped",
-                "delivered",
-                "cancelled"
-              ]
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "description": "رقم الصفحة (افتراضي: 1)",
-            "schema": {
-              "type": "integer",
-              "default": 1,
-              "minimum": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "عدد النتائج (افتراضي: 20، أقصى: 50)",
-            "schema": {
-              "type": "integer",
-              "default": 20,
-              "minimum": 1,
-              "maximum": 50
-            }
-          }
+          { "name": "orderId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateOrderItemInput" } } } },
+        "responses": {
+          "200": { "description": "تم التعديل" },
+          "409": { "description": "ORDER_NOT_MUTABLE" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "tags": ["Orders"],
+        "summary": "حذف بند",
+        "operationId": "deleteOrderItem",
+        "parameters": [
+          { "name": "orderId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "itemId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": {
-          "200": {
-            "description": "قائمة الطلبات",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Order"
-                      }
-                    },
-                    "count": {
-                      "type": "integer",
-                      "example": 5
-                    },
-                    "pagination": {
-                      "$ref": "#/components/schemas/PaginationMeta"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
+          "200": { "description": "تم الحذف" },
+          "409": { "description": "ORDER_NOT_MUTABLE" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
     },
@@ -1637,104 +1577,6 @@
                       "type": "integer",
                       "example": 10
                     }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/api/v1/bot/announcements": {
-      "get": {
-        "tags": [
-          "Announcements"
-        ],
-        "summary": "قائمة الإعلانات",
-        "description": "جلب قائمة الإعلانات (رسائل الترويج/التنبيهات) المرسلة عبر النظام. افتراضياً يجلب الإعلانات المُرسلة (sent).\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X GET \"http://localhost:3000/api/v1/bot/announcements\" \\\n  -H \"x-api-key: YOUR_API_KEY\"\n```\n",
-        "operationId": "listAnnouncements",
-        "parameters": [
-          {
-            "name": "status",
-            "in": "query",
-            "description": "فلترة حسب حالة الإعلان (sent, draft, sending)",
-            "schema": {
-              "type": "string"
-            },
-            "example": "sent"
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "description": "رقم الصفحة",
-            "schema": {
-              "type": "integer",
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "عدد النتائج في الصفحة",
-            "schema": {
-              "type": "integer",
-              "default": 50
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "قائمة الإعلانات",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Announcement"
-                      }
-                    },
-                    "count": {
-                      "type": "integer",
-                      "example": 10
-                    },
-                    "pagination": {
-                      "$ref": "#/components/schemas/PaginationMeta"
-                    }
-                  }
-                },
-                "example": {
-                  "success": true,
-                  "count": 1,
-                  "data": [
-                    {
-                      "id": "123e4567-e89b-12d3-a456-426614174000",
-                      "title": "إعلان خصومات الشتاء",
-                      "status": "sent",
-                      "sentAt": "2026-05-20T10:00:00.000Z",
-                      "createdAt": "2026-05-19T10:00:00.000Z",
-                      "_count": {
-                        "messages": 500
-                      }
-                    }
-                  ],
-                  "pagination": {
-                    "total": 1,
-                    "page": 1,
-                    "limit": 50,
-                    "totalPages": 1
                   }
                 }
               }
@@ -2206,6 +2048,32 @@
           }
         }
       },
+      "SKU": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "skuCode": { "type": "string", "example": "ELC-AP-0001-RED-30ML" },
+          "sizeLabel": { "type": "string", "nullable": true, "example": "30ml" },
+          "isDefault": { "type": "boolean" },
+          "isAvailable": { "type": "boolean" },
+          "order": { "type": "integer" }
+        }
+      },
+      "SKC": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "colorCode": { "type": "string", "example": "RD" },
+          "colorName": { "type": "string", "example": "أحمر" },
+          "hexCode": { "type": "string", "example": "#EF4444" },
+          "isDefault": { "type": "boolean" },
+          "isAvailable": { "type": "boolean" },
+          "skus": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SKU" }
+          }
+        }
+      },
       "Variant": {
         "type": "object",
         "properties": {
@@ -2299,77 +2167,71 @@
               "$ref": "#/components/schemas/ProductPrice"
             }
           },
-          "variants": {
+          "skcs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Variant"
+              "$ref": "#/components/schemas/SKC"
             }
           }
         }
       },
       "OrderItemInput": {
         "type": "object",
-        "required": [
-          "productId",
-          "priceLabelId"
-        ],
-        "description": "بند في الطلب — يتطلب مٌعرف المنتج (productId) ومُعرف التسعيرة (priceLabelId).",
+        "required": ["productId"],
+        "description": "بند في الطلب — snapshot السعر يُحسب تلقائياً إن لم يُمرَّر unitPrice.",
         "properties": {
-          "productId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "UUID المنتج"
-          },
-          "priceLabelId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "UUID التسعيرة المطبقة"
-          },
-          "variantId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "UUID المتغير (اختياري)"
-          },
-          "quantity": {
-            "type": "integer",
-            "minimum": 1,
-            "default": 1,
-            "description": "الكمية"
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true,
-            "description": "ملاحظة على البند"
-          }
+          "productId": { "type": "string", "format": "uuid" },
+          "skuId": { "type": "string", "format": "uuid", "nullable": true },
+          "unitId": { "type": "string", "format": "uuid", "nullable": true },
+          "quantity": { "type": "integer", "minimum": 1, "default": 1 },
+          "notes": { "type": "string", "nullable": true },
+          "unitPrice": { "type": "number", "nullable": true, "description": "override اختياري للsnapshot" },
+          "currencyId": { "type": "string", "format": "uuid", "nullable": true },
+          "priceLabelId": { "type": "string", "format": "uuid", "nullable": true }
         }
       },
       "CreateOrderInput": {
         "type": "object",
-        "required": [
-          "items"
-        ],
-        "description": "إنشاء طلب من خلال تقديم مصفوفة items.",
+        "description": "إنشاء طلب — items اختيارية (فارغ = سلة واتساب).",
         "properties": {
-          "personId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "UUID العميل (أو استخدم groupNumber)"
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true,
-            "description": "ملاحظات على الطلب"
-          },
+          "customerId": { "type": "string", "format": "uuid", "nullable": true },
+          "notes": { "type": "string", "nullable": true },
+          "deliveryInfo": { "type": "string", "nullable": true },
           "items": {
             "type": "array",
-            "description": "بنود الطلب (مطلوب منتج واحد على الأقل)",
-            "items": {
-              "$ref": "#/components/schemas/OrderItemInput"
-            },
-            "minItems": 1
+            "items": { "$ref": "#/components/schemas/OrderItemInput" },
+            "default": []
           }
+        }
+      },
+      "UpdateOrderInput": {
+        "type": "object",
+        "description": "تحديث جزئي — status و/أو metadata.",
+        "properties": {
+          "status": { "type": "string", "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"] },
+          "notes": { "type": "string", "nullable": true },
+          "deliveryInfo": { "type": "string", "nullable": true },
+          "customerId": { "type": "string", "format": "uuid", "nullable": true }
+        }
+      },
+      "ReplaceOrderItemsInput": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/components/schemas/OrderItemInput" }
+          }
+        }
+      },
+      "UpdateOrderItemInput": {
+        "type": "object",
+        "properties": {
+          "quantity": { "type": "integer", "minimum": 1 },
+          "skuId": { "type": "string", "format": "uuid", "nullable": true },
+          "unitId": { "type": "string", "format": "uuid", "nullable": true },
+          "notes": { "type": "string", "nullable": true }
         }
       },
       "OrderItem": {
@@ -2411,26 +2273,22 @@
               }
             }
           },
-          "variant": {
+          "sku": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string",
-                "example": "أسود"
-              },
-              "hex": {
-                "type": "string",
+              "id": { "type": "string", "format": "uuid" },
+              "skuCode": { "type": "string", "example": "ELC-AP-0001-RED-30ML" },
+              "sizeLabel": { "type": "string", "nullable": true, "example": "30ml" },
+              "skc": {
+                "type": "object",
                 "nullable": true,
-                "example": "#000000"
-              },
-              "type": {
-                "type": "string",
-                "example": "color"
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "colorCode": { "type": "string", "example": "RD" },
+                  "colorName": { "type": "string", "example": "أحمر" },
+                  "hexCode": { "type": "string", "example": "#EF4444" }
+                }
               }
             }
           },
@@ -2483,18 +2341,17 @@
             "nullable": true,
             "example": 300
           },
-          "person": {
+          "deliveryInfo": {
+            "type": "string",
+            "nullable": true
+          },
+          "customer": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string",
-                "example": "أحمد محمد"
-              }
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string", "example": "أحمد محمد" },
+              "priceLabelId": { "type": "string", "format": "uuid", "nullable": true }
             }
           },
           "items": {
@@ -2630,10 +2487,10 @@
               }
             }
           },
-          "variants": {
+          "skcs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Variant"
+              "$ref": "#/components/schemas/SKC"
             }
           },
           "images": {
@@ -2762,46 +2619,6 @@
             "nullable": true,
             "default": "bot",
             "description": "المصدر (افتراضي: bot)"
-          }
-        }
-      },
-      "Announcement": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "title": {
-            "type": "string",
-            "example": "إعلان توفر آيفون 15"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "draft",
-              "sending",
-              "sent"
-            ],
-            "example": "sent"
-          },
-          "sentAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "_count": {
-            "type": "object",
-            "properties": {
-              "messages": {
-                "type": "integer",
-                "example": 150
-              }
-            }
           }
         }
       }

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { getProductFilterOptions } from '@/lib/actions/inventory'
 
 export const metadata = {
-    title: 'استيراد المنتجات | إدارة المخزون',
+    title: 'استيراد المنتجات | إدارة المنتجات',
 }
 
 export default async function ImportPage() {

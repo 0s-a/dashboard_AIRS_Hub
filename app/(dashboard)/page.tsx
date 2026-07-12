@@ -25,16 +25,30 @@ const getDashboardData = unstable_cache(
             prisma.product.count(),
             prisma.customer.count(),
             prisma.customer.count({ where: { isActive: true } }),
-            prisma.product.count({ where: { isAvailable: false } }),
+            prisma.product.count({
+                where: { NOT: { skcs: { some: { isAvailable: true } } } },
+            }),
             // Get recent products (last 5)
             prisma.product.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    productImages: true,
-                    productPrices: {
-                        include: { priceLabel: true, currency: true },
-                        orderBy: { createdAt: 'asc' },
+                    skcs: {
+                        include: {
+                            images: { orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }], take: 1 },
+                            skus: {
+                                include: {
+                                    productPrices: {
+                                        include: { priceLabel: true, currency: true },
+                                        orderBy: { createdAt: 'asc' },
+                                        take: 1,
+                                    },
+                                },
+                                take: 1,
+                            },
+                        },
+                        orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
+                        take: 1,
                     },
                 },
             }),
@@ -62,18 +76,23 @@ const getDashboardData = unstable_cache(
                 activeCustomerCount,
                 unavailableProductCount
             },
-            recentProducts: recentProducts.map((p: any) => ({
+            recentProducts: recentProducts.map((p: any) => {
+                const primarySkc = (p.skcs || []).find((s: any) => s.isDefault) || p.skcs?.[0]
+                return {
                 ...p,
-                mediaImages: (p.productImages || []).map((pi: any) => ({
+                isAvailable: (p.skcs || []).some((skc: { isAvailable?: boolean }) => skc.isAvailable),
+                mediaImages: (primarySkc?.images || []).map((pi: any) => ({
                     url: toDisplayUrl(pi.url),
                     isPrimary: pi.isPrimary,
                 })),
-                productPrices: (p.productPrices || []).map((pp: any) => ({
-                    priceLabelName: pp.priceLabel.name,
-                    value: Number(pp.value),
-                    currencySymbol: pp.currency.symbol,
-                })),
-            })),
+                productPrices: (primarySkc?.skus || []).flatMap((sku: any) =>
+                    (sku.productPrices || []).map((pp: any) => ({
+                        priceLabelName: pp.priceLabel.name,
+                        value: Number(pp.value),
+                        currencySymbol: pp.currency.symbol,
+                    }))
+                ).slice(0, 1),
+            }}),
             recentCustomers,
             activityData
         }
@@ -111,7 +130,7 @@ async function generateActivityData() {
                 })
             ])
             return {
-                date: date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
+                date: date.toLocaleDateString('ar-YE', { month: 'short', day: 'numeric' }),
                 products,
                 customers
             }

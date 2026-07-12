@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { buildSubPath, toDiskDir, toDisplayUrl } from "@/lib/utils/image-paths"
+import { requireAuth } from "@/lib/auth-utils"
 
 const DEFAULT_ID = "default"
 
@@ -47,6 +48,7 @@ export async function updateStoreSettings(data: {
     socialLinks?: any
 }) {
     try {
+        await requireAuth()
         const settings = await prisma.storeSettings.upsert({
             where: { id: DEFAULT_ID },
             update: {
@@ -68,6 +70,7 @@ export async function updateStoreSettings(data: {
 
 export async function uploadStoreLogo(formData: FormData) {
     try {
+        await requireAuth()
         const file = formData.get("file") as File
         if (!file || file.size === 0) {
             return { success: false, error: "لم يتم اختيار ملف" }

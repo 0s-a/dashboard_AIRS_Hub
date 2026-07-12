@@ -1,0 +1,41 @@
+---
+description: التصميم البصري — RTL، tokens، typography، layout، locale
+globs: **/*.tsx,app/globals.css
+alwaysApply: false
+---
+
+# Frontend Design
+
+## RTL واللغة
+
+- الجذر: `lang="ar" dir="rtl"` في `app/layout.tsx` — لا تكرار إلا لجزر LTR
+- LTR islands: `dir="ltr"` + `font-mono` لـ HEX، أكواد منتج، هواتف، URLs
+- كل النصوص والـ toast والـ validation بالعربية
+
+## Tokens والألوان
+
+- semantic tokens فقط: `bg-background`, `text-muted-foreground`, `border-border`
+- لا `slate-*` / `blue-*` جديدة — راجع `app/globals.css`
+- استثناءات مسموحة: stat-card (`bg-primary/10`) وgradients العناوين
+- Dark mode: tokens عبر `next-themes` — لا ألوان ثابتة للوضع الداكن
+
+## Typography والأيقونات
+
+- خط Cairo عبر `--font-cairo`
+- عناوين صفحات: `bg-linear-to-l from-primary to-indigo-400 bg-clip-text text-transparent`
+- أيقونات: `lucide-react` فقط
+- shadcn/ui من `components/ui/` — لا مكوّنات UI جديدة خارجها
+
+## Layout الصفحة
+
+```
+space-y-6
+├── header (عنوان + وصف + actions)
+├── stats → glass-panel
+└── content → glass-panel
+```
+
+## Locale
+
+- `ar-YE` للأرقام والتواريخ والعملات في كل الواجهة
+

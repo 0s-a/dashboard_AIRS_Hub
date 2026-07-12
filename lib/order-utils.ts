@@ -1,23 +1,31 @@
 // ============================================================
 // Order Utilities — Dynamic price resolution
-// السعر لا يُخزَّن في OrderItem بل يُحسب من ProductPrice
-// حسب: تسعيرة العميل المرتبط بالطلب + العملة الافتراضية
+// السعر يُحسب بالأولوية:
+// 1. unitPrice (snapshot) — المُثبَّت وقت إنشاء الطلب ← الأولوية
+// 2. تسعيرة العميل من ProductPrice (للطلبات القديمة بدون snapshot)
+// 3. التسعيرة الافتراضية للنظام (isDefault=true) بالعملة الافتراضية
+// 4. أي سعر متاح بالعملة الافتراضية
 // ============================================================
 
 export interface ResolvedPrice {
     price: number
     symbol: string
     priceLabelName: string
+    isSnapshot: boolean  // true إذا كان السعر مُثبَّتاً، false إذا كان محسوباً ديناميكياً
 }
 
 /**
  * يختار السعر المناسب لبند الطلب بالأولوية:
- * 1. تسعيرة العميل المرتبط بالطلب (بالعملة الافتراضية)
- * 2. التسعيرة الافتراضية للنظام (isDefault=true) بالعملة الافتراضية
- * 3. أي سعر متاح بالعملة الافتراضية
+ * 1. unitPrice snapshot (مُثبَّت وقت إنشاء الطلب) — لا يتغير أبداً
+ * 2. تسعيرة العميل المرتبط بالطلب (بالعملة الافتراضية) — للطلبات القديمة
+ * 3. التسعيرة الافتراضية للنظام (isDefault=true) بالعملة الافتراضية
+ * 4. أي سعر متاح بالعملة الافتراضية
  */
 export function resolveItemPrice(
     item: {
+        unitPrice?: number | string | null       // Snapshot — الأولوية القصوى
+        currency?: { symbol: string } | null     // Snapshot currency
+        priceLabel?: { name: string } | null     // Snapshot label
         product?: {
             productPrices?: Array<{
                 priceLabelId: string
@@ -29,48 +37,63 @@ export function resolveItemPrice(
     },
     customerPriceLabelId?: string | null
 ): ResolvedPrice {
-    const prices = item.product?.productPrices ?? []
-
-    if (prices.length === 0) {
-        return { price: 0, symbol: '', priceLabelName: '—' }
+    // ── 1. Snapshot — السعر المُثبَّت وقت إنشاء الطلب ──
+    if (item.unitPrice != null) {
+        return {
+            price: Number(item.unitPrice),
+            symbol: item.currency?.symbol ?? '',
+            priceLabelName: item.priceLabel?.name ?? '—',
+            isSnapshot: true,
+        }
     }
 
-    // 1. سعر تسعيرة العميل
+    // ── Fallback الديناميكي للطلبات القديمة ──
+    const prices = (item as any).sku?.productPrices ?? item.product?.productPrices ?? []
+
+    if (prices.length === 0) {
+        return { price: 0, symbol: '', priceLabelName: '—', isSnapshot: false }
+    }
+
+    // 2. سعر تسعيرة العميل
     if (customerPriceLabelId) {
-        const match = prices.find(p => p.priceLabelId === customerPriceLabelId)
+        const match = prices.find((p: { priceLabelId: string }) => p.priceLabelId === customerPriceLabelId)
         if (match) {
             return {
                 price: Number(match.value),
                 symbol: match.currency?.symbol ?? '',
                 priceLabelName: match.priceLabel?.name ?? '—',
+                isSnapshot: false,
             }
         }
     }
 
-    // 2. التسعيرة الافتراضية للنظام
-    const defaultLabel = prices.find(p => p.priceLabel?.isDefault)
+    // 3. التسعيرة الافتراضية للنظام
+    const defaultLabel = prices.find((p: { priceLabel?: { isDefault?: boolean } }) => p.priceLabel?.isDefault)
     if (defaultLabel) {
         return {
             price: Number(defaultLabel.value),
             symbol: defaultLabel.currency?.symbol ?? '',
             priceLabelName: defaultLabel.priceLabel?.name ?? '—',
+            isSnapshot: false,
         }
     }
 
-    // 3. أي سعر متاح
+    // 4. أي سعر متاح
     const fallback = prices[0]
     return {
         price: Number(fallback.value),
         symbol: fallback.currency?.symbol ?? '',
         priceLabelName: fallback.priceLabel?.name ?? '—',
+        isSnapshot: false,
     }
 }
 
 /**
- * يحسب إجمالي الطلب من بنوده ديناميكياً
+ * يحسب إجمالي الطلب من بنوده
+ * يعطي أولوية لـ unitPrice snapshot إذا كان موجوداً
  */
 export function calcOrderTotal(
-    items: Array<{ quantity?: number | null; product?: any }>,
+    items: Array<{ quantity?: number | null; unitPrice?: number | string | null; product?: any; currency?: any; priceLabel?: any }>,
     customerPriceLabelId?: string | null
 ): number {
     return items.reduce((sum, item) => {

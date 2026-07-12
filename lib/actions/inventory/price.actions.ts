@@ -1,13 +1,32 @@
 'use server'
 
-import { prisma, serializeProduct, requireProduct, revalidateProduct } from './_shared'
+import {
+    prisma,
+    serializeProduct,
+    requireProduct,
+    revalidateProduct,
+    revalidateSkc,
+    revalidateSku,
+    getProductIdFromSkuId,
+    SKU_INCLUDE,
+    serializeSKU,
+    serializeProductUnits,
+} from './_shared'
+import { upsertProductToMeilisearch } from '@/lib/utils/meilisearch-sync'
+import { requireAuth } from '@/lib/auth-utils'
 
-// ─────────────────────────────────────────────────────────────
-// PRODUCT PRICES — CRUD + Auto-Pricing + Copy
-// ─────────────────────────────────────────────────────────────
+async function revalidateSkuPrice(skuId: string) {
+    const productId = await getProductIdFromSkuId(skuId)
+    if (!productId) return
+    const sku = await prisma.sKU.findUnique({ where: { id: skuId }, select: { skcId: true } })
+    if (sku) revalidateSkc(sku.skcId, productId)
+    revalidateSku(skuId, productId)
+    revalidateProduct(productId)
+    upsertProductToMeilisearch(productId).catch(console.warn)
+}
 
-/** Add a single price entry to a product */
-export async function addProductPrice(productId: string, data: {
+/** Add a single price entry to a SKU */
+export async function addProductPrice(skuId: string, data: {
     priceLabelId: string
     currencyId: string
     unitId: string
@@ -15,14 +34,18 @@ export async function addProductPrice(productId: string, data: {
     isAutoCalculated?: boolean
 }) {
     try {
+        await requireAuth()
         if (isNaN(data.value) || data.value < 0) return { success: false, error: 'القيمة غير صحيحة' }
         if (!data.priceLabelId) return { success: false, error: 'مسمى التسعيرة مطلوب' }
         if (!data.currencyId)   return { success: false, error: 'العملة مطلوبة' }
         if (!data.unitId)       return { success: false, error: 'الوحدة مطلوبة' }
 
+        const sku = await prisma.sKU.findUnique({ where: { id: skuId }, select: { id: true } })
+        if (!sku) return { success: false, error: 'المقاس غير موجود' }
+
         await prisma.productPrice.create({
             data: {
-                productId,
+                skuId,
                 priceLabelId: data.priceLabelId,
                 currencyId:   data.currencyId,
                 unitId:       data.unitId,
@@ -31,9 +54,13 @@ export async function addProductPrice(productId: string, data: {
             },
         })
 
-        const product = await requireProduct(productId)
-        revalidateProduct(productId)
-        return { success: true, data: serializeProduct(product) }
+        await revalidateSkuPrice(skuId)
+        const productId = await getProductIdFromSkuId(skuId)
+        if (productId) {
+            const product = await requireProduct(productId)
+            return { success: true, data: serializeProduct(product) }
+        }
+        return { success: true }
     } catch (error: any) {
         console.error('Failed to add product price:', error)
         if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + العملة + الوحدة) موجود بالفعل' }
@@ -41,7 +68,6 @@ export async function addProductPrice(productId: string, data: {
     }
 }
 
-/** Update an existing price entry */
 export async function updateProductPrice(priceId: string, data: {
     value?: number
     isAutoCalculated?: boolean
@@ -50,6 +76,7 @@ export async function updateProductPrice(priceId: string, data: {
     unitId?: string
 }) {
     try {
+        await requireAuth()
         if (data.value !== undefined && (isNaN(data.value) || data.value < 0)) {
             return { success: false, error: 'القيمة غير صحيحة' }
         }
@@ -68,9 +95,13 @@ export async function updateProductPrice(priceId: string, data: {
             },
         })
 
-        const product = await requireProduct(existing.productId)
-        revalidateProduct(existing.productId)
-        return { success: true, data: serializeProduct(product) }
+        await revalidateSkuPrice(existing.skuId)
+        const productId = await getProductIdFromSkuId(existing.skuId)
+        if (productId) {
+            const product = await requireProduct(productId)
+            return { success: true, data: serializeProduct(product) }
+        }
+        return { success: true }
     } catch (error: any) {
         console.error('Failed to update product price:', error)
         if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + العملة + الوحدة) موجود بالفعل' }
@@ -78,27 +109,32 @@ export async function updateProductPrice(priceId: string, data: {
     }
 }
 
-/** Delete a price entry */
 export async function deleteProductPrice(priceId: string) {
     try {
-        const existing = await prisma.productPrice.findUnique({ where: { id: priceId } })
+        await requireAuth()
+        const existing = await prisma.productPrice.findUnique({
+            where: { id: priceId },
+            include: { sku: { select: { skc: { select: { productId: true } } } } },
+        })
         if (!existing) return { success: false, error: 'السعر غير موجود' }
 
+        const productId = existing.sku.skc.productId
         await prisma.productPrice.delete({ where: { id: priceId } })
 
-        // Auto-disable product if it has no prices or no units left
-        const remainingPricesCount = await prisma.productPrice.count({ where: { productId: existing.productId } })
-        const remainingUnitsCount = await prisma.productUnit.count({ where: { productId: existing.productId } })
-        
+        const remainingPricesCount = await prisma.productPrice.count({
+            where: { sku: { skc: { productId } } },
+        })
+        const remainingUnitsCount = await prisma.productUnit.count({ where: { productId } })
+
         if (remainingPricesCount === 0 || remainingUnitsCount === 0) {
-            await prisma.product.update({
-                where: { id: existing.productId },
-                data: { isAvailable: false }
+            await prisma.sKC.updateMany({
+                where: { productId },
+                data: { isAvailable: false },
             })
         }
 
-        const product = await requireProduct(existing.productId)
-        revalidateProduct(existing.productId)
+        await revalidateSkuPrice(existing.skuId)
+        const product = await requireProduct(productId)
         return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to delete product price:', error)
@@ -106,18 +142,12 @@ export async function deleteProductPrice(priceId: string) {
     }
 }
 
-/**
- * Smart pricing: add prices for ALL product units across multiple currencies.
- * Prices for non-base units are auto-calculated via their conversionFactor.
- */
-export async function addProductPricesForAllUnits(productId: string, data: {
+export async function addProductPricesForAllUnits(skuId: string, data: {
     priceLabelId: string
-    currencies: Array<{
-        currencyId: string
-        basePriceValue: number  // price for the BASE unit in this currency
-    }>
+    currencies: Array<{ currencyId: string; basePriceValue: number }>
 }) {
     try {
+        await requireAuth()
         if (!data.priceLabelId) return { success: false, error: 'مسمى التسعيرة مطلوب' }
         if (!data.currencies.length) return { success: false, error: 'حدد عملة واحدة على الأقل' }
 
@@ -127,8 +157,14 @@ export async function addProductPricesForAllUnits(productId: string, data: {
             }
         }
 
+        const sku = await prisma.sKU.findUnique({
+            where: { id: skuId },
+            include: { skc: { select: { productId: true } } },
+        })
+        if (!sku) return { success: false, error: 'المقاس غير موجود' }
+
         const productUnits = await prisma.productUnit.findMany({
-            where: { productId },
+            where: { productId: sku.skc.productId },
             include: { unit: true },
             orderBy: { order: 'asc' },
         })
@@ -137,7 +173,6 @@ export async function addProductPricesForAllUnits(productId: string, data: {
             return { success: false, error: 'أضف وحدات المنتج أولاً' }
         }
 
-        // Upsert for each (currency × unit) combination
         for (const cur of data.currencies) {
             for (const pu of productUnits) {
                 const value = pu.isBase
@@ -146,15 +181,15 @@ export async function addProductPricesForAllUnits(productId: string, data: {
 
                 await prisma.productPrice.upsert({
                     where: {
-                        productId_priceLabelId_currencyId_unitId: {
-                            productId,
+                        skuId_priceLabelId_currencyId_unitId: {
+                            skuId,
                             priceLabelId: data.priceLabelId,
                             currencyId:   cur.currencyId,
                             unitId:       pu.unitId,
                         },
                     },
                     create: {
-                        productId,
+                        skuId,
                         priceLabelId:     data.priceLabelId,
                         currencyId:       cur.currencyId,
                         unitId:           pu.unitId,
@@ -169,8 +204,8 @@ export async function addProductPricesForAllUnits(productId: string, data: {
             }
         }
 
-        const product = await requireProduct(productId)
-        revalidateProduct(productId)
+        await revalidateSkuPrice(skuId)
+        const product = await requireProduct(sku.skc.productId)
         return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to add prices for all units:', error)
@@ -179,23 +214,20 @@ export async function addProductPricesForAllUnits(productId: string, data: {
     }
 }
 
-/**
- * Copy all prices from one PriceLabel to another for a given product.
- * @param adjustmentPercent - e.g. 20 means ×1.2 (+20%); -10 means ×0.9
- */
 export async function copyPriceLabelPrices(
-    productId: string,
+    skuId: string,
     fromLabelId: string,
     toLabelId: string,
     adjustmentPercent: number = 0
 ) {
     try {
+        await requireAuth()
         if (fromLabelId === toLabelId) {
             return { success: false, error: 'القائمة المصدر والهدف نفس القائمة' }
         }
 
         const sourcePrices = await prisma.productPrice.findMany({
-            where: { productId, priceLabelId: fromLabelId },
+            where: { skuId, priceLabelId: fromLabelId },
         })
 
         if (sourcePrices.length === 0) {
@@ -209,15 +241,15 @@ export async function copyPriceLabelPrices(
 
             await prisma.productPrice.upsert({
                 where: {
-                    productId_priceLabelId_currencyId_unitId: {
-                        productId,
+                    skuId_priceLabelId_currencyId_unitId: {
+                        skuId,
                         priceLabelId: toLabelId,
                         currencyId:   sp.currencyId,
                         unitId:       sp.unitId,
                     },
                 },
                 create: {
-                    productId,
+                    skuId,
                     priceLabelId:     toLabelId,
                     currencyId:       sp.currencyId,
                     unitId:           sp.unitId,
@@ -231,11 +263,37 @@ export async function copyPriceLabelPrices(
             })
         }
 
-        const product = await requireProduct(productId)
-        revalidateProduct(productId)
-        return { success: true, data: serializeProduct(product) }
+        await revalidateSkuPrice(skuId)
+        const productId = await getProductIdFromSkuId(skuId)
+        if (productId) {
+            const product = await requireProduct(productId)
+            return { success: true, data: serializeProduct(product) }
+        }
+        return { success: true }
     } catch (error: any) {
         console.error('Failed to copy price label prices:', error)
         return { success: false, error: error?.message ?? 'فشل نسخ الأسعار' }
+    }
+}
+
+export async function getSkuPrices(skuId: string) {
+    try {
+        await requireAuth()
+        const sku = await prisma.sKU.findUnique({
+            where: { id: skuId },
+            include: {
+                ...SKU_INCLUDE.include,
+                skc: {
+                    include: {
+                        product: { include: { productUnits: { include: { unit: true } } } },
+                    },
+                },
+            },
+        })
+        if (!sku) return { success: false, error: 'المقاس غير موجود' }
+        const units = serializeProductUnits(sku.skc.product.productUnits)
+        return { success: true, data: serializeSKU(sku, units) }
+    } catch (error) {
+        return { success: false, error: 'فشل جلب الأسعار' }
     }
 }

@@ -22,7 +22,7 @@ import {
 type CurrencyOption = { id: string; name: string; symbol: string }
 
 interface SinglePriceFormProps {
-    productId: string
+    skuId: string
     productUnits: ProductUnitEntry[]
     priceLabels: { id: string; name: string; isDefault?: boolean }[]
     currencies: CurrencyOption[]
@@ -32,7 +32,7 @@ interface SinglePriceFormProps {
 }
 
 export function SinglePriceForm({
-    productId, productUnits, priceLabels, currencies, existingPrices, onComplete, onCancel
+    skuId, productUnits, priceLabels, currencies, existingPrices, onComplete, onCancel
 }: SinglePriceFormProps) {
     const [isPending, startTransition] = useTransition()
     const defaultLabel = priceLabels.find(pl => pl.isDefault)
@@ -53,7 +53,7 @@ export function SinglePriceForm({
         if (isNaN(val) || val < 0) return toast.error("السعر غير صحيح")
 
         startTransition(async () => {
-            const res = await addProductPrice(productId, {
+            const res = await addProductPrice(skuId, {
                 priceLabelId: labelId,
                 currencyId,
                 unitId,

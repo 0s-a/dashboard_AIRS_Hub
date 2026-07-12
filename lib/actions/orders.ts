@@ -9,6 +9,7 @@ import {
 } from '@/lib/action-utils'
 import { validateOrderStatus, VALID_ORDER_STATUSES } from '@/lib/order-constants'
 import { ORDER_INCLUDE } from '@/lib/prisma-includes'
+import { requireAuth } from '@/lib/auth-utils'
 
 // ============================================================
 // Types
@@ -16,22 +17,39 @@ import { ORDER_INCLUDE } from '@/lib/prisma-includes'
 
 export interface OrderItemInput {
     productId: string
-    variantId?: string | null
+    skuId?: string | null
     quantity: number
     notes?: string | null
+    unitId?: string | null
+    // Snapshot — السعر المُثبَّت وقت إنشاء الطلب
+    unitPrice?: number | null
+    currencyId?: string | null
+    priceLabelId?: string | null
 }
 
 export interface CreateOrderData {
     customerId?: string | null
     notes?: string | null
+    deliveryInfo?: string | null
     items: OrderItemInput[]
 }
 
 export interface UpdateOrderData {
     customerId?: string | null
     notes?: string | null
+    deliveryInfo?: string | null
     status?: string
     items?: OrderItemInput[]
+}
+
+export interface GetOrdersOptions {
+    page?: number
+    limit?: number
+    status?: string
+    customerId?: string    // فلتر بالعميل
+    search?: string        // بحث برقم الطلب
+    dateFrom?: string      // فلتر بالتاريخ (ISO string)
+    dateTo?: string        // فلتر بالتاريخ
 }
 
 
@@ -40,19 +58,28 @@ export interface UpdateOrderData {
 // ============================================================
 
 /**
- * Fetch orders with pagination.
+ * Fetch orders with pagination + server-side filtering.
  * Defaults: page=1, limit=50
  */
-export async function getOrders(opts?: { page?: number; limit?: number; status?: string }) {
-    const page = Math.max(1, opts?.page ?? 1)
+export async function getOrders(opts?: GetOrdersOptions) {
+    const page  = Math.max(1, opts?.page ?? 1)
     const limit = Math.max(1, Math.min(100, opts?.limit ?? 50))
-    const skip = (page - 1) * limit
+    const skip  = (page - 1) * limit
 
     const where: Record<string, unknown> = {}
-    if (opts?.status) where.status = opts.status
+    if (opts?.status)     where.status     = opts.status
+    if (opts?.customerId) where.customerId = opts.customerId
+    if (opts?.search)     where.orderNumber = { contains: opts.search, mode: 'insensitive' }
+    if (opts?.dateFrom || opts?.dateTo) {
+        where.createdAt = {
+            ...(opts.dateFrom ? { gte: new Date(opts.dateFrom) } : {}),
+            ...(opts.dateTo   ? { lte: new Date(opts.dateTo)   } : {}),
+        }
+    }
 
     return safeAction(
         async () => {
+            await requireAuth()
             const [data, total] = await Promise.all([
                 prisma.order.findMany({
                     where,
@@ -70,18 +97,33 @@ export async function getOrders(opts?: { page?: number; limit?: number; status?:
 }
 
 /**
- * Get order stats (counts by status) — computed at DB level.
+ * Get order stats (counts by status) — استعلام واحد بـ groupBy بدلاً من 6 استعلامات منفصلة.
  */
 export async function getOrderStats() {
     return safeAction(
         async () => {
-            const [total, pending, delivered, cancelled] = await Promise.all([
+            await requireAuth()
+            const [grouped, total] = await Promise.all([
+                prisma.order.groupBy({
+                    by: ['status'],
+                    _count: { _all: true },
+                }),
                 prisma.order.count(),
-                prisma.order.count({ where: { status: 'pending' } }),
-                prisma.order.count({ where: { status: 'delivered' } }),
-                prisma.order.count({ where: { status: 'cancelled' } }),
             ])
-            return { total, pending, delivered, cancelled }
+
+            const byStatus = Object.fromEntries(
+                grouped.map(g => [g.status, g._count._all])
+            )
+
+            return {
+                total,
+                pending:    byStatus['pending']    ?? 0,
+                confirmed:  byStatus['confirmed']  ?? 0,
+                processing: byStatus['processing'] ?? 0,
+                shipped:    byStatus['shipped']    ?? 0,
+                delivered:  byStatus['delivered']  ?? 0,
+                cancelled:  byStatus['cancelled']  ?? 0,
+            }
         },
         'تعذّر جلب الإحصائيات'
     )
@@ -108,6 +150,7 @@ export async function getOrderById(id: string) {
 export async function createOrder(data: CreateOrderData) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             return prisma.$transaction(async (tx) => {
                 const orderNumber = await generateItemNumber('order')
                 return tx.order.create({
@@ -115,12 +158,18 @@ export async function createOrder(data: CreateOrderData) {
                         orderNumber,
                         customerId: data.customerId ?? null,
                         notes: data.notes ?? null,
+                        deliveryInfo: data.deliveryInfo ?? null,
                         items: {
                             create: data.items.map(it => ({
-                                productId: it.productId,
-                                variantId: it.variantId ?? null,
-                                quantity: it.quantity,
-                                notes: it.notes ?? null,
+                                productId:    it.productId,
+                                skuId:        it.skuId ?? null,
+                                unitId:       it.unitId ?? null,
+                                quantity:     it.quantity,
+                                notes:        it.notes ?? null,
+                                // Snapshot — السعر المُثبَّت وقت الإنشاء
+                                unitPrice:    it.unitPrice ?? null,
+                                currencyId:   it.currencyId ?? null,
+                                priceLabelId: it.priceLabelId ?? null,
                             }))
                         },
                     },
@@ -139,6 +188,7 @@ export async function createOrder(data: CreateOrderData) {
 export async function updateOrder(id: string, data: UpdateOrderData) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             if (data.status !== undefined) {
                 const valid = validateOrderStatus(data.status)
                 if (!valid) throw new Error(`حالة غير صالحة: ${data.status}`)
@@ -147,13 +197,23 @@ export async function updateOrder(id: string, data: UpdateOrderData) {
             let itemsPayload: { deleteMany: Record<string, never>; create: any[] } | undefined
 
             if (data.items !== undefined) {
+                // حماية: رفض items فارغة بدلاً من حذف جميع البنود صامتاً
+                if (data.items.length === 0) {
+                    throw new Error('لا يمكن حفظ طلب بدون منتجات — أضف منتجاً واحداً على الأقل')
+                }
+
                 itemsPayload = {
                     deleteMany: {},
                     create: data.items.map(it => ({
-                        productId: it.productId,
-                        variantId: it.variantId ?? null,
-                        quantity: it.quantity,
-                        notes: it.notes ?? null,
+                        productId:    it.productId,
+                        skuId:        it.skuId ?? null,
+                        unitId:       it.unitId ?? null,
+                        quantity:     it.quantity,
+                        notes:        it.notes ?? null,
+                        // Snapshot
+                        unitPrice:    it.unitPrice ?? null,
+                        currencyId:   it.currencyId ?? null,
+                        priceLabelId: it.priceLabelId ?? null,
                     }))
                 }
             }
@@ -162,9 +222,10 @@ export async function updateOrder(id: string, data: UpdateOrderData) {
                 return tx.order.update({
                     where: { id },
                     data: {
-                        customerId: data.customerId !== undefined ? data.customerId ?? null : undefined,
-                        notes: data.notes !== undefined ? data.notes ?? null : undefined,
-                        status: data.status,
+                        customerId:   data.customerId !== undefined ? data.customerId ?? null : undefined,
+                        notes:        data.notes !== undefined ? data.notes ?? null : undefined,
+                        deliveryInfo: data.deliveryInfo !== undefined ? data.deliveryInfo ?? null : undefined,
+                        status:       data.status as any,
                         ...(itemsPayload && { items: itemsPayload }),
                     },
                 })
@@ -186,7 +247,10 @@ export async function updateOrderStatus(id: string, status: string) {
     }
 
     return safeActionWithRevalidation(
-        () => prisma.order.update({ where: { id }, data: { status: validStatus } }),
+        async () => {
+            await requireAuth()
+            return prisma.order.update({ where: { id }, data: { status: validStatus as any } })
+        },
         '/orders',
         'تعذّر تحديث حالة الطلب'
     )
@@ -199,6 +263,7 @@ export async function updateOrderStatus(id: string, status: string) {
 export async function deleteOrder(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             await prisma.order.delete({ where: { id } })
             return null
         },
@@ -211,46 +276,104 @@ export async function deleteOrder(id: string) {
 // Helpers: Product price labels & variants (for order form)
 // ============================================================
 
-export async function getProductPriceLabels(productId: string) {
+export async function getProductPriceLabels(productId: string, skuId?: string | null) {
     return safeAction(
         async () => {
-            // أولاً: جلب تسعيرات العملة الافتراضية فقط
+            await requireAuth()
+            let resolvedSkuId = skuId
+            if (!resolvedSkuId) {
+                const sku = await prisma.sKU.findFirst({
+                    where: { skc: { productId } },
+                    orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
+                    select: { id: true },
+                })
+                resolvedSkuId = sku?.id
+            }
+            if (!resolvedSkuId) return []
+
             const defaultPrices = await prisma.productPrice.findMany({
-                where: { productId, currency: { isDefault: true } },
+                where: { skuId: resolvedSkuId, currency: { isDefault: true } },
                 include: { priceLabel: true, currency: true },
                 orderBy: { priceLabel: { name: 'asc' } },
             })
 
-            // إذا لم توجد أسعار بالعملة الافتراضية → إرجاع جميع الأسعار كـ fallback
             const data = defaultPrices.length > 0
                 ? defaultPrices
                 : await prisma.productPrice.findMany({
-                    where: { productId },
+                    where: { skuId: resolvedSkuId },
                     include: { priceLabel: true, currency: true },
                     orderBy: { priceLabel: { name: 'asc' } },
                 })
 
-            // Serialize to convert Decimal → number for client components
             return JSON.parse(JSON.stringify(data))
         },
         'تعذّر جلب التسعيرات'
     )
 }
 
-export async function getProductVariants(productId: string) {
+export async function getProductSkcs(productId: string) {
     return safeAction(
-        () => prisma.variant.findMany({
-            where: { productId },
-            orderBy: { order: 'asc' },
-            select: {
-                id: true,
-                name: true,
-                type: true,
-                hex: true,
-                suffix: true,
-                isDefault: true,
-            },
-        }),
-        'تعذّر جلب المتغيرات'
+        async () => {
+            await requireAuth()
+            return prisma.sKC.findMany({
+                where: { productId },
+                orderBy: { order: 'asc' },
+                select: {
+                    id: true,
+                    colorId: true,
+                    color: { select: { id: true, code: true, name: true, hexCode: true } },
+                    isDefault: true,
+                    isAvailable: true,
+                },
+            })
+        },
+        'تعذّر جلب الأصناف'
     )
+}
+
+export async function getProductSkus(productId: string, skcId?: string) {
+    return safeAction(
+        async () => {
+            await requireAuth()
+            return prisma.sKU.findMany({
+                where: {
+                    skc: {
+                        productId,
+                        ...(skcId ? { id: skcId } : {}),
+                    },
+                },
+                orderBy: [{ skc: { order: 'asc' } }, { order: 'asc' }],
+                select: {
+                    id: true,
+                    skuCode: true,
+                    sizeLabel: true,
+                    isDefault: true,
+                    isAvailable: true,
+                    skcId: true,
+                    skc: { select: { color: { select: { name: true, hexCode: true, code: true } } } },
+                },
+            })
+        },
+        'تعذّر جلب المقاسات'
+    )
+}
+
+/** @deprecated use getProductSkcs */
+export async function getProductVariants(productId: string) {
+    const res = await getProductSkcs(productId)
+    if (!res.success || !res.data) return res
+    return {
+        ...res,
+        data: res.data.map(s => ({
+            id: s.id,
+            name: s.color.name,
+            type: 'color',
+            hex: s.color.hexCode,
+            suffix: s.color.code,
+            colorName: s.color.name,
+            hexCode: s.color.hexCode,
+            colorCode: s.color.code,
+            isDefault: s.isDefault,
+        })),
+    }
 }

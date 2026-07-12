@@ -1,0 +1,5 @@
+-- Category code length change: 3 chars → 2 chars (data-only)
+-- No schema change — Category.code remains String @unique
+--
+-- Run the data migration script after this migration:
+--   npx tsx prisma/scripts/migrate-category-codes.ts

@@ -1,0 +1,38 @@
+---
+description: إدارة الحالة — transitions، searchParams، refresh، hooks
+globs: components/**,hooks/**,app/**/page.tsx
+alwaysApply: false
+---
+
+# Frontend State
+
+## المبادئ
+
+- لا Redux / Zustand / React Query — Server Actions + state محلي فقط
+- `router.refresh()` بعد أي mutation تؤثر Server Components
+- `localStorage` لتفضيلات UI فقط (مثل `sidebar-collapsed`)
+
+## useTransition
+
+- للعمليات غير الحاجبة: pagination، حفظ ثقيل، تحديث جدول
+- نموذج: `products-table.tsx`, `items-table.tsx`, `order-sheet.tsx`
+
+## فلاتر قابلة للمشاركة
+
+- `searchParams` في Server pages للفلاتر والصفحات
+- نموذج: `customers/page.tsx`, `items/page.tsx`
+
+## Hooks
+
+- منطق UI قابل لإعادة الاستخدام في `hooks/` — لا في components إذا تجاوز ~30 سطر
+- نموذج: `use-notification-alert.ts`, `use-product-pricing.ts`
+
+## Polling
+
+- فقط عبر hooks مخصّصة مع تنظيف في `useEffect` return
+- نموذج: `hooks/use-notification-alert.ts` (30s interval)
+
+## بعد التعديل
+
+- `onRefresh` في الجدول عند الحاجة لإعادة تحميل client-side
+- `router.refresh()` لإعادة جلب Server Components

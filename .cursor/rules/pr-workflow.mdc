@@ -1,0 +1,17 @@
+---
+description: سير عمل PR ومراجعة Bugbot
+alwaysApply: false
+---
+
+# PR Workflow
+
+عند طلب إنشاء PR أو دمج تغييرات:
+
+1. شغّل Bugbot review على `branch changes`
+2. أصلح findings الصحيحة فقط — اشرح إن اختلفت
+3. `npm run lint` و `npm run build`
+4. `gh pr create` مع body يتضمن:
+   - Summary (1-3 نقاط)
+   - Test plan (قائمة تحقق)
+
+لا تنشئ PR قبل اجتياز lint و build.

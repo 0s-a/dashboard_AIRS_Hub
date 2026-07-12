@@ -3,7 +3,6 @@
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation } from '@/lib/action-utils'
 import { requireAuth } from '@/lib/auth-utils'
-import { revalidatePath } from 'next/cache'
 import type { ContactInput } from '@/lib/config/contact.config'
 
 const PATHS = '/supervisors'
@@ -56,16 +55,6 @@ export async function getSupervisors(options?: {
         ])
         return { supervisors, total, page, pageSize }
     }, 'تعذّر جلب المشرفين')
-}
-
-export async function getSupervisorById(id: string) {
-    return safeAction(
-        () => prisma.supervisor.findUniqueOrThrow({
-            where: { id },
-            include: { contacts: true },
-        }),
-        'تعذّر جلب بيانات المشرف'
-    )
 }
 
 // ─── Create ─────────────────────────────────────────────────
@@ -182,47 +171,4 @@ export async function toggleSupervisorActive(id: string, isActive: boolean) {
         PATHS,
         'تعذّر تغيير حالة المشرف'
     )
-}
-
-// ─── Contacts ───────────────────────────────────────────────
-
-export async function addSupervisorContact(supervisorId: string, contact: SupervisorContactInput) {
-    try {
-        await requireAuth()
-        const result = await prisma.contact.create({
-            data: {
-                supervisorId,
-                type: contact.type,
-                value: contact.value.trim(),
-                label: contact.label || null,
-                isPrimary: contact.isPrimary ?? false,
-            },
-        })
-        revalidatePath(PATHS)
-        return { success: true, data: result }
-    } catch (error: any) {
-        if (error?.code === 'P2002') {
-            const constraint = error?.meta?.target as string | string[] | undefined
-            const name = Array.isArray(constraint) ? constraint.join(',') : constraint
-            if (name?.includes('value')) {
-                return { success: false, error: 'هذا الرقم/البريد مسجّل بالفعل في النظام' }
-            }
-            if (name?.includes('supervisor_type')) {
-                return { success: false, error: 'لا يمكن إضافة أكثر من وسيلة اتصال واحدة من نفس النوع' }
-            }
-            return { success: false, error: 'بيانات مكررة — تأكد من عدم تكرار المعلومات' }
-        }
-        return { success: false, error: 'تعذّر إضافة جهة الاتصال' }
-    }
-}
-
-export async function deleteSupervisorContact(contactId: string) {
-    try {
-        await requireAuth()
-        await prisma.contact.delete({ where: { id: contactId } })
-        revalidatePath(PATHS)
-        return { success: true }
-    } catch {
-        return { success: false, error: 'تعذّر حذف جهة الاتصال' }
-    }
 }

@@ -2,32 +2,27 @@
 
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation } from '@/lib/action-utils'
+import { requireAuth } from '@/lib/auth-utils'
 import type { BrandPayload } from '@/lib/types/brand'
+import { BRAND_CODE_CONFIG } from '@/lib/config/product-number.config'
 
 // Paths to revalidate after any write operation
 const REVALIDATE_PATHS = ['/brands', '/inventory']
+const BRAND_CODE_REGEX = BRAND_CODE_CONFIG.pattern
 
 // ─── READ ─────────────────────────────────────────────────────
 
 /** Fetch all brands ordered alphabetically, including product count */
 export async function getBrands() {
     return safeAction(
-        () => prisma.brand.findMany({
+        async () => {
+            await requireAuth()
+            return prisma.brand.findMany({
             orderBy: { name: 'asc' },
             include: { _count: { select: { products: true } } },
-        }),
+            })
+        },
         'تعذّر جلب البراندات'
-    )
-}
-
-/** Fetch a single brand by ID */
-export async function getBrandById(id: string) {
-    return safeAction(
-        () => prisma.brand.findUnique({
-            where: { id },
-            include: { _count: { select: { products: true } } },
-        }),
-        'تعذّر جلب البراند'
     )
 }
 
@@ -36,14 +31,21 @@ export async function getBrandById(id: string) {
 /** Create a new brand. Code is always stored uppercase. */
 export async function createBrand(data: BrandPayload) {
     return safeActionWithRevalidation(
-        () => prisma.brand.create({
+        async () => {
+            await requireAuth()
+            const code = data.code.trim().toUpperCase()
+            if (!BRAND_CODE_REGEX.test(code)) {
+                throw new Error('كود البراند يجب أن يكون حرفاً أو رقماً واحداً')
+            }
+            return prisma.brand.create({
             data: {
                 name:        data.name.trim(),
-                code:        data.code.trim().toUpperCase(),
+                code,
                 logo:        data.logo        ?? null,
                 description: data.description?.trim() ?? null,
             },
-        }),
+            })
+        },
         REVALIDATE_PATHS,
         'تعذّر إنشاء البراند'
     )
@@ -52,15 +54,22 @@ export async function createBrand(data: BrandPayload) {
 /** Update an existing brand by ID. */
 export async function updateBrand(id: string, data: BrandPayload) {
     return safeActionWithRevalidation(
-        () => prisma.brand.update({
+        async () => {
+            await requireAuth()
+            const code = data.code.trim().toUpperCase()
+            if (!BRAND_CODE_REGEX.test(code)) {
+                throw new Error('كود البراند يجب أن يكون حرفاً أو رقماً واحداً')
+            }
+            return prisma.brand.update({
             where: { id },
             data: {
                 name:        data.name.trim(),
-                code:        data.code.trim().toUpperCase(),
+                code,
                 logo:        data.logo        ?? null,
                 description: data.description?.trim() ?? null,
             },
-        }),
+            })
+        },
         REVALIDATE_PATHS,
         'تعذّر تعديل البراند'
     )
@@ -73,6 +82,7 @@ export async function updateBrand(id: string, data: BrandPayload) {
 export async function deleteBrand(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             const brand = await prisma.brand.findUnique({
                 where: { id },
                 include: { _count: { select: { products: true } } },

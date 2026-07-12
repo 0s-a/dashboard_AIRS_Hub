@@ -6,6 +6,7 @@ import { validateApiKey, apiError, apiSuccess, normalizePhonePatterns } from '@/
 const CheckPriceSchema = z.object({
     phoneNumber: z.string().min(1, 'phoneNumber is required'),
     productId: z.string().min(1, 'productId is required'),
+    skuId: z.string().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -22,11 +23,30 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        const { phoneNumber, productId } = parsed.data
+        const { phoneNumber, productId, skuId } = parsed.data
 
-        // Get Product with prices
         const product = await prisma.product.findUnique({
             where: { id: productId },
+            select: { id: true, name: true },
+        })
+        if (!product) return apiError('Product not found', 404, { code: 'NOT_FOUND' })
+
+        let resolvedSkuId = skuId
+        if (!resolvedSkuId) {
+            const sku = await prisma.sKU.findFirst({
+                where: { skc: { productId } },
+                orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
+                select: { id: true },
+            })
+            resolvedSkuId = sku?.id
+        }
+
+        if (!resolvedSkuId) {
+            return apiSuccess({ productId: product.id, productName: product.name, customerName: null, prices: [] })
+        }
+
+        const sku = await prisma.sKU.findUnique({
+            where: { id: resolvedSkuId },
             include: {
                 productPrices: {
                     include: {
@@ -39,29 +59,17 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        if (!product) return apiError('Product not found', 404, { code: 'NOT_FOUND' })
-
-        // Find customer by phone number — using normalized patterns
         const patterns = normalizePhonePatterns(phoneNumber)
         const customer = await prisma.customer.findFirst({
-            where: {
-                contacts: {
-                    some: {
-                        value: { in: patterns },
-                    },
-                },
-            },
+            where: { contacts: { some: { value: { in: patterns } } } },
             select: { id: true, name: true, priceLabelId: true },
         })
 
-        // Filter prices based on customer's assigned price labels
-        let filteredPrices = product.productPrices
-
+        let filteredPrices = sku?.productPrices ?? []
         if (customer?.priceLabelId) {
-            filteredPrices = product.productPrices.filter(pp => pp.priceLabelId === customer.priceLabelId)
+            filteredPrices = filteredPrices.filter(pp => pp.priceLabelId === customer.priceLabelId)
         }
 
-        // Format response
         const prices = filteredPrices.map(pp => ({
             label: pp.priceLabel.name,
             value: pp.value,
@@ -70,16 +78,16 @@ export async function POST(req: NextRequest) {
                 symbol: pp.currency.symbol,
                 name: pp.currency.name,
             },
-            unit: (pp as any).unit?.name ?? null,
+            unit: pp.unit?.name ?? null,
         }))
 
         return apiSuccess({
             productId: product.id,
+            skuId: resolvedSkuId,
             productName: product.name,
             customerName: customer?.name || null,
             prices,
         })
-
     } catch (error) {
         console.error('API Price Check Error:', error)
         return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })

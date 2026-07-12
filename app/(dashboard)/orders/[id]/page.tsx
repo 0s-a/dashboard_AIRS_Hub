@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { OrderSheet } from "@/components/orders/order-sheet"
 import { OrderStatusUpdater } from "@/components/orders/order-status-updater"
 import { resolveItemPrice, calcOrderTotal } from "@/lib/order-utils"
+import { ORDER_STATUS_CONFIG, type OrderStatusValue } from "@/lib/order-constants"
 import {
     ArrowRight, ArrowLeft,
     ShoppingCart, User, StickyNote,
@@ -22,7 +23,7 @@ export default async function OrderDetailPage({ params }: Props) {
         getOrderById(id),
         getCustomers(),
         prisma.product.findMany({
-            select: { id: true, name: true, itemNumber: true },
+            select: { id: true, name: true, productNumber: true },
             orderBy: { name: "asc" },
         }),
         getDefaultCurrency(),
@@ -224,18 +225,18 @@ export default async function OrderDetailPage({ params }: Props) {
                                         )}
                                     </div>
                                 </div>
-                                {/* Variant */}
+                                {/* SKU / SKC */}
                                 <div className="flex items-center justify-center gap-1.5">
-                                    {item.variant ? (
+                                    {item.sku ? (
                                         <>
-                                            {item.variant.hex && (
+                                            {item.sku.skc?.color?.hexCode && (
                                                 <span
                                                     className="size-4 rounded-full border border-black/10 shrink-0"
-                                                    style={{ backgroundColor: item.variant.hex }}
+                                                    style={{ backgroundColor: item.sku.skc.color.hexCode }}
                                                 />
                                             )}
                                             <span className="text-xs text-muted-foreground truncate max-w-[50px]">
-                                                {item.variant.name}
+                                                {[item.sku.skc?.color?.name, item.sku.sizeLabel].filter(Boolean).join(' / ') || item.sku.skuCode}
                                             </span>
                                         </>
                                     ) : (
@@ -274,16 +275,9 @@ export default async function OrderDetailPage({ params }: Props) {
     )
 }
 // ── Inline StatusBadge (server-safe, no "use client") ────────────────────────
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-    pending:    { label: "معلق",       color: "bg-yellow-500/10 text-yellow-600 border-yellow-200" },
-    confirmed:  { label: "مؤكد",       color: "bg-blue-500/10 text-blue-600 border-blue-200" },
-    processing: { label: "قيد التجهيز", color: "bg-violet-500/10 text-violet-600 border-violet-200" },
-    shipped:    { label: "تم الشحن",    color: "bg-indigo-500/10 text-indigo-600 border-indigo-200" },
-    delivered:  { label: "تم التسليم",  color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
-    cancelled:  { label: "ملغي",        color: "bg-red-500/10 text-red-600 border-red-200" },
-}
 function OrderStatusBadge({ status }: { status: string }) {
-    const cfg = STATUS_MAP[status] ?? { label: status, color: "bg-muted text-muted-foreground border-border" }
+    const cfg = ORDER_STATUS_CONFIG[status as OrderStatusValue]
+        ?? { label: status, color: 'bg-muted text-muted-foreground border-border' }
     return (
         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${cfg.color}`}>
             {cfg.label}

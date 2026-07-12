@@ -31,13 +31,16 @@ export function ProductSheet({ product, trigger }: ProductSheetProps) {
                     </Button>
                 )}
             </SheetTrigger>
-            <SheetContent className="p-3 overflow-y-auto sm:max-w-md">
+            <SheetContent
+                side="left"
+                className={`overflow-y-auto ${product ? "sm:max-w-2xl" : "sm:max-w-lg"}`}
+            >
                 <SheetHeader>
                     <SheetTitle>{product ? "تعديل المنتج" : "إضافة منتج جديد"}</SheetTitle>
                     <SheetDescription>
                         {product
                             ? "قم بإجراء التعديلات اللازمة على تفاصيل المنتج هنا."
-                            : "أضف منتجاً جديداً إلى مخزونك بكل تفاصيله."}
+                            : "أدخل بيانات المنتج واختر نوع المواصفة والألوان — الأصناف تُضاف من صفحة الأصناف."}
                     </SheetDescription>
                 </SheetHeader>
                 <div className="py-4">

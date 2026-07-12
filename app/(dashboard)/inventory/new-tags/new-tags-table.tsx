@@ -122,18 +122,9 @@ function ProductRow({ product, onToggle }: { product: NewTagProduct; onToggle: (
                 )}
             </td>
 
-            {/* Product Code */}
+            {/* Product Number */}
             <td className="px-4 py-3 w-[150px]">
-                <span className="text-xs font-mono text-muted-foreground">{product.productCode}</span>
-            </td>
-
-            {/* Item Number */}
-            <td className="px-4 py-3 w-[130px]">
-                {product.itemNumber ? (
-                    <span className="text-xs font-mono text-muted-foreground">{product.itemNumber}</span>
-                ) : (
-                    <span className="text-xs text-muted-foreground/40">—</span>
-                )}
+                <span className="text-xs font-mono text-muted-foreground">{product.productNumber}</span>
             </td>
         </tr>
     )
@@ -273,14 +264,13 @@ export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTabl
                                 <th className="px-4 py-3 w-[70px]" />
                                 <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider">الاسم</th>
                                 <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider w-[160px]">البراند</th>
-                                <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider w-[150px]">الرقم المركب</th>
-                                <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider w-[130px]">رقم الصنف</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider w-[150px]">رقم المنتج</th>
                             </tr>
                         </thead>
                         <tbody>
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="py-20 text-center">
+                                    <td colSpan={5} className="py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="h-14 w-14 rounded-full bg-muted/30 flex items-center justify-center">
                                                 <Package className="h-7 w-7 text-muted-foreground/30" />

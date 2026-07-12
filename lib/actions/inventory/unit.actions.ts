@@ -1,6 +1,8 @@
 'use server'
 
 import { prisma, serializeProduct, requireProduct, revalidateProduct } from './_shared'
+import { upsertProductToMeilisearch } from '@/lib/utils/meilisearch-sync'
+import { requireAuth } from '@/lib/auth-utils'
 
 // ─────────────────────────────────────────────────────────────
 // PRODUCT UNITS — Which units a product is sold in
@@ -15,6 +17,7 @@ export async function setProductUnits(
     units: { unitId: string; isBase: boolean; conversionFactor?: number; barcode?: string }[]
 ) {
     try {
+        await requireAuth()
         // Replace in a transaction to keep data consistent
         await prisma.$transaction(async (tx) => {
             await tx.productUnit.deleteMany({ where: { productId } })
@@ -30,16 +33,16 @@ export async function setProductUnits(
                     })),
                 })
             } else {
-                // If no units exist, the product cannot be available
-                await tx.product.update({
-                    where: { id: productId },
-                    data: { isAvailable: false }
+                await tx.sKC.updateMany({
+                    where: { productId },
+                    data: { isAvailable: false },
                 })
             }
         })
 
         const product = await requireProduct(productId)
         revalidateProduct(productId)
+        upsertProductToMeilisearch(productId).catch(console.warn)
         return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to set product units:', error)

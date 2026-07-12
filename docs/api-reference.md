@@ -345,34 +345,3 @@ GET /api/v1/bot/customers/{uuid}/pricing
 
 > إذا لم يُعثر على العميل → تُعاد جميع أسعار المنتج.  
 > إذا وُجد العميل → تُعاد فقط الأسعار المخصصة له.
-
----
-
-## Announcements API
-
-### `GET /announcements` — قائمة الإعلانات
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `status` | string | `sent` | حالة الإعلان |
-| `page` / `limit` | number | — | pagination |
-
----
-
-## Webhook (n8n)
-
-### `POST /api/webhooks/n8n` — نتيجة إرسال رسالة
-
-**Auth:** `Authorization: Bearer {N8N_WEBHOOK_SECRET}` أو `x-n8n-api-key: {N8N_WEBHOOK_SECRET}`
-
-**Body (الصيغة الجديدة — Source of Truth):**
-```json
-{
-  "messageId": "uuid",
-  "status": "success",
-  "providerId": "WAMID...",
-  "errorReason": null
-}
-```
-
-> **Idempotent:** إعادة الإرسال لنفس الـ messageId تُعاد بـ `alreadyProcessed: true` دون تأثير على العدادات.

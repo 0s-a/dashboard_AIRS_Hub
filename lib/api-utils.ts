@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 
 // ────────────────────────────────────────────────────────
 // API Key Validation
@@ -145,70 +144,4 @@ export function paginationMeta(total: number, page: number, limit: number) {
         limit,
         totalPages: Math.ceil(total / limit),
     }
-}
-
-// ────────────────────────────────────────────────────────
-// Order Helpers (shared between bot API & server actions)
-// ────────────────────────────────────────────────────────
-
-/**
- * Generate next 4-digit order number e.g. "0001".
- */
-export async function generateOrderNumber(): Promise<string> {
-    const last = await prisma.order.findFirst({
-        orderBy: { orderNumber: 'desc' },
-        select: { orderNumber: true },
-    })
-    const next = last ? parseInt(last.orderNumber, 10) + 1 : 1
-    return String(next).padStart(4, '0')
-}
-
-
-/**
- * Resolve a product by UUID, productCode, or itemNumber.
- * Returns the product with its core identifiers, or null.
- */
-export async function resolveProduct(identifier: { productId?: string; productCode?: string; productItemNumber?: string }) {
-    if (identifier.productId) {
-        return prisma.product.findUnique({
-            where: { id: identifier.productId },
-            select: { id: true, name: true, productCode: true, itemNumber: true },
-        })
-    }
-    if (identifier.productCode) {
-        return prisma.product.findUnique({
-            where: { productCode: identifier.productCode },
-            select: { id: true, name: true, productCode: true, itemNumber: true },
-        })
-    }
-    if (identifier.productItemNumber) {
-        return prisma.product.findFirst({
-            where: { itemNumber: identifier.productItemNumber },
-            select: { id: true, name: true, productCode: true, itemNumber: true },
-        })
-    }
-    return null
-}
-
-/**
- * Auto-resolve the best priceLabelId for a customer and product.
- * Finds the first ProductPrice matching one of the customer's assigned price labels.
- * Returns { priceLabelId, value, currencyId } or null.
- */
-export async function autoResolvePriceLabel(productId: string, customerId: string) {
-    const customer = await prisma.customer.findUnique({
-        where: { id: customerId },
-        select: { priceLabelId: true },
-    })
-    if (!customer?.priceLabelId) return null
-
-    const productPrice = await prisma.productPrice.findFirst({
-        where: {
-            productId,
-            priceLabelId: customer.priceLabelId,
-        },
-        include: { currency: true },
-    })
-
-    return productPrice
 }

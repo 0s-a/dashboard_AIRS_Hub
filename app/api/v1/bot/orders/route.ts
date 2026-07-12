@@ -1,37 +1,71 @@
 import { NextRequest } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
-import { generateItemNumber } from '@/lib/action-utils'
-import { ORDER_INCLUDE } from '@/lib/prisma-includes'
-import { z } from 'zod'
+import { validateApiKey, apiSuccess, apiError } from '@/lib/api-utils'
+import {
+    CreateOrderSchema,
+    GetOrdersDispatchSchema,
+    OrderIdQuerySchema,
+    UpdateOrderSchema,
+    createOrder,
+    listOrders,
+    getPendingOrder,
+    getOrderById,
+    updateOrder,
+    deleteOrder,
+} from '@/lib/orders'
+import { handleOrderServiceError } from '@/lib/orders/handle-error'
 
-// ────────────────────────────────────────────────────────
-// Validation Schema
-// ────────────────────────────────────────────────────────
+export async function GET(req: NextRequest) {
+    const authError = validateApiKey(req)
+    if (authError) return authError
 
-const OrderItemSchema = z.object({
-    productId: z.string().uuid(),
-    variantId: z.string().uuid().optional().nullable(),
-    quantity: z.number().int().min(1).default(1),
-    notes: z.string().optional().nullable(),
-})
+    try {
+        const { searchParams } = new URL(req.url)
+        const parsed = GetOrdersDispatchSchema.safeParse(Object.fromEntries(searchParams))
 
-const CreateOrderSchema = z.object({
-    customerId: z.string().uuid().optional().nullable(),
-    notes: z.string().optional().nullable(),
-    items: z.array(OrderItemSchema).min(1, 'يجب أن يحتوي الطلب على منتج واحد على الأقل'),
-})
+        if (!parsed.success) {
+            return apiError('بيانات غير صالحة', 400, {
+                code: 'VALIDATION_ERROR',
+                details: parsed.error.flatten(),
+            })
+        }
 
-// ────────────────────────────────────────────────────────
-// POST /api/v1/bot/orders — Create a new order
-// ────────────────────────────────────────────────────────
+        const { pending, id, ...listFilters } = parsed.data
+
+        if (pending) {
+            const order = await getPendingOrder({
+                customerId: listFilters.customerId,
+                phone: listFilters.phone,
+            })
+            return apiSuccess(order)
+        }
+
+        if (id) {
+            const order = await getOrderById(id)
+            return apiSuccess(order)
+        }
+
+        const result = await listOrders(listFilters)
+
+        return apiSuccess(result.orders, 200, {
+            count: result.orders.length,
+            pagination: {
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+                totalPages: result.totalPages,
+            },
+        })
+    } catch (error) {
+        return handleOrderServiceError(error)
+    }
+}
 
 export async function POST(req: NextRequest) {
     const authError = validateApiKey(req)
     if (authError) return authError
 
     try {
-        const body = await req.json()
+        const body = await req.json().catch(() => ({}))
         const parsed = CreateOrderSchema.safeParse(body)
 
         if (!parsed.success) {
@@ -41,78 +75,63 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        const { customerId, notes, items } = parsed.data
-
-        // ── Create order in transaction (prevents order number race condition) ──
-        const order = await prisma.$transaction(async (tx) => {
-            const orderNumber = await generateItemNumber('order')
-
-            return tx.order.create({
-                data: {
-                    orderNumber,
-                    customerId: customerId ?? null,
-                    notes: notes ?? null,
-                    items: {
-                        create: items.map(it => ({
-                            productId: it.productId,
-                            variantId: it.variantId ?? null,
-                            quantity: it.quantity,
-                            notes: it.notes ?? null,
-                        }))
-                    },
-                },
-                include: ORDER_INCLUDE,
-            })
-        })
-
+        const order = await createOrder(parsed.data)
         return apiSuccess(order, 201)
-    } catch (error: any) {
-        console.error('API Error [POST /orders]:', error?.message || error)
-        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
+    } catch (error) {
+        return handleOrderServiceError(error)
     }
 }
 
-// ────────────────────────────────────────────────────────
-// GET /api/v1/bot/orders — List orders (with optional filters)
-// ────────────────────────────────────────────────────────
-
-export async function GET(req: NextRequest) {
+export async function PATCH(req: NextRequest) {
     const authError = validateApiKey(req)
     if (authError) return authError
 
     try {
         const { searchParams } = new URL(req.url)
-        const customerId = searchParams.get('customerId')
-        const status = searchParams.get('status')
-        const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-        const limit = Math.max(1, Math.min(50, parseInt(searchParams.get('limit') || '20')))
-        const skip = (page - 1) * limit
+        const idParsed = OrderIdQuerySchema.safeParse(Object.fromEntries(searchParams))
 
-        // ── Build where clause ──
-        const where: Record<string, unknown> = {}
-        if (customerId) where.customerId = customerId
-        if (status) where.status = status
+        if (!idParsed.success) {
+            return apiError('يجب تمرير id في query parameters', 400, {
+                code: 'VALIDATION_ERROR',
+                details: idParsed.error.flatten(),
+            })
+        }
 
-        const [orders, total] = await Promise.all([
-            prisma.order.findMany({
-                where,
-                orderBy: { createdAt: 'desc' },
-                skip,
-                take: limit,
-                include: ORDER_INCLUDE,
-            }),
-            prisma.order.count({ where }),
-        ])
+        const body = await req.json().catch(() => ({}))
+        const parsed = UpdateOrderSchema.safeParse(body)
 
-        return apiSuccess(orders, 200, {
-            count: orders.length,
-            pagination: {
-                total, page, limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        })
-    } catch (error: any) {
-        console.error('API Error [GET /orders]:', error?.message || error)
-        return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })
+        if (!parsed.success) {
+            return apiError('بيانات غير صالحة', 400, {
+                code: 'VALIDATION_ERROR',
+                details: parsed.error.flatten(),
+            })
+        }
+
+        const order = await updateOrder(idParsed.data.id, parsed.data)
+        return apiSuccess(order)
+    } catch (error) {
+        return handleOrderServiceError(error)
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const authError = validateApiKey(req)
+    if (authError) return authError
+
+    try {
+        const { searchParams } = new URL(req.url)
+        const idParsed = OrderIdQuerySchema.safeParse(Object.fromEntries(searchParams))
+
+        if (!idParsed.success) {
+            return apiError('يجب تمرير id في query parameters', 400, {
+                code: 'VALIDATION_ERROR',
+                details: idParsed.error.flatten(),
+            })
+        }
+
+        const result = await deleteOrder(idParsed.data.id)
+        return apiSuccess(result)
+    } catch (error) {
+        return handleOrderServiceError(error)
     }
 }

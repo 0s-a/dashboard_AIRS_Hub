@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation } from '@/lib/action-utils'
+import { requireAuth } from '@/lib/auth-utils'
 
 const PATHS = '/notifications'
 
@@ -15,7 +16,9 @@ export async function getNotifications(filters?: {
     offset?: number
 }) {
     return safeAction(
-        () => prisma.aiNotification.findMany({
+        async () => {
+            await requireAuth()
+            return prisma.aiNotification.findMany({
             where: {
                 isArchived: filters?.isArchived ?? false,
                 ...(filters?.type ? { type: filters.type } : {}),
@@ -23,7 +26,7 @@ export async function getNotifications(filters?: {
             },
             include: {
                 product: {
-                    select: { id: true, name: true, itemNumber: true, isAvailable: true },
+                    select: { id: true, name: true, productNumber: true },
                 },
                 customer: {
                     select: { id: true, name: true },
@@ -32,14 +35,18 @@ export async function getNotifications(filters?: {
             orderBy: { createdAt: 'desc' },
             take: filters?.limit ?? 50,
             skip: filters?.offset ?? 0,
-        }),
+            })
+        },
         'تعذّر جلب الإشعارات'
     )
 }
 
 export async function getUnreadCount() {
     return safeAction(
-        () => prisma.aiNotification.count({ where: { isRead: false, isArchived: false } }),
+        async () => {
+            await requireAuth()
+            return prisma.aiNotification.count({ where: { isRead: false, isArchived: false } })
+        },
         'تعذّر عدّ الإشعارات'
     )
 }
@@ -47,6 +54,7 @@ export async function getUnreadCount() {
 export async function getNotificationStats() {
     return safeAction(
         async () => {
+            await requireAuth()
             const [total, unread, outOfStock, notFound, archived] = await Promise.all([
                 prisma.aiNotification.count({ where: { isArchived: false } }),
                 prisma.aiNotification.count({ where: { isRead: false, isArchived: false } }),
@@ -64,10 +72,13 @@ export async function getNotificationStats() {
 
 export async function markAsRead(id: string) {
     return safeActionWithRevalidation(
-        () => prisma.aiNotification.update({
+        async () => {
+            await requireAuth()
+            return prisma.aiNotification.update({
             where: { id },
             data: { isRead: true },
-        }),
+            })
+        },
         PATHS,
         'تعذّر تحديث الإشعار'
     )
@@ -75,10 +86,13 @@ export async function markAsRead(id: string) {
 
 export async function markAllAsRead() {
     return safeActionWithRevalidation(
-        () => prisma.aiNotification.updateMany({
+        async () => {
+            await requireAuth()
+            return prisma.aiNotification.updateMany({
             where: { isRead: false },
             data: { isRead: true },
-        }),
+            })
+        },
         PATHS,
         'تعذّر تعيين الكل مقروء'
     )
@@ -87,6 +101,7 @@ export async function markAllAsRead() {
 export async function deleteNotification(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             await prisma.aiNotification.delete({ where: { id } })
             return null
         },
@@ -98,6 +113,7 @@ export async function deleteNotification(id: string) {
 export async function clearOldNotifications(daysOld: number = 30) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             const cutoff = new Date()
             cutoff.setDate(cutoff.getDate() - daysOld)
             const result = await prisma.aiNotification.deleteMany({
@@ -112,7 +128,9 @@ export async function clearOldNotifications(daysOld: number = 30) {
 
 export async function archiveNotification(id: string, reason: string) {
     return safeActionWithRevalidation(
-        () => prisma.aiNotification.update({
+        async () => {
+            await requireAuth()
+            return prisma.aiNotification.update({
             where: { id },
             data: {
                 isArchived: true,
@@ -120,56 +138,27 @@ export async function archiveNotification(id: string, reason: string) {
                 archivedAt: new Date(),
                 archiveReason: reason,
             },
-        }),
+            })
+        },
         PATHS,
         'تعذّر أرشفة الإشعار'
     )
 }
 
-export async function archiveAllRead() {
-    return safeActionWithRevalidation(
-        () => prisma.aiNotification.updateMany({
-            where: { isRead: true, isArchived: false },
-            data: {
-                isArchived: true,
-                archivedAt: new Date(),
-                archiveReason: 'تم القراءة',
-            },
-        }),
-        PATHS,
-        'تعذّر أرشفة الكل'
-    )
-}
-
 export async function unarchiveNotification(id: string) {
     return safeActionWithRevalidation(
-        () => prisma.aiNotification.update({
+        async () => {
+            await requireAuth()
+            return prisma.aiNotification.update({
             where: { id },
             data: {
                 isArchived: false,
                 archivedAt: null,
                 archiveReason: null,
             },
-        }),
+            })
+        },
         PATHS,
         'تعذّر إلغاء الأرشفة'
-    )
-}
-
-// ── Create (called by Bot API) ───────────────────────────
-
-export async function createNotification(data: {
-    type: 'out_of_stock' | 'not_found'
-    searchQuery: string
-    productId?: string
-    productName?: string
-    customerId?: string
-    source?: string
-    phoneNumber?: string
-}) {
-    const payload = data
-    return safeAction(
-        () => prisma.aiNotification.create({ data: payload }),
-        'تعذّر إنشاء الإشعار'
     )
 }

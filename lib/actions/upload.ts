@@ -12,6 +12,7 @@ import {
     toDiskDir,
     toDisplayUrl,
 } from '@/lib/utils/image-paths'
+import { requireAuth } from '@/lib/auth-utils'
 
 // ─── Config aliases ───────────────────────────────────────────────────────────
 
@@ -33,18 +34,18 @@ function isValidImageType(file: File): boolean {
 
 /**
  * Build the sub-path for a product image folder.
- * e.g. "products/elc-ap-0001"
+ * e.g. "products/s-el-001"
  */
-function getProductSubDir(productCode: string): string {
-    return buildSubPath(STORAGE.productFolder, sanitizeSlug(productCode))
+function getProductSubDir(productNumber: string): string {
+    return buildSubPath(STORAGE.productFolder, sanitizeSlug(productNumber))
 }
 
 /**
  * Build the sub-path for a product image file.
- * e.g. "products/elc-ap-0001/01.webp"
+ * e.g. "products/x-ge-001/01.webp"
  */
-function getProductImageSubPath(productCode: string, filename: string): string {
-    return buildSubPath(getProductSubDir(productCode), filename)
+function getProductImageSubPath(productNumber: string, filename: string): string {
+    return buildSubPath(getProductSubDir(productNumber), filename)
 }
 
 // ─── Core Upload ──────────────────────────────────────────────────────────────
@@ -55,17 +56,18 @@ function getProductImageSubPath(productCode: string, filename: string): string {
  * Files are named by order: 01.webp, 02.webp, etc.
  *
  * @param file          - The image file to upload
- * @param productCode   - Product composite code (folder name, e.g. "ELC-AP-0001")
+ * @param productNumber - Product number folder name (e.g. "001")
  * @param order         - 0-based image order (produces filename: 01.webp, 02.webp, ...)
  * @param oldImagePath  - Optional old image path to delete before saving
  */
 export async function uploadProductImage(
     file: File,
-    productCode: string,
+    productNumber: string,
     order: number = 0,
     oldImagePath?: string | null
 ): Promise<{ success: boolean; url?: string; filename?: string; sizeBytes?: number; width?: number; height?: number; error?: string }> {
     try {
+        await requireAuth()
         // ── Validation ──────────────────────────────────────────────────────
         if (!file || file.size === 0) {
             return { success: false, error: 'لم يتم اختيار ملف — يُرجى اختيار صورة للرفع' }
@@ -86,12 +88,12 @@ export async function uploadProductImage(
             }
         }
 
-        if (!productCode?.trim()) {
+        if (!productNumber?.trim()) {
             return { success: false, error: 'رمز المنتج مطلوب — يُرجى إدخال رمز المنتج لتحديد مجلد الحفظ' }
         }
 
         // ── Prepare paths ────────────────────────────────────────────────────
-        const dirSubPath = getProductSubDir(productCode)
+        const dirSubPath = getProductSubDir(productNumber)
         const uploadDir = toDiskDir(dirSubPath)
         await mkdir(uploadDir, { recursive: true })
 
@@ -117,7 +119,7 @@ export async function uploadProductImage(
         await writeFile(filePath, buffer)
 
         // Sub-path for DB storage (no prefix)
-        const subPath = getProductImageSubPath(productCode, filename)
+        const subPath = getProductImageSubPath(productNumber, filename)
 
         const displayUrl = toDisplayUrl(subPath)
         console.log(
@@ -143,36 +145,6 @@ export async function uploadProductImage(
     }
 }
 
-/**
- * Upload multiple product images at once.
- * Files are auto-named by order: 01.webp, 02.webp, ...
- */
-export type UploadResult = Awaited<ReturnType<typeof uploadProductImage>>
-
-export async function uploadProductImages(
-    files: File[],
-    productCode: string,
-    startIndex: number = 0
-): Promise<{ success: boolean; results: UploadResult[]; errors?: string[] }> {
-    const results = await Promise.all(
-        files.map((file, i) => {
-            const order = startIndex + i
-            return uploadProductImage(file, productCode, order)
-        })
-    )
-
-    const errors: string[] = []
-    results.forEach((r, i) => {
-        if (!r.success) errors.push(`الصورة ${i + 1}: ${r.error}`)
-    })
-
-    return {
-        success: errors.length === 0,
-        results,
-        errors: errors.length > 0 ? errors : undefined,
-    }
-}
-
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
 /**
@@ -183,6 +155,7 @@ export async function deleteProductImage(
     imagePath: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        await requireAuth()
         if (!imagePath) return { success: true }
 
         // Resolve to disk path — handles both sub-paths and legacy full paths
@@ -209,12 +182,13 @@ export async function deleteProductImage(
  * Used when deleting a product.
  */
 export async function deleteProductFolder(
-    productCode: string
+    productNumber: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
-        if (!productCode?.trim()) return { success: true }
+        await requireAuth()
+        if (!productNumber?.trim()) return { success: true }
 
-        const folderPath = toDiskDir(getProductSubDir(productCode))
+        const folderPath = toDiskDir(getProductSubDir(productNumber))
         if (existsSync(folderPath)) {
             await rm(folderPath, { recursive: true, force: true })
             console.log(`✓ Product folder deleted: ${folderPath}`)
@@ -224,40 +198,5 @@ export async function deleteProductFolder(
     } catch (error) {
         console.error('Folder delete error:', error)
         return { success: false, error: 'تعذّر حذف مجلد الصور — يُرجى المحاولة مجدداً' }
-    }
-}
-
-// ─── Move / Rename ────────────────────────────────────────────────────────────
-
-/**
- * Move product images folder when productCode changes.
- * Called automatically when updating a product's productCode.
- */
-export async function moveProductImages(
-    oldProductCode: string,
-    newProductCode: string
-): Promise<{ success: boolean; error?: string }> {
-    try {
-        if (!oldProductCode || !newProductCode) return { success: true }
-        if (sanitizeSlug(oldProductCode) === sanitizeSlug(newProductCode)) return { success: true }
-
-        const oldDir = toDiskDir(getProductSubDir(oldProductCode))
-        const newDir = toDiskDir(getProductSubDir(newProductCode))
-
-        if (!existsSync(oldDir)) return { success: true }
-
-        // Ensure parent exists
-        const parentDir = toDiskDir('products')
-        await mkdir(parentDir, { recursive: true })
-
-        // Read all files and move them
-        const { rename } = await import('fs/promises')
-        await rename(oldDir, newDir)
-
-        console.log(`✓ Product images moved: ${oldProductCode} → ${newProductCode}`)
-        return { success: true }
-    } catch (error) {
-        console.error('Move images error:', error)
-        return { success: false, error: 'تعذّر نقل مجلد الصور — يُرجى المحاولة مجدداً' }
     }
 }

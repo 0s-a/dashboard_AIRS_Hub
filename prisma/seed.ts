@@ -68,6 +68,27 @@ const PRICE_LABELS = [
     { itemNumber: 'PL-005', name: 'سعر العرض',    customerType: null,         isDefault: false },
 ] as const
 
+const COLORS = [
+    { code: 'RD', name: 'أحمر',     hexCode: '#EF4444', order: 1 },
+    { code: 'BL', name: 'أزرق',     hexCode: '#3B82F6', order: 2 },
+    { code: 'GR', name: 'أخضر',     hexCode: '#22C55E', order: 3 },
+    { code: 'YL', name: 'أصفر',     hexCode: '#EAB308', order: 4 },
+    { code: 'BK', name: 'أسود',     hexCode: '#171717', order: 5 },
+    { code: 'WH', name: 'أبيض',     hexCode: '#FFFFFF', order: 6 },
+    { code: 'GY', name: 'رمادي',    hexCode: '#6B7280', order: 7 },
+    { code: 'BR', name: 'بني',      hexCode: '#92400E', order: 8 },
+    { code: 'OR', name: 'برتقالي',  hexCode: '#F97316', order: 9 },
+    { code: 'PK', name: 'وردي',     hexCode: '#EC4899', order: 10 },
+    { code: 'PR', name: 'بنفسجي',   hexCode: '#A855F7', order: 11 },
+    { code: 'CY', name: 'سماوي',    hexCode: '#06B6D4', order: 12 },
+    { code: 'GD', name: 'ذهبي',     hexCode: '#D97706', order: 13 },
+    { code: 'SV', name: 'فضي',      hexCode: '#9CA3AF', order: 14 },
+    { code: 'NV', name: 'كحلي',     hexCode: '#1E3A5F', order: 15 },
+    { code: 'OL', name: 'زيتي',     hexCode: '#65A30D', order: 16 },
+    { code: 'IN', name: 'نيلي',     hexCode: '#1D4ED8', order: 17 },
+    { code: 'ST', name: 'قياسي',    hexCode: '#9CA3AF', order: 0 },
+] as const
+
 // ─────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────
@@ -145,11 +166,24 @@ async function main() {
         logItem(pl.name)
     }
 
+    // ── 5b. Colors ─────────────────────────────────────────────
+
+    log('🎨', 'Seeding Colors...')
+    for (const color of COLORS) {
+        await prisma.color.upsert({
+            where:  { code: color.code },
+            update: {},
+            create: color,
+        })
+        logItem(`${color.name} (${color.code})`)
+    }
+
+    const defaultColor = await prisma.color.findUniqueOrThrow({ where: { code: 'ST' } })
+
     // ── 6. Sample Product (Test Only) ─────────────────────────
     //
-    // هذا المنتج للاختبار فقط — كود المنتج يستخدم "GEN-XX"
-    // لأنه لا ينتمي لفئة أو ماركة محددة.
-    // في الإنتاج، تُنشأ المنتجات عبر الواجهة مع توليد الكود تلقائياً.
+    // هذا المنتج للاختبار فقط — رقم المنتج "001" (3 خانات يدوية).
+    // في الإنتاج، يُدخل رقم المنتج عند الإنشاء من الواجهة.
 
     log('📦', 'Seeding Sample Product...')
 
@@ -163,14 +197,34 @@ async function main() {
     }
 
     const sampleProduct = await prisma.product.upsert({
-        where:  { productCode: 'GEN-XX-TEST-001' },
+        where:  { productNumber: '001' },
         update: {},
         create: {
-            productCode: 'GEN-XX-TEST-001',
-            itemNumber:  'TEST-001',
+            productNumber: '001',
+            slug:        'test-product',
             name:        'منتج اختبار',
             description: 'منتج تجريبي — يمكن حذفه بعد التشغيل الأول',
-            isAvailable: false,
+        },
+    })
+
+    const sampleSkc = await prisma.sKC.upsert({
+        where: { productId_colorId: { productId: sampleProduct.id, colorId: defaultColor.id } },
+        update: {},
+        create: {
+            productId: sampleProduct.id,
+            colorId: defaultColor.id,
+            itemNumber: 'TEST-001',
+            isDefault: true,
+        },
+    })
+
+    const sampleSku = await prisma.sKU.upsert({
+        where: { skuCode: '001-ST' },
+        update: {},
+        create: {
+            skcId: sampleSkc.id,
+            skuCode: '001-ST',
+            isDefault: true,
         },
     })
 
@@ -192,8 +246,8 @@ async function main() {
 
     await prisma.productPrice.upsert({
         where: {
-            productId_priceLabelId_currencyId_unitId: {
-                productId:    sampleProduct.id,
+            skuId_priceLabelId_currencyId_unitId: {
+                skuId:        sampleSku.id,
                 priceLabelId: defaultPriceLabel.id,
                 currencyId:   defaultCurrency.id,
                 unitId:       defaultUnit.id,
@@ -201,7 +255,7 @@ async function main() {
         },
         update: {},
         create: {
-            productId:    sampleProduct.id,
+            skuId:        sampleSku.id,
             priceLabelId: defaultPriceLabel.id,
             currencyId:   defaultCurrency.id,
             unitId:       defaultUnit.id,
@@ -209,7 +263,7 @@ async function main() {
         },
     })
 
-    logItem(`${sampleProduct.name} (${sampleProduct.productCode})`)
+    logItem(`${sampleProduct.name} (${sampleProduct.productNumber})`)
 
     // ── 7. Sample Customer (Test Only) ────────────────────────
 

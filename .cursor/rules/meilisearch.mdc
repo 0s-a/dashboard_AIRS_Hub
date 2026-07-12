@@ -1,0 +1,17 @@
+---
+description: Meilisearch — مزامنة وبحث مرن
+globs: lib/meilisearch.ts,lib/utils/meilisearch-sync.ts,app/api/v1/dashboard/meilisearch/**
+alwaysApply: false
+---
+
+# Meilisearch
+
+- العميل: `lib/meilisearch.ts` — `getMeilisearchClient()`, `MEILI_INDEX`
+- المزامنة: `lib/utils/meilisearch-sync.ts`
+- APIs: `app/api/v1/dashboard/meilisearch/*` — `requireDashboardAuth()`
+
+## قواعد
+
+- resilient: `.catch(console.warn)` — لا تعطّل التطبيق عند تعطّل Meili
+- بعد تعديل منتج/سعر: `upsertProductToMeilisearch(id).catch(console.warn)`
+- `MEILISEARCH_HOST`, `MEILISEARCH_MASTER_KEY` من env

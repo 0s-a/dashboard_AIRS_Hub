@@ -2,23 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import {
-    LayoutDashboard,
-    Package,
-    Users,
-    Layers,
-    UserSquare2,
-    Images,
-    Tag,
-    UserCog,
-    Coins,
-    Search,
-    Megaphone,
-    MessageSquare,
-    ShoppingCart,
-    ShieldCheck,
-    Bell,
-} from "lucide-react"
+import { Search } from "lucide-react"
 import {
     CommandDialog,
     CommandEmpty,
@@ -29,51 +13,16 @@ import {
     CommandSeparator,
 } from "@/components/ui/command"
 import { Button } from "@/components/ui/button"
+import { navigationGroups, settingsNavigationItem } from "@/lib/navigation"
 
-const navigationGroups = [
+const commandPaletteGroups = [
+    ...navigationGroups.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !item.hidden && !item.disabled),
+    })).filter((group) => group.items.length > 0),
     {
-        title: "الرئيسية",
-        items: [
-            { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, keywords: "dashboard home الرئيسية" },
-        ],
-    },
-    {
-        title: "الإعلانات والتواصل",
-        items: [
-            { href: "/announcements", label: "الإعلانات", icon: Megaphone, keywords: "announcements ads إعلانات حملات تعميم" },
-            { href: "/announcements/templates", label: "قوالب الرسائل", icon: MessageSquare, keywords: "templates messages قوالب رسائل واتساب" },
-        ],
-    },
-    {
-        title: "الطلبات والمخزون",
-        items: [
-            { href: "/orders", label: "الطلبات", icon: ShoppingCart, keywords: "orders sales طلبات مبيعات فاتورة" },
-            { href: "/inventory", label: "المخزون", icon: Package, keywords: "inventory products منتجات مخزون بضاعة" },
-            { href: "/categories", label: "التصنيفات", icon: Layers, keywords: "categories تصنيفات اقسام" },
-        ],
-    },
-    {
-        title: "العملاء والمستخدمين",
-        items: [
-            { href: "/customers", label: "العملاء والعملاء", icon: Users, keywords: "customers people عملاء عملاء زبون" },
-            { href: "/groups", label: "المجموعات", icon: UserSquare2, keywords: "groups مجموعات فئة" },
-            { href: "/customer-types", label: "أنواع العملاء", icon: UserCog, keywords: "customer types أنواع" },
-            { href: "/users", label: "المستخدمين", icon: ShieldCheck, keywords: "users admin مستخدمين إدارة موظفين" },
-        ],
-    },
-    {
-        title: "الإعدادات والنظام",
-        items: [
-            { href: "/price-labels", label: "مسميات التسعيرات", icon: Tag, keywords: "price labels تسعيرات أسعار" },
-            { href: "/currencies", label: "العملات", icon: Coins, keywords: "currencies عملات صرف" },
-            { href: "/notifications", label: "الإشعارات", icon: Bell, keywords: "notifications alerts إشعارات تنبيهات" },
-        ],
-    },
-    {
-        title: "الوسائط",
-        items: [
-            { href: "/gallery", label: "معرض الصور", icon: Images, keywords: "gallery images صور معرض" },
-        ],
+        title: "الإعدادات",
+        items: [settingsNavigationItem],
     },
 ]
 
@@ -99,7 +48,6 @@ export function CommandPalette() {
 
     return (
         <>
-            {/* Search trigger button */}
             <Button
                 variant="outline"
                 onClick={() => setOpen(true)}
@@ -112,7 +60,6 @@ export function CommandPalette() {
                 </kbd>
             </Button>
 
-            {/* Command Dialog */}
             <CommandDialog open={open} onOpenChange={setOpen}>
                 <CommandInput placeholder="ابحث عن صفحة، منتج، أو أمر..." />
                 <CommandList>
@@ -125,7 +72,7 @@ export function CommandPalette() {
                             <p className="text-xs text-muted-foreground/60">جرب استخدام كلمات مفتاحية أخرى</p>
                         </div>
                     </CommandEmpty>
-                    {navigationGroups.map((group, idx) => (
+                    {commandPaletteGroups.map((group, idx) => (
                         <div key={group.title}>
                             {idx > 0 && <CommandSeparator />}
                             <CommandGroup heading={group.title}>
@@ -134,7 +81,7 @@ export function CommandPalette() {
                                     return (
                                         <CommandItem
                                             key={item.href}
-                                            value={`${item.label} ${item.keywords}`}
+                                            value={`${item.label} ${item.keywords ?? ""}`}
                                             onSelect={() => handleSelect(item.href)}
                                             className="gap-3 px-3 py-2.5 cursor-pointer rounded-lg hover:bg-muted/60 transition-colors"
                                         >

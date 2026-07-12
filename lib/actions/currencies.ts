@@ -3,6 +3,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation, generateItemNumber } from '@/lib/action-utils'
+import { requireAuth } from '@/lib/auth-utils'
 
 
 const PATHS = '/currencies'
@@ -10,6 +11,7 @@ const PATHS = '/currencies'
 export async function getCurrencies() {
     return safeAction(
         async () => {
+            await requireAuth()
             const rows = await prisma.currency.findMany({
                 orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
             })
@@ -41,6 +43,7 @@ export async function getDefaultCurrency() {
 export async function getActiveCurrencies() {
     return safeAction(
         async () => {
+            await requireAuth()
             const rows = await prisma.currency.findMany({
                 orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
             })
@@ -60,6 +63,7 @@ export async function createCurrency(data: {
 }) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             if (data.isDefault) {
                 // Clear all existing defaults first
                 await prisma.currency.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
@@ -98,6 +102,7 @@ export async function updateCurrency(id: string, data: {
 }) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             if (data.isDefault) {
                 // Clear all existing defaults, keep the one being updated
                 await prisma.currency.updateMany(
@@ -133,6 +138,7 @@ export async function updateCurrency(id: string, data: {
 export async function deleteCurrency(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             const linkedCount = await prisma.productPrice.count({ where: { currencyId: id } })
             if (linkedCount > 0) {
                 throw new Error(`لا يمكن حذف هذه العملة — مرتبطة بـ ${linkedCount} تسعيرة منتج`)
@@ -148,6 +154,7 @@ export async function deleteCurrency(id: string) {
 export async function setDefaultCurrency(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             await prisma.currency.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
             const updated = await prisma.currency.update({ where: { id }, data: { isDefault: true } })
             return { ...updated, exchangeRate: updated.exchangeRate?.toString() ?? null }
@@ -159,5 +166,6 @@ export async function setDefaultCurrency(id: string) {
 
 
 export async function getNextCurrencyItemNumber() {
+    await requireAuth()
     return generateItemNumber('currency')
 }

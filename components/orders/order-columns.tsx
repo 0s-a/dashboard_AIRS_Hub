@@ -9,27 +9,37 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Pencil, Trash2, Package, CheckCircle2, Clock, XCircle, Truck, ShoppingBag, ExternalLink } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, Package, CheckCircle2, Clock, XCircle, Truck, ShoppingBag, ExternalLink, Printer } from "lucide-react"
 import { deleteOrder, updateOrderStatus } from "@/lib/actions/orders"
 import { toast } from "sonner"
 import { OrderSheet } from "./order-sheet"
 import Link from "next/link"
 import { calcOrderTotal } from "@/lib/order-utils"
+import { ORDER_STATUS_CONFIG, ORDER_STATUS_LIST, type OrderStatusValue } from "@/lib/order-constants"
 
 // ─── Status Config ────────────────────────────────────────────────────────────
+// استخدام ORDER_STATUS_LIST من constants — مصدر موحّد
+// نُضيف icon هنا لأن constants لا تستورد React components
 
-export const ORDER_STATUSES = [
-    { value: "pending",    label: "معلق",       icon: Clock,         color: "bg-yellow-500/10 text-yellow-600 border-yellow-200 dark:border-yellow-800" },
-    { value: "confirmed",  label: "مؤكد",       icon: CheckCircle2,  color: "bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800" },
-    { value: "processing", label: "قيد التجهيز", icon: Package,       color: "bg-violet-500/10 text-violet-600 border-violet-200 dark:border-violet-800" },
-    { value: "shipped",    label: "تم الشحن",    icon: Truck,         color: "bg-indigo-500/10 text-indigo-600 border-indigo-200 dark:border-indigo-800" },
-    { value: "delivered",  label: "تم التسليم",  icon: ShoppingBag,   color: "bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800" },
-    { value: "cancelled",  label: "ملغي",        icon: XCircle,       color: "bg-red-500/10 text-red-600 border-red-200 dark:border-red-800" },
-]
+const STATUS_ICONS: Record<OrderStatusValue, React.ComponentType<{ className?: string }>> = {
+    pending:    Clock,
+    confirmed:  CheckCircle2,
+    processing: Package,
+    shipped:    Truck,
+    delivered:  ShoppingBag,
+    cancelled:  XCircle,
+}
+
+/** للتوافق مع order-sheet.tsx الذي يستورد ORDER_STATUSES من هنا */
+export const ORDER_STATUSES = ORDER_STATUS_LIST.map(s => ({
+    ...s,
+    icon: STATUS_ICONS[s.value],
+}))
 
 export function StatusBadge({ status }: { status: string }) {
-    const cfg = ORDER_STATUSES.find(s => s.value === status) ?? ORDER_STATUSES[0]
-    const Icon = cfg.icon
+    const cfg = ORDER_STATUS_CONFIG[status as OrderStatusValue]
+        ?? { label: status, color: 'bg-muted text-muted-foreground border-border' }
+    const Icon = STATUS_ICONS[status as OrderStatusValue] ?? Package
     return (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cfg.color}`}>
             <Icon className="size-3" />
@@ -80,6 +90,12 @@ function ActionsCell({ row, customers, products }: { row: any, customers: any[],
                         <Link href={`/orders/${order.id}`} className="flex items-center cursor-pointer">
                             <ExternalLink className="size-4 ml-2 text-violet-500" />
                             عرض تفاصيل الطلب
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href={`/invoice/${order.id}`} target="_blank" className="flex items-center cursor-pointer">
+                            <Printer className="size-4 ml-2 text-blue-500" />
+                            طباعة الفاتورة
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -156,19 +172,28 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
                     <div className="flex flex-col gap-0.5 py-0.5">
                         {visibleItems.map((item: any, i: number) => (
                             <div key={i} className="flex items-center gap-1.5 text-xs">
-                                {item.variant?.hex && (
+                                {item.sku?.skc?.color?.hexCode && (
                                     <span
                                         className="size-2.5 rounded-full border border-black/10 shrink-0"
-                                        style={{ backgroundColor: item.variant.hex }}
+                                        style={{ backgroundColor: item.sku.skc.color.hexCode }}
                                     />
                                 )}
                                 <span className="text-foreground/80 truncate max-w-[140px]">
                                     {item.product?.name ?? '—'}
-                                    {item.variant?.name && (
-                                        <span className="text-muted-foreground/60"> ({item.variant.name})</span>
+                                    {(item.sku?.skc?.color?.name || item.sku?.sizeLabel) && (
+                                        <span className="text-muted-foreground/60">
+                                            {' '}({[item.sku?.skc?.color?.name, item.sku?.sizeLabel].filter(Boolean).join(' / ')})
+                                        </span>
                                     )}
                                 </span>
-                                <span className="text-foreground font-semibold shrink-0 mr-auto">×{item.quantity}</span>
+                                <span className="text-foreground font-semibold shrink-0 mr-auto">
+                                    ×{item.quantity}
+                                    {item.unit?.name && (
+                                        <span className="text-muted-foreground font-normal text-[9px] mr-0.5">
+                                            {item.unit.name}
+                                        </span>
+                                    )}
+                                </span>
                             </div>
                         ))}
                         {extraCount > 0 && (

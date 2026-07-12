@@ -2,6 +2,8 @@
 // Product Types — Centralized type definitions for inventory module
 // ============================================================
 
+import type { SkuSpecKind } from '@/lib/config/sku-spec.config'
+
 // ─── Image Types ────────────────────────────────────────────
 
 /**
@@ -17,50 +19,19 @@ export type ProductImage = {
 /** Image entry for create/update operations */
 export type ImageEntry = { url?: string; alt?: string; isPrimary: boolean; order?: number }
 
-// ─── Image Helpers ──────────────────────────────────────────
-
-/** Helper to get primary image from images array */
-export function getPrimaryImage(images: ProductImage[] | null): ProductImage | null {
-    if (!images || images.length === 0) return null
-    return images.find(img => img.isPrimary) || images[0]
-}
-
-/** Helper to get primary image URL */
-export function getPrimaryImageUrl(images: ProductImage[] | null): string | null {
-    const primaryImage = getPrimaryImage(images)
-    return primaryImage?.url || null
-}
-
-/** Validate images array */
-export function validateProductImages(images: ProductImage[]): { valid: boolean; error?: string } {
-    if (images.length === 0) {
-        return { valid: false, error: 'يجب إضافة صورة واحدة على الأقل' }
-    }
-    if (images.length > 10) {
-        return { valid: false, error: 'الحد الأقصى 10 صور' }
-    }
-    const primaryImages = images.filter(img => img.isPrimary)
-    if (primaryImages.length === 0) {
-        return { valid: false, error: 'يجب تحديد صورة رئيسية واحدة' }
-    }
-    if (primaryImages.length > 1) {
-        return { valid: false, error: 'لا يمكن تحديد أكثر من صورة رئيسية واحدة' }
-    }
-    return { valid: true }
-}
-
 // ─── Product Input Types ─────────────────────────────────────
 
 /** Input for creating/updating a product */
 export interface ProductInput {
-    itemNumber?: string | null    // Optional manual code
     name: string
+    productNumber: string
+    slug?: string
     brandId?: string | null
     description?: string | null
-    isAvailable?: boolean
     categoryId?: string | null
     alternativeNames?: string[]
     tags?: string[]
+    skuSpecKind?: SkuSpecKind
 }
 
 // ─── Serialized Types (returned to client) ───────────────────
@@ -116,7 +87,6 @@ export type ProductsFilters = {
     search?: string
     categoryId?: string
     brandId?: string
-    isAvailable?: boolean
     hasPrices?: boolean
     page?: number
     limit?: number
@@ -129,8 +99,8 @@ export type ProductsFilters = {
 /** The shape returned by serializeProduct() — used in table/list views */
 export type SerializedProduct = {
     id: string
-    productCode: string          // Auto-generated composite code
-    itemNumber: string | null     // Optional manual code
+    productNumber: string
+    slug: string
     name: string
     brandId: string | null
     brandRef: {
@@ -140,17 +110,20 @@ export type SerializedProduct = {
         logo: string | null
     } | null
     description: string | null
-    isAvailable: boolean
     alternativeNames: string[]  // always an array, never null
     tags: string[]              // always an array, never null
     categoryId: string | null
     category: SerializedCategory | null
+    skuSpecKind: SkuSpecKind
     createdAt: string
     updatedAt: string
     mediaImages: ProductMediaImage[]
-    variants: ProductVariantWithImages[]
+    skcs: import('@/lib/types/skc').SerializedSKC[]
+    skcCount: number
     productPrices: SerializedPrice[]
     productUnits: ProductUnitEntry[]
+    /** @deprecated use skcs */
+    variants: ProductVariantWithImages[]
 }
 
 
@@ -198,5 +171,5 @@ export type ProductMediaImage = {
     width?: number | null
     height?: number | null
     sizeBytes?: number | null
-    variantIds?: string[]
+    skcIds?: string[]
 }

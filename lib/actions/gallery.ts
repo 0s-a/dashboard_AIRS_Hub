@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
+import { requireAuth } from '@/lib/auth-utils'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -13,9 +14,11 @@ export type GalleryImage = {
     width: number | null
     height: number | null
     isPrimary: boolean
+    skcId: string
+    defaultSkuId: string | null
     productId: string
     productName: string
-    productCode: string
+    productNumber: string
     itemNumber: string | null
     categoryName: string | null
 }
@@ -30,8 +33,7 @@ const PAGE_SIZE = 30
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 /**
- * Paginated gallery — fetches images via the ProductImage junction table
- * with cursor-based pagination for efficient "load more".
+ * Paginated gallery — images linked to SKC only.
  */
 export async function getGalleryImages(cursor?: string): Promise<{
     success: boolean
@@ -40,8 +42,9 @@ export async function getGalleryImages(cursor?: string): Promise<{
     error?: string
 }> {
     try {
+        await requireAuth()
         const productImages = await prisma.productImage.findMany({
-            take: PAGE_SIZE + 1, // fetch one extra to check if there's more
+            take: PAGE_SIZE + 1,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
             orderBy: [{ createdAt: 'desc' }],
             select: {
@@ -52,13 +55,23 @@ export async function getGalleryImages(cursor?: string): Promise<{
                 width: true,
                 height: true,
                 isPrimary: true,
-                product: {
+                skcId: true,
+                skc: {
                     select: {
-                        id: true,
-                        name: true,
-                        productCode: true,
                         itemNumber: true,
-                        category: { select: { name: true } },
+                        skus: {
+                            orderBy: [{ isDefault: "desc" }, { order: "asc" }],
+                            take: 1,
+                            select: { id: true },
+                        },
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                productNumber: true,
+                                category: { select: { name: true } },
+                            },
+                        },
                     },
                 },
             },
@@ -75,11 +88,13 @@ export async function getGalleryImages(cursor?: string): Promise<{
             width: pi.width,
             height: pi.height,
             isPrimary: pi.isPrimary,
-            productId: pi.product.id,
-            productName: pi.product.name,
-            productCode: pi.product.productCode,
-            itemNumber: pi.product.itemNumber,
-            categoryName: pi.product.category?.name ?? null,
+            skcId: pi.skcId,
+            defaultSkuId: pi.skc.skus[0]?.id ?? null,
+            productId: pi.skc.product.id,
+            productName: pi.skc.product.name,
+            productNumber: pi.skc.product.productNumber,
+            itemNumber: pi.skc.itemNumber,
+            categoryName: pi.skc.product.category?.name ?? null,
         }))
 
         return {
@@ -93,18 +108,17 @@ export async function getGalleryImages(cursor?: string): Promise<{
     }
 }
 
-/**
- * Quick stats for the gallery header.
- */
+/** Quick stats for the gallery header. */
 export async function getGalleryStats(): Promise<{
     success: boolean
     data: GalleryStats
 }> {
     try {
+        await requireAuth()
         const [totalImages, productsWithImages] = await Promise.all([
             prisma.productImage.count(),
             prisma.product.count({
-                where: { productImages: { some: {} } },
+                where: { skcs: { some: { images: { some: {} } } } },
             }),
         ])
 

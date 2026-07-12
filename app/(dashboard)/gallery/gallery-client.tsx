@@ -29,6 +29,13 @@ interface GalleryClientProps {
     stats: GalleryStats
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function galleryItemHref(img: GalleryImage): string {
+    if (img.defaultSkuId) return `/items/${img.defaultSkuId}`
+    return `/items?productId=${img.productId}`
+}
+
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 
 function Lightbox({
@@ -68,7 +75,7 @@ function Lightbox({
             {/* Product info top-left */}
             <div className="absolute top-4 left-4 z-10">
                 <Link
-                    href={`/inventory/${img.productId}`}
+                    href={galleryItemHref(img)}
                     onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-2 bg-primary/90 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-xl hover:bg-primary transition-colors shadow-lg"
                 >
@@ -190,7 +197,7 @@ function ImageCard({
 
             {/* Footer — Product Info */}
             <Link
-                href={`/inventory/${image.productId}`}
+                href={galleryItemHref(image)}
                 className="block p-3 group/link hover:bg-muted/30 transition-colors"
             >
                 <div className="flex items-start justify-between gap-2">
@@ -199,7 +206,7 @@ function ImageCard({
                             {image.productName}
                         </p>
                         <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                            #{image.productCode}
+                            #{image.productNumber}
                         </p>
                     </div>
                     <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50 group-hover/link:text-primary transition-colors shrink-0 mt-0.5" />

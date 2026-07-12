@@ -141,17 +141,15 @@ export async function generateItemNumber(
  * Always prefers the default currency (isDefault=true) over other currencies.
  * Falls back to any available price if no default-currency price exists.
  */
-export async function resolveProductPrice(productId: string, priceLabelId: string, unitId?: string) {
-    const baseWhere = { productId, priceLabelId, ...(unitId ? { unitId } : {}) }
+export async function resolveSkuPrice(skuId: string, priceLabelId: string, unitId?: string) {
+    const baseWhere = { skuId, priceLabelId, ...(unitId ? { unitId } : {}) }
 
-    // 1️⃣ Try to find the price in the default currency first
     const defaultCurrencyPrice = await prisma.productPrice.findFirst({
         where: { ...baseWhere, currency: { isDefault: true } },
         include: { currency: true, unit: true },
     })
     if (defaultCurrencyPrice) return defaultCurrencyPrice
 
-    // 2️⃣ Fallback: any price for this product + label
     return prisma.productPrice.findFirst({
         where: baseWhere,
         include: { currency: true, unit: true },

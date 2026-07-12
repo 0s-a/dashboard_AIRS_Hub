@@ -1,110 +1,77 @@
-# AI-Driven Admin Dashboard & CRM
+# Nawaat CRM
 
-This project is the core "Brain" for an intelligent application ecosystem. It serves as a centralized Inventory and CRM system that powers both an administrative dashboard and an automated Chatbot via a secure API.
+نظام إدارة متجر وعلاقات عملاء (CRM) بالعربية — يشغّل لوحة تحكم إدارية وبوت واتساب عبر API آمن.
 
-## 🚀 Key Features
+## الميزات
 
-### 1. Live Inventory Management
-*   **Real-time Data Grid**: View, search, and filter products instantly.
-*   **CRUD Operations**: Full Add, Edit, and Update capabilities.
-*   **AI Integration**: Generates professional product marketing descriptions in Arabic using Google Gemini.
-*   **Image Support**: Visual thumbnails and URL-based image management.
-*   **Optimistic UI**: Instant feedback on availability toggles.
+- **المخزون**: منتجات، variants، تصنيفات، براندات، استيراد CSV، Meilisearch
+- **التسعير**: PriceLabel × عملة × وحدة — تسعيرة ديناميكية لكل عميل
+- **الطلبات**: دورة حياة كاملة مع snapshot للسعر، فواتير قابلة للطباعة
+- **CRM**: عملاء، مشرفون
+- **البوت**: API محمي بـ `x-api-key` للبحث والتسعير والطلبات
 
-### 2. CRM (Customer Relationship Management)
-*   **Customer Profiles**: Manage customer details and history.
-*   **Dynamic Tiering**: Assign tiers (RETAIL, WHOLESALE, VIP) that automatically dictate pricing.
-*   **Soft Delete**: Safely deactivate customers without losing historical data.
-*   **Visual Enhancements**: Initials-based avatars and color-coded tier badges.
+## التقنيات
 
-### 3. External "Bot" API Layer
-*   **Product Feed**: Secure endpoint (`GET /api/v1/bot/products`) for the chatbot to query availability.
-*   **Smart Pricing**: Endpoint (`POST /api/v1/bot/check-price`) that calculates the exact price for a customer based on their tier.
-*   **Security**: Protected by a customizable `x-api-key`.
+| الطبقة | التقنية |
+|--------|---------|
+| Frontend | Next.js 16, React 19, Tailwind, shadcn/ui |
+| Backend | Server Actions, Prisma, PostgreSQL |
+| Search | Meilisearch |
+| Deploy | Docker |
 
-### 4. Modern UI/UX
-*   **Tech Stack**: Next.js 14, TypeScript, Prisma, Tailwind CSS, Shadcn/ui.
-*   **Dark Mode**: Fully supported with a seamless toggle.
-*   **Responsive**: Mobile-friendly sidebar and layouts.
+## البدء السريع (Docker)
 
----
-
-## 🛠️ Getting Started
-
-### Prerequisites
-*   Node.js 18+
-*   PostgreSQL
-
-### Installation
-
-1.  **Clone the repository:**
-    ```bash
-    git clone <repo-url>
-    cd dash
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-
-3.  **Configure Environment Variables:**
-    Create a `.env` file in the root directory:
-    ```env
-    DATABASE_URL="postgresql://user:password@localhost:5432/dash"
-    GOOGLE_GEMINI_API_KEY="your-gemini-api-key"
-    BOT_API_KEY="your-secret-bot-key"
-    ```
-
-4.  **Database Setup:**
-    ```bash
-    # Push schema to database
-    npx prisma db push
-
-    # (Optional) Seed with sample data
-    npx prisma db seed
-    ```
-
-5.  **Run Development Server:**
-    ```bash
-    npm run dev
-    ```
-    Visit `http://localhost:3000`
-
----
-
-## 📚 API Documentation
-
-### Authentication
-All requests to `/api/v1/bot/*` must include the header:
-`x-api-key: <your-BOT_API_KEY>`
-
-### Endpoints
-
-#### `GET /api/v1/bot/products`
-Returns a list of all *available* products with their details.
-
-#### `POST /api/v1/bot/check-price`
-Calculates the price for a specific customer/product combination.
-
-**Body:**
-```json
-{
-  "phoneNumber": "+1234567890",
-  "productId": "uuid-of-product"
-}
+```bash
+cp .env.example .env.development   # ثم عبّئ القيم
+npm run up                         # postgres + rabbitmq + meilisearch + app
+npm run db:migrate
+npm run db:seed                    # اختياري
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "productId": "...",
-    "customerTier": "VIP",
-    "price": 900.00,
-    "currency": "SAR"
-  }
-}
+افتح `http://localhost:3000`
+
+### أوامر مفيدة
+
+| الأمر | الوظيفة |
+|-------|---------|
+| `npm run down` | إيقاف الخدمات |
+| `npm run rebuild` | إعادة بناء وتشغيل الحاويات |
+| `npm run logs` | سجلات جميع خدمات التطوير |
+| `npm run logs:app` | سجلات التطبيق |
+| `npm run shell` | shell داخل الحاوية |
+| `npm run db:generate` | توليد Prisma client بعد تغيير schema |
+| `npm run lint` | ESLint |
+| `npm run build` | بناء الإنتاج |
+| `npm run reset:dev` | إعادة ضبط كاملة — **يحذف بيانات قاعدة البيانات والخدمات** |
+
+> قائمة أوامر كاملة (تطوير، إنتاج، prisma): راجع [AGENTS.md](AGENTS.md).
+
+**منافذ التطوير:** app `3000`, postgres `5430`, meilisearch `7700`, rabbitmq `5672`
+
+## التسعير
+
+- كل عميل له **PriceLabel** (مسمى تسعير) اختياري
+- `POST /api/v1/bot/check-price` يحسب السعر حسب `customer.priceLabelId`
+
+## API البوت
+
+جميع طلبات `/api/v1/bot/*` تتطلب:
+
 ```
-# dashboard_AIRS_Hub
+x-api-key: <BOT_API_KEY>
+```
+
+راجع `app/api-docs` أو `public/openapi.json` للتوثيق الكامل.
+
+## للمطورين والوكلاء
+
+- **[AGENTS.md](AGENTS.md)** — تعليمات Cursor والوكلاء
+- **[PROJECT.md](PROJECT.md)** — خريطة معمارية
+- **`.cursor/rules/`** — قواعد المشروع
+- **`.cursor/skills/`** — مهارات متخصصة
+
+## المصادقة
+
+- لوحة التحكم: JWT cookie — كل المستخدمين لهم نفس الصلاحيات (لا أدوار)
+- البوت: `x-api-key`
+- Webhooks: `N8N_WEBHOOK_SECRET`

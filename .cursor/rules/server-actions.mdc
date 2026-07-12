@@ -1,0 +1,27 @@
+---
+description: أنماط Server Actions في lib/actions
+globs: lib/actions/**
+alwaysApply: false
+---
+
+# Server Actions
+
+## النمط الإلزامي
+
+```typescript
+// القراءة
+export const getX = () => safeAction(() => prisma.x.findMany(), 'رسالة خطأ')
+
+// الكتابة مع revalidation
+export const createX = (data) =>
+  safeActionWithRevalidation(() => prisma.x.create({ data }), '/path', 'رسالة خطأ')
+```
+
+## قواعد
+
+- `'use server'` في أعلى كل ملف action
+- `requireAuth()` من `lib/auth-utils.ts` للعمليات الحساسة — **لا نظام أدوار**، كل مستخدم مسجّل = صلاحيات كاملة
+- استثناءات بدون auth: `auth.ts`، `getStoreSettings()` (صفحة login)، `getOrderById()` و `getDefaultCurrency()` (فاتورة عامة)
+- لا تُرجع أخطاء Prisma خام — استخدم `safeAction`
+- تعديلات المخزون: `upsertProductToMeilisearch(id).catch(console.warn)` بعد التغيير
+- الملفات المساعدة الداخلية (مثل `_shared.ts`) بدون `'use server'`

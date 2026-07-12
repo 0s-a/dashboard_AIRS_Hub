@@ -1,0 +1,49 @@
+---
+description: أنماط المكونات — جداول، نماذج، sheets، صور، حالات UI
+globs: components/**
+alwaysApply: false
+---
+
+# Frontend Patterns
+
+## CRUD Catalog
+
+نموذج مرجعي: `components/colors/` — form + sheet + table + columns
+
+## الجداول
+
+| الوضع | متى | الإعداد |
+|-------|-----|---------|
+| Client | كتالوجات صغيرة | `DataTable` مع pagination مدمج |
+| Server | قوائم كبيرة | `showPagination={false}` + `ServerPagination` + debounce 350ms |
+
+- `*-table.tsx` — غلاف رفيع حول `components/ui/data-table.tsx`
+- رأس العمود: `<div className="text-start pe-0">العنوان</div>`
+- فلاتر: `meta: { filterType, filterPlaceholder }` + `enableColumnFilter: true`
+- حذف: `AlertDialog` تأكيد عربي قبل `deleteX()`
+- تعديل: `createColumns({ onEdit, onDelete })` — **لا `CustomEvent`** في كود جديد
+
+## النماذج
+
+- `react-hook-form` + `zodResolver` + shadcn `Form`
+- zod inline في `*-form.tsx`؛ رسائل validation بالعربية
+- إرسال: `createX` / `updateX` من `lib/actions/`
+- نجاح: `toast.success` + `router.refresh()` + `onSuccess?.()`
+- فشل: `toast.error(res.error || '...')` — لا أخطاء Prisma خام
+- زر الحفظ: `Loader2` أثناء `form.formState.isSubmitting`
+
+## Sheets
+
+- `side="left"`, `sm:max-w-lg overflow-y-auto`
+- `*-sheet.tsx` يغلّف `*-form.tsx`
+
+## حالات UI
+
+- Empty: مدمج في `DataTable` (نص عربي)
+- Loading: `Loader2` أو `Skeleton`
+- فشل fetch: `toast.error` — لا صمت عند `res.success === false`
+
+## الصور
+
+- عرض: `next/image` + `toDisplayUrl()` من `lib/utils/image-paths.ts`
+- رفع: `components/ui/image-gallery-upload.tsx`

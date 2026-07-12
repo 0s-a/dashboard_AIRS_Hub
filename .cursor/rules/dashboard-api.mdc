@@ -1,0 +1,25 @@
+---
+description: Dashboard API routes — JWT cookie auth
+globs: app/api/v1/dashboard/**
+alwaysApply: false
+---
+
+# Dashboard API
+
+## النمط الإلزامي
+
+```typescript
+const authError = await requireDashboardAuth()
+if (authError) return authError
+```
+
+من `lib/route-auth.ts` — يقرأ JWT cookie (`auth-token`).
+
+## توزيع المصادقة حسب المسار
+
+| المسار | Auth |
+|--------|------|
+| `/api/v1/dashboard/**` | `requireDashboardAuth()` |
+| `/api/v1/bot/**` | `validateApiKey()` |
+
+لا أدوار — أي مستخدم مسجّل = صلاحيات كاملة.

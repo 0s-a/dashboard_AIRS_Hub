@@ -3,16 +3,24 @@
 import { prisma } from '@/lib/actions/inventory/_shared'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
 import type { PaginationMeta } from '@/lib/types/product'
+import { requireAuth } from '@/lib/auth-utils'
 
 // Slim include — only what the new-tags page needs
 const NEW_TAGS_INCLUDE = {
     brandRef: { select: { id: true, name: true, code: true, logo: true } },
-    productImages: { where: { isPrimary: true }, take: 1, select: { url: true, alt: true } },
+    skcs: {
+        orderBy: { order: 'asc' as const },
+        select: {
+            itemNumber: true,
+            isDefault: true,
+            images: { where: { isPrimary: true }, take: 1, select: { url: true, alt: true } },
+        },
+    },
 } as const
 
 export interface NewTagProduct {
     id: string
-    productCode: string
+    productNumber: string
     itemNumber: string | null
     name: string
     isNew: boolean
@@ -24,11 +32,12 @@ export interface NewTagsPaginationMeta extends PaginationMeta {}
 
 function toNewTagProduct(p: any): NewTagProduct {
     const tags = Array.isArray(p.tags) ? p.tags : []
-    const rawImg = p.productImages?.[0]?.url ?? null
+    const defaultSkc = (p.skcs || []).find((s: any) => s.isDefault) || p.skcs?.[0]
+    const rawImg = defaultSkc?.images?.[0]?.url ?? null
     return {
         id: p.id,
-        productCode: p.productCode,
-        itemNumber: p.itemNumber ?? null,
+        productNumber: p.productNumber,
+        itemNumber: defaultSkc?.itemNumber ?? null,
         name: p.name,
         isNew: tags.includes('new'),
         brandRef: p.brandRef ?? null,
@@ -42,6 +51,7 @@ export async function getProductsForNewTags(params: {
     limit?: number
     filterNew?: boolean
 }) {
+    await requireAuth()
     const { search, page = 1, limit = 50, filterNew } = params
     const safePage  = Math.max(1, page)
     const safeLimit = Math.min(Math.max(1, limit), 200)
@@ -53,8 +63,8 @@ export async function getProductsForNewTags(params: {
         const q = search.trim()
         where.OR = [
             { name:        { contains: q, mode: 'insensitive' } },
-            { productCode: { contains: q, mode: 'insensitive' } },
-            { itemNumber:  { contains: q, mode: 'insensitive' } },
+            { productNumber: { contains: q, mode: 'insensitive' } },
+            { skcs: { some: { itemNumber: { contains: q, mode: 'insensitive' } } } },
             { brandRef:    { name: { contains: q, mode: 'insensitive' } } },
         ]
     }

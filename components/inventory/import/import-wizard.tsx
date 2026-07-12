@@ -42,6 +42,7 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
             const rawRows = currentRows.map(r => ({
                 _id: r._id,
                 name: r.name,
+                productNumber: r.productNumber,
                 itemNumber: r.itemNumber,
                 categoryCode: r.categoryCode,
                 brandCode: r.brandCode
@@ -126,7 +127,7 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
     }
 
     const handleDownloadTemplate = () => {
-        const headers = ['name', 'itemNumber', 'categoryCode', 'brandCode']
+        const headers = ['name', 'productNumber', 'itemNumber', 'categoryCode', 'brandCode']
         const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n"
         const encodedUri = encodeURI(csvContent)
         const link = document.createElement("a")

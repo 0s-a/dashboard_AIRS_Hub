@@ -24,7 +24,7 @@ import {
 type CurrencyOption = { id: string; name: string; symbol: string; exchangeRate?: number | null; isDefault?: boolean }
 
 interface SmartPricingWizardProps {
-    productId: string
+    skuId: string
     productUnits: ProductUnitEntry[]
     priceLabels: { id: string; name: string; isDefault?: boolean }[]
     currencies: CurrencyOption[]
@@ -33,7 +33,7 @@ interface SmartPricingWizardProps {
 }
 
 export function SmartPricingWizard({
-    productId, productUnits, priceLabels, currencies, onComplete, onCancel
+    skuId, productUnits, priceLabels, currencies, onComplete, onCancel
 }: SmartPricingWizardProps) {
     const [isPending, startTransition] = useTransition()
 
@@ -67,7 +67,7 @@ export function SmartPricingWizard({
                 })
                 .filter(Boolean) as { currencyId: string; basePriceValue: number }[]
 
-            const res = await addProductPricesForAllUnits(productId, { priceLabelId: labelId, currencies: currencyEntries })
+            const res = await addProductPricesForAllUnits(skuId, { priceLabelId: labelId, currencies: currencyEntries })
             if (res.success && res.data) {
                 onComplete((res.data as any).productPrices || [])
                 toast.success("تم توليد الأسعار بنجاح")

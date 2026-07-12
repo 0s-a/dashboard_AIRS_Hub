@@ -1,17 +1,21 @@
 // ============================================================
 // Shared Prisma Include/Select constants
-// Eliminates duplication of query shapes across the codebase
 // ============================================================
-
-// ─── Order ──────────────────────────────────────────────────
 
 export const ORDER_ITEM_INCLUDE = {
     product: {
         select: {
             id: true,
             name: true,
-            itemNumber: true,
-            // جلب أسعار المنتج بالعملة الافتراضية فقط — لحساب السعر عند العرض
+            productNumber: true,
+        },
+    },
+    sku: {
+        select: {
+            id: true,
+            skuCode: true,
+            sizeLabel: true,
+            skc: { select: { id: true, color: { select: { id: true, code: true, name: true, hexCode: true } } } },
             productPrices: {
                 where: { currency: { isDefault: true } },
                 include: {
@@ -21,7 +25,9 @@ export const ORDER_ITEM_INCLUDE = {
             },
         },
     },
-    variant: { select: { id: true, name: true, hex: true, type: true, suffix: true } },
+    unit:       { select: { id: true, name: true, pluralName: true } },
+    currency:   { select: { id: true, symbol: true, code: true } },
+    priceLabel: { select: { id: true, name: true } },
 } as const
 
 export const ORDER_INCLUDE = {
@@ -29,13 +35,11 @@ export const ORDER_INCLUDE = {
         select: {
             id: true,
             name: true,
-            priceLabelId: true,  // تسعيرة العميل — تُستخدم لاسترجاع السعر المناسب
+            priceLabelId: true,
         },
     },
     items: { include: ORDER_ITEM_INCLUDE },
 } as const
-
-// ─── Customer (formerly Customer) ─────────────────────────────
 
 export const CUSTOMER_INCLUDE = {
     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
@@ -44,25 +48,26 @@ export const CUSTOMER_INCLUDE = {
     customerCurrencies: { include: { currency: { select: { id: true, name: true, code: true, symbol: true } } } },
 } as const
 
-/** @deprecated use CUSTOMER_INCLUDE */
-export const PERSON_INCLUDE = CUSTOMER_INCLUDE
-
-// ─── Product ────────────────────────────────────────────────
-
 export const PRODUCT_INCLUDE = {
-    category: { select: { id: true, name: true, icon: true } },
-    productImages: {
-        orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }],
-    },
-    variants: {
+    category: { select: { id: true, name: true, code: true, icon: true } },
+    brandRef: { select: { id: true, name: true, code: true } },
+    skcs: {
         orderBy: { order: 'asc' as const },
-        include: { variantImages: true },
-    },
-    productPrices: {
         include: {
-            priceLabel: true,
-            currency: true,
+            images: { orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }] },
+            skus: {
+                orderBy: { order: 'asc' as const },
+                include: {
+                    productPrices: {
+                        include: { priceLabel: true, currency: true, unit: true },
+                        orderBy: { createdAt: 'asc' as const },
+                    },
+                },
+            },
         },
-        orderBy: { createdAt: 'asc' as const },
+    },
+    productUnits: {
+        include: { unit: true },
+        orderBy: { order: 'asc' as const },
     },
 } as const

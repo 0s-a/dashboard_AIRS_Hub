@@ -2,25 +2,22 @@
 
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation, generateItemNumber } from '@/lib/action-utils'
+import { requireAuth } from '@/lib/auth-utils'
 
 const PATHS = '/price-labels'
 
 export async function getPriceLabels() {
     return safeAction(
-        () => prisma.priceLabel.findMany({
+        async () => {
+            await requireAuth()
+            return prisma.priceLabel.findMany({
             orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
             include: {
                 _count: { select: { customers: true } },
             },
-        }),
+            })
+        },
         'تعذّر جلب مسميات التسعيرة'
-    )
-}
-
-export async function getPriceLabelById(id: string) {
-    return safeAction(
-        () => prisma.priceLabel.findUnique({ where: { id } }),
-        'تعذّر جلب مسمى التسعيرة'
     )
 }
 
@@ -33,6 +30,7 @@ export async function createPriceLabel(data: {
 }) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             if (data.isDefault) {
                 await prisma.priceLabel.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
             }
@@ -61,6 +59,7 @@ export async function updatePriceLabel(id: string, data: {
 }) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             if (data.isDefault) {
                 await prisma.priceLabel.updateMany(
                     { where: { isDefault: true, id: { not: id } }, data: { isDefault: false } }
@@ -85,6 +84,7 @@ export async function updatePriceLabel(id: string, data: {
 export async function deletePriceLabel(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             const label = await prisma.priceLabel.findUnique({
                 where: { id },
                 include: { _count: { select: { productPrices: true } } },
@@ -102,6 +102,7 @@ export async function deletePriceLabel(id: string) {
 export async function setDefaultPriceLabel(id: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             await prisma.priceLabel.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
             return prisma.priceLabel.update({ where: { id }, data: { isDefault: true } })
         },
@@ -111,5 +112,6 @@ export async function setDefaultPriceLabel(id: string) {
 }
 
 export async function getNextPriceLabelItemNumber() {
+    await requireAuth()
     return generateItemNumber('priceLabel')
 }

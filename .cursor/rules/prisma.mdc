@@ -1,0 +1,24 @@
+---
+description: قواعد Prisma وقاعدة البيانات
+globs: prisma/**
+alwaysApply: false
+---
+
+# Prisma Conventions
+
+- مصدر الحقيقة: `prisma/schema.prisma`
+- استخدم `npm run db:migrate` — لا `db push` في الإنتاج
+- بعد تغيير schema: `npm run db:generate` ثم حدّث `lib/prisma-includes.ts` إن لزم
+- `npm run db:seed` — بذر بيانات التطوير
+- `npm run db:push` — **تطوير فقط**؛ بديل سريع لـ migrate، ممنوع في الإنتاج
+
+## قيود فريدة مهمة
+
+- `ProductPrice`: unique على `(productId, priceLabelId, currencyId, unitId)`
+- `Contact.value`: فريد عالمياً عبر النظام
+- `OrderItem`: حقول snapshot (`unitPrice`, `currencyId`, `priceLabelId`) لا تُحسب ديناميكياً بعد الإنشاء
+
+## Migrations
+
+- اسم واضح يصف التغيير: `20260701_add_unit_to_order_item`
+- لا تستخدم `--accept-data-loss` على بيانات حقيقية

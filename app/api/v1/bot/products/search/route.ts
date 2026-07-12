@@ -2,6 +2,52 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
 
+// ── Types ─────────────────────────────────────────────
+
+interface ProductSearchRow {
+    id: string
+    name: string
+    productNumber: string | null
+    brand: string | null
+    itemNumber: string | null
+    description: string | null
+    isAvailable: boolean
+    tags: unknown[]
+    alternativeNames: unknown[]
+    rank: number
+    category: { id: string; name: string; icon: string | null } | null
+    prices: Array<{
+        id: string
+        value: number
+        unitName: string | null
+        priceLabelId: string
+        priceLabelName: string
+        currencyCode: string
+        currencySymbol: string
+        currencyName: string
+    }>
+    skcs: Array<{
+        id: string
+        colorCode: string
+        colorName: string
+        hexCode: string
+        isDefault: boolean
+        isAvailable: boolean
+        skus: Array<{
+            id: string
+            skuCode: string
+            sizeLabel: string | null
+            isDefault: boolean
+            isAvailable: boolean
+        }>
+    }>
+    images: Array<{
+        url: string
+        alt: string | null
+        isPrimary: boolean
+    }>
+}
+
 // ── Subqueries extracted as constants for DRY ────────
 
 const CATEGORY_SUBQUERY = `
@@ -11,22 +57,35 @@ const CATEGORY_SUBQUERY = `
     ) AS category
 `
 
-const VARIANTS_SUBQUERY = `
+const SKCS_SUBQUERY = `
     (
         SELECT COALESCE(jsonb_agg(
             jsonb_build_object(
-                'id', v.id,
-                'variantNumber', v."variantNumber",
-                'suffix', v.suffix,
-                'name', v.name,
-                'type', v.type,
-                'hex', v.hex,
-                'price', v.price,
-                'isDefault', v."isDefault"
-            ) ORDER BY v."order" ASC
+                'id', skc.id,
+                'itemNumber', skc."itemNumber",
+                'colorCode', c.code,
+                'colorName', c.name,
+                'hexCode', c."hexCode",
+                'isDefault', skc."isDefault",
+                'isAvailable', skc."isAvailable",
+                'skus', (
+                    SELECT COALESCE(jsonb_agg(
+                        jsonb_build_object(
+                            'id', sku.id,
+                            'skuCode', sku."skuCode",
+                            'sizeLabel', sku."sizeLabel",
+                            'isDefault', sku."isDefault",
+                            'isAvailable', sku."isAvailable"
+                        ) ORDER BY sku."order" ASC
+                    ), '[]'::jsonb)
+                    FROM "SKU" sku WHERE sku."skcId" = skc.id
+                )
+            ) ORDER BY skc."order" ASC
         ), '[]'::jsonb)
-        FROM "Variant" v WHERE v."productId" = p.id
-    ) AS variants
+        FROM "SKC" skc
+        JOIN "Color" c ON c.id = skc."colorId"
+        WHERE skc."productId" = p.id
+    ) AS skcs
 `
 
 const IMAGES_SUBQUERY = `
@@ -39,8 +98,14 @@ const IMAGES_SUBQUERY = `
             ) ORDER BY pi."order" ASC
         ), '[]'::jsonb)
         FROM "ProductImage" pi
-        WHERE pi."productId" = p.id
+        WHERE pi."skcId" IN (SELECT id FROM "SKC" WHERE "productId" = p.id)
     ) AS images
+`
+
+const SKU_IDS_FOR_PRODUCT = `
+    SELECT sku.id FROM "SKU" sku
+    JOIN "SKC" skc ON skc.id = sku."skcId"
+    WHERE skc."productId" = p.id
 `
 
 const getPriceSubquery = (customerId: string | null, paramIdx: number) => {
@@ -63,7 +128,7 @@ const getPriceSubquery = (customerId: string | null, paramIdx: number) => {
                 JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
                 JOIN "Currency" c ON c.id = pp."currencyId"
                 LEFT JOIN "Unit" u ON u.id = pp."unitId"
-                WHERE pp."productId" = p.id
+                WHERE pp."skuId" IN (${SKU_IDS_FOR_PRODUCT})
                   AND (
                       pp."priceLabelId" IN (SELECT "priceLabelId" FROM "CustomerPriceLabel" WHERE "customerId" = $${paramIdx})
                       OR (NOT EXISTS (SELECT 1 FROM "CustomerPriceLabel" WHERE "customerId" = $${paramIdx}) AND pl."isDefault" = true)
@@ -93,7 +158,7 @@ const getPriceSubquery = (customerId: string | null, paramIdx: number) => {
             JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
             JOIN "Currency" c ON c.id = pp."currencyId"
             LEFT JOIN "Unit" u ON u.id = pp."unitId"
-            WHERE pp."productId" = p.id
+            WHERE pp."skuId" IN (${SKU_IDS_FOR_PRODUCT})
               AND pl."isDefault" = true
               AND c."isDefault" = true
         ) AS prices
@@ -108,19 +173,22 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url)
         const query = (searchParams.get('q') || searchParams.get('search') || '').trim()
-        const customerId = searchParams.get('customerId') || searchParams.get('customerId') // backward compat
+        const customerId = searchParams.get('customerId') || searchParams.get('customer_id') // backward compat
         const available = searchParams.get('available')
         const categoryId = searchParams.get('category')
         const brand = searchParams.get('brand')
-        const productCode = searchParams.get('productCode')
+        const productNumber = searchParams.get('productNumber') || searchParams.get('productCode')
         const tags = searchParams.getAll('tag').filter(Boolean)   // ?tag=new&tag=sale → ['new','sale']
+        const colorFilter   = searchParams.get('color')    // ?color=أحمر  → filter by SKC colorName
+        const hexFilter     = searchParams.get('hex')      // ?hex=ef4444   → filter by hex (with or without #)
+        const variantSuffix = searchParams.get('variant') || searchParams.get('suffix')  // ?variant=BLK or ?suffix=BLK
         const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
         const limit = Math.max(1, Math.min(50, parseInt(searchParams.get('limit') || '20')))
         const offset = (page - 1) * limit
 
         // ── Build WHERE clauses ──────────────────────
         const conditions: string[] = []
-        const params: any[] = []
+        const params: unknown[] = []
         let paramIndex = 1
 
         let selectRank = "0::float AS rank"
@@ -138,22 +206,28 @@ export async function GET(req: NextRequest) {
             conditions.push(`(
                 p.search_vector @@ websearch_to_tsquery('arabic', $${ftsParamIndex}) OR
                 p.name ILIKE $${likeParamIndex} OR
-                p."itemNumber" ILIKE $${likeParamIndex} OR
-                p."productCode" ILIKE $${likeParamIndex} OR
+                p."productNumber" ILIKE $${likeParamIndex} OR
                 p.description ILIKE $${likeParamIndex} OR
                 p."alternativeNames"::text ILIKE $${likeParamIndex} OR
                 b.name ILIKE $${likeParamIndex} OR
-                (SELECT name FROM "Category" WHERE id = p."categoryId") ILIKE $${likeParamIndex}
+                (SELECT name FROM "Category" WHERE id = p."categoryId") ILIKE $${likeParamIndex} OR
+                EXISTS (
+                    SELECT 1 FROM "SKC" skc_q
+                    WHERE skc_q."productId" = p.id AND skc_q."itemNumber" ILIKE $${likeParamIndex}
+                )
             )`)
 
-            // Rank higher for FTS matches
             selectRank = `ts_rank(p.search_vector, websearch_to_tsquery('arabic', $${ftsParamIndex})) AS rank`
             orderBy = "ORDER BY rank DESC, p.name ASC"
         }
 
         if (available === 'true' || available === 'false') {
-            conditions.push(`p."isAvailable" = $${paramIndex}`)
-            params.push(available === 'true')
+            const avail = available === 'true'
+            conditions.push(`EXISTS (
+                SELECT 1 FROM "SKC" skc_av
+                WHERE skc_av."productId" = p.id AND skc_av."isAvailable" = $${paramIndex}
+            )`)
+            params.push(avail)
             paramIndex++
         }
         if (categoryId) {
@@ -166,49 +240,86 @@ export async function GET(req: NextRequest) {
             params.push(`%${brand}%`)
             paramIndex++
         }
-        if (productCode) {
-            conditions.push(`p."productCode" ILIKE $${paramIndex}`)
-            params.push(`%${productCode}%`)
+        if (productNumber) {
+            conditions.push(`p."productNumber" ILIKE $${paramIndex}`)
+            params.push(`%${productNumber}%`)
             paramIndex++
         }
-        // ── Tag filter (JSONB containment: product.tags @> '["new","sale"]') ──
-        // Supports multiple ?tag= values — AND logic (product must have ALL tags)
         if (tags.length > 0) {
             conditions.push(`p.tags @> $${paramIndex}::jsonb`)
             params.push(JSON.stringify(tags))
             paramIndex++
         }
 
+        if (colorFilter) {
+            conditions.push(`EXISTS (
+                SELECT 1 FROM "SKC" vc
+                JOIN "Color" c ON c.id = vc."colorId"
+                WHERE vc."productId" = p.id AND (c.code ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex})
+            )`)
+            params.push(`%${colorFilter}%`)
+            paramIndex++
+        }
+
+        if (hexFilter) {
+            const normalizedHex = hexFilter.startsWith('#') ? hexFilter : `#${hexFilter}`
+            conditions.push(`EXISTS (
+                SELECT 1 FROM "SKC" vh
+                JOIN "Color" c ON c.id = vh."colorId"
+                WHERE vh."productId" = p.id AND c."hexCode" ILIKE $${paramIndex}
+            )`)
+            params.push(`%${normalizedHex}%`)
+            paramIndex++
+        }
+
+        if (variantSuffix) {
+            conditions.push(`EXISTS (
+                SELECT 1 FROM "SKC" vs
+                JOIN "Color" c ON c.id = vs."colorId"
+                WHERE vs."productId" = p.id AND c.code ILIKE $${paramIndex}
+            )`)
+            params.push(variantSuffix)
+            paramIndex++
+        }
+
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-        // ── Customer price label filter ────────────────
+        const whereParams = [...params]
+        const mainParams = [...params]
+
         let priceSubquery = ""
         if (customerId) {
-            params.push(customerId)
-            priceSubquery = getPriceSubquery(customerId, paramIndex)
-            paramIndex++
+            mainParams.push(customerId)
+            priceSubquery = getPriceSubquery(customerId, mainParams.length)
         } else {
-            priceSubquery = getPriceSubquery(null, paramIndex)
+            priceSubquery = getPriceSubquery(null, 0)
         }
 
         const needsBrandJoin = !!(query || brand)
 
-        // ── Main query ───────────────────────────────
         const mainSQL = `
             SELECT
                 p.id,
                 p.name,
-                p."productCode",
+                p."productNumber",
                 b.name AS brand,
-                p."itemNumber",
+                (
+                    SELECT skc."itemNumber" FROM "SKC" skc
+                    WHERE skc."productId" = p.id AND skc."itemNumber" IS NOT NULL
+                    ORDER BY skc."isDefault" DESC, skc."order" ASC
+                    LIMIT 1
+                ) AS "itemNumber",
                 p.description,
-                p."isAvailable",
+                EXISTS (
+                    SELECT 1 FROM "SKC" skc_av
+                    WHERE skc_av."productId" = p.id AND skc_av."isAvailable" = true
+                ) AS "isAvailable",
                 p.tags,
                 p."alternativeNames",
                 ${selectRank},
                 ${CATEGORY_SUBQUERY},
                 ${priceSubquery},
-                ${VARIANTS_SUBQUERY},
+                ${SKCS_SUBQUERY},
                 ${IMAGES_SUBQUERY}
             FROM "Product" p
             LEFT JOIN "Brand" b ON b.id = p."brandId"
@@ -217,18 +328,16 @@ export async function GET(req: NextRequest) {
             LIMIT ${limit} OFFSET ${offset}
         `
 
-        // Count query
         const countSQL = `
             SELECT count(*)::int AS total
             FROM "Product" p
-            ${needsBrandJoin ? 'LEFT JOIN "Brand" b ON b.id = p."brandId"' : ''}  
+            ${needsBrandJoin ? 'LEFT JOIN "Brand" b ON b.id = p."brandId"' : ''}
             ${whereClause}
         `
 
-        // Execute both
         const [results, countResult] = await Promise.all([
-            prisma.$queryRawUnsafe(mainSQL, ...params) as Promise<any[]>,
-            prisma.$queryRawUnsafe(countSQL, ...params) as Promise<any[]>,
+            prisma.$queryRawUnsafe(mainSQL, ...mainParams) as Promise<ProductSearchRow[]>,
+            prisma.$queryRawUnsafe(countSQL, ...whereParams) as Promise<{ total: number }[]>,
         ])
 
         const total = countResult[0]?.total ?? 0
@@ -236,10 +345,14 @@ export async function GET(req: NextRequest) {
             count: results.length,
             searchMode: query ? 'hybrid' : 'browse',
             filters: {
-                ...(tags.length > 0 && { tags }),
-                ...(categoryId && { categoryId }),
-                ...(brand && { brand }),
-                ...(available !== null && { available }),
+                ...(tags.length > 0         && { tags }),
+                ...(categoryId              && { categoryId }),
+                ...(brand                   && { brand }),
+                ...(productNumber            && { productNumber }),
+                ...(available !== null      && { available }),
+                ...(colorFilter             && { color: colorFilter }),
+                ...(hexFilter               && { hex: hexFilter }),
+                ...(variantSuffix           && { colorCode: variantSuffix }),
             },
             pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
         })

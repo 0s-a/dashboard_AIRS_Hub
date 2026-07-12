@@ -32,7 +32,7 @@ import {
     archiveNotification,
     unarchiveNotification,
 } from "@/lib/actions/notifications"
-import { toggleProductAvailability, addAlternativeNameToProduct, getProducts } from "@/lib/actions/inventory"
+import { addAlternativeNameToProduct, getProducts } from "@/lib/actions/inventory"
 function timeAgo(date: Date | string) {
     const now = new Date()
     const d = new Date(date)
@@ -72,7 +72,6 @@ export default function NotificationsPage() {
     const [filterType, setFilterType] = useState<"all" | "out_of_stock" | "not_found">("all")
     const [filterRead, setFilterRead] = useState<"all" | "unread" | "read">("all")
     const [loading, setLoading] = useState(true)
-    const [togglingId, setTogglingId] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<"inbox" | "archive">("inbox")
     const [archivedNotifications, setArchivedNotifications] = useState<any[]>([])
     
@@ -204,23 +203,6 @@ export default function NotificationsPage() {
     const groupedNotifications = useMemo(() => {
         return groupNotificationsByDate(processedNotifications)
     }, [processedNotifications])
-    // ── Quick Action: Toggle product availability ──
-    const handleToggleAvailability = async (notif: any) => {
-        if (!notif.product?.id || togglingId) return
-        setTogglingId(notif.id)
-        try {
-            const res = await toggleProductAvailability(notif.product.id, notif.product.isAvailable)
-            if (res.success) {
-                toast.success(notif.product.isAvailable ? "تم إيقاف المنتج" : "تم تفعيل المنتج ✓")
-                await archiveNotification(notif.id, "تم تفعيل المنتج")
-                loadData()
-            } else {
-                toast.error(res.error || "فشل تحديث حالة المنتج")
-            }
-        } finally {
-            setTogglingId(null)
-        }
-    }
     // ── Quick Action: Open link-product dialog ──
     const handleOpenLinkDialog = async (notif: any) => {
         setLinkDialog({ open: true, notifId: notif.id, searchQuery: notif.searchQuery })
@@ -237,7 +219,7 @@ export default function NotificationsPage() {
         const q = productSearch.toLowerCase()
         return allProducts.filter(p =>
             p.name?.toLowerCase().includes(q) ||
-            p.itemNumber?.toLowerCase().includes(q) ||
+            p.productNumber?.toLowerCase().includes(q) ||
             p.brand?.toLowerCase().includes(q)
         ).slice(0, 20)
     }, [allProducts, productSearch])
@@ -620,7 +602,7 @@ export default function NotificationsPage() {
                                                                 {notif.productName}
                                                                 {notif.product && (
                                                                     <Link
-                                                                        href={`/inventory/${notif.product.id}`}
+                                                                        href={`/items?productId=${notif.product.id}`}
                                                                         className="text-primary hover:underline mr-1.5"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >
@@ -646,20 +628,16 @@ export default function NotificationsPage() {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                className={cn(
-                                                                    "h-8 text-[11px] rounded-xl gap-2 font-bold transition-all shadow-xs border-dashed",
-                                                                    notif.product.isAvailable
-                                                                        ? "border-amber-300 text-amber-700 hover:bg-amber-50"
-                                                                        : "border-emerald-300 text-emerald-700 hover:bg-emerald-50 active:scale-95"
-                                                                )}
-                                                                disabled={togglingId === notif.id}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    handleToggleAvailability(notif)
-                                                                }}
+                                                                className="h-8 text-[11px] rounded-xl gap-2 font-bold transition-all shadow-xs border-dashed border-violet-300 text-violet-700 hover:bg-violet-50"
+                                                                asChild
                                                             >
-                                                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                {notif.product.isAvailable ? "إيقاف المنتج" : "تفعيل المنتج"}
+                                                                <Link
+                                                                    href={`/items?productId=${notif.product.id}`}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <Package className="h-3.5 w-3.5" />
+                                                                    إدارة الأصناف
+                                                                </Link>
                                                             </Button>
                                                         )}
                                                         {notif.type === "not_found" && (
@@ -766,7 +744,7 @@ export default function NotificationsPage() {
                                         <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold truncate text-xs">{product.name}</p>
-                                            <p className="text-[10px] text-muted-foreground font-mono">{product.itemNumber}</p>
+                                            <p className="text-[10px] text-muted-foreground font-mono">{product.productNumber}</p>
                                         </div>
                                         {linkingProductId === product.id && (
                                             <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />

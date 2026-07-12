@@ -5,6 +5,7 @@ import { Package } from "lucide-react"
 import {
     Dialog,
     DialogContent,
+    DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
 
@@ -41,6 +42,7 @@ export function ProductImageCell({ src, alt }: ProductImageCellProps) {
                 </div>
             </DialogTrigger>
             <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
+                <DialogTitle className="sr-only">{alt}</DialogTitle>
                 <div className="relative aspect-square w-full max-h-[80vh]">
                     <Image
                         src={src}

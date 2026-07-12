@@ -3,7 +3,7 @@
 // Used across: columns, form, sheet, and server actions
 // ─────────────────────────────────────────────────────────────
 
-/** Shape returned by the DB (via getBrands / getBrandById) */
+/** Shape returned by the DB (via getBrands) */
 export type BrandRow = {
     id: string
     name: string
@@ -20,7 +20,7 @@ export type BrandFormData = Pick<BrandRow, "id" | "name" | "code" | "logo" | "de
 /** Payload sent to createBrand / updateBrand */
 export type BrandPayload = {
     name: string
-    code: string        // required — exactly 2 uppercase letters
+    code: string        // required — exactly 1 uppercase letter or digit
     logo?: string | null
     description?: string | null
 }

@@ -97,8 +97,8 @@ export async function getCustomerById(id: string) {
                     include: {
                         items: {
                             include: {
-                                product: { select: { id: true, name: true, itemNumber: true } },
-                                variant: { select: { id: true, name: true, hex: true } },
+                                product: { select: { id: true, name: true, productNumber: true } },
+                                sku: { select: { id: true, skuCode: true, sizeLabel: true, skc: { select: { color: { select: { name: true, hexCode: true } } } } } },
                             },
                         },
                     },

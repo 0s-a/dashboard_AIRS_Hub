@@ -21,9 +21,6 @@ export {
     createProduct,
     updateProduct,
     deleteProduct,
-    duplicateProduct,
-    toggleProductAvailability,
-    updateProductDescription,
     toggleProductNewTag,
 } from './product.actions'
 

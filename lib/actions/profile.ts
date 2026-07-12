@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { safeActionWithRevalidation } from '@/lib/action-utils'
+import { requireAuth } from '@/lib/auth-utils'
 import { getCurrentUser } from '@/lib/actions/auth'
 
 const PATHS = '/profile'
@@ -13,6 +14,7 @@ const SALT_ROUNDS = 12
 export async function updateProfile(data: { name?: string; color?: string }) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             const currentUser = await getCurrentUser()
             if (!currentUser.success || !currentUser.data) {
                 throw new Error('يرجى تسجيل الدخول أولاً')
@@ -37,6 +39,7 @@ export async function updateProfile(data: { name?: string; color?: string }) {
 export async function changePassword(currentPassword: string, newPassword: string) {
     return safeActionWithRevalidation(
         async () => {
+            await requireAuth()
             const currentUser = await getCurrentUser()
             if (!currentUser.success || !currentUser.data) {
                 throw new Error('يرجى تسجيل الدخول أولاً')

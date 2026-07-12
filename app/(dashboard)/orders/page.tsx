@@ -4,7 +4,7 @@ import { getOrders, getOrderStats } from "@/lib/actions/orders"
 import { getCustomers } from "@/lib/actions/customers"
 import { getDefaultCurrency } from "@/lib/actions/currencies"
 import { prisma } from "@/lib/prisma"
-import { ShoppingCart, Clock, CheckCircle2, XCircle } from "lucide-react"
+import { ShoppingCart, Clock, CheckCircle2, XCircle, Package, Truck } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -14,7 +14,15 @@ export default async function OrdersPage() {
         getOrderStats(),
         getCustomers(),
         prisma.product.findMany({
-            select: { id: true, name: true, itemNumber: true },
+            select: {
+                id: true,
+                name: true,
+                productNumber: true,
+                productUnits: {
+                    include: { unit: { select: { id: true, name: true, pluralName: true } } },
+                    orderBy: { order: 'asc' },
+                },
+            },
             orderBy: { name: "asc" },
         }),
         getDefaultCurrency(),
@@ -30,13 +38,15 @@ export default async function OrdersPage() {
     const defaultSymbol = defaultCurrencyRes.success ? (defaultCurrencyRes.data?.symbol ?? "") : ""
 
     // ── Stats — computed at database level ──
-    const s = statsRes.success ? statsRes.data : { total: 0, pending: 0, delivered: 0, cancelled: 0 }
+    const s = statsRes.success ? statsRes.data : { total: 0, pending: 0, confirmed: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0 }
 
     const stats = [
-        { label: "إجمالي الطلبات", value: s.total, icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-500/10" },
-        { label: "معلقة", value: s.pending, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-500/10" },
-        { label: "مسلّمة", value: s.delivered, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-        { label: "ملغاة", value: s.cancelled, icon: XCircle, color: "text-red-600", bg: "bg-red-500/10" },
+        { label: "إجمالي الطلبات", value: s.total,      icon: ShoppingCart, color: "text-blue-600",    bg: "bg-blue-500/10" },
+        { label: "معلقة",          value: s.pending,     icon: Clock,        color: "text-yellow-600", bg: "bg-yellow-500/10" },
+        { label: "قيد التجهيز",   value: s.processing,  icon: Package,      color: "text-violet-600", bg: "bg-violet-500/10" },
+        { label: "تم الشحن",      value: s.shipped,     icon: Truck,        color: "text-indigo-600", bg: "bg-indigo-500/10" },
+        { label: "مسلّمة",        value: s.delivered,   icon: CheckCircle2, color: "text-emerald-600",bg: "bg-emerald-500/10" },
+        { label: "ملغاة",         value: s.cancelled,   icon: XCircle,      color: "text-red-600",    bg: "bg-red-500/10" },
     ]
 
     return (
@@ -57,7 +67,7 @@ export default async function OrdersPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
                 {stats.map((stat, i) => (
                     <div
                         key={i}

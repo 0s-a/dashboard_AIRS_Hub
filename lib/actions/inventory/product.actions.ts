@@ -2,84 +2,93 @@
 
 import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
-import { prisma, PRODUCT_INCLUDE, serializeProduct, revalidateProduct, requireProduct, generateProductCode } from './_shared'
+import {
+    prisma,
+    PRODUCT_INCLUDE,
+    serializeProduct,
+    revalidateProduct,
+    requireProduct,
+    validateProductNumber,
+    rebuildProductSkuCodes,
+} from './_shared'
 import type { ProductInput } from '@/lib/types/product'
+import { upsertProductToMeilisearch, deleteProductFromMeilisearch } from '@/lib/utils/meilisearch-sync'
+import { requireAuth } from '@/lib/auth-utils'
+import { uniqueProductSlug } from '@/lib/utils/slug'
 
-// ─────────────────────────────────────────────────────────────
-// WRITE — Product CRUD Actions
-// ─────────────────────────────────────────────────────────────
-
-/** Create a new product */
 export async function createProduct(data: ProductInput) {
     try {
+        await requireAuth()
         if (!data.name?.trim()) return { success: false, error: 'اسم المنتج مطلوب' }
 
-        const { alternativeNames, tags, ...productData } = data
+        const pnResult = validateProductNumber(data.productNumber ?? '')
+        if (!pnResult.ok) return { success: false, error: pnResult.error }
 
-        // Resolve category/brand codes for product code generation
-        const [catCode, brandCode] = await Promise.all([
-            productData.categoryId
-                ? prisma.category.findUnique({ where: { id: productData.categoryId }, select: { code: true } })
-                    .then(c => c?.code ?? null)
-                : null,
-            productData.brandId
-                ? prisma.brand.findUnique({ where: { id: productData.brandId }, select: { code: true } })
-                    .then(b => b?.code ?? null)
-                : null,
-        ])
+        const { alternativeNames, tags, slug: inputSlug, productNumber: _pn, ...productData } = data
+
+        const slug = inputSlug?.trim()
+            ? await uniqueProductSlug(inputSlug)
+            : await uniqueProductSlug(productData.name.trim())
 
         const product = await prisma.$transaction(async (tx) => {
-            const productCode = await generateProductCode(catCode, brandCode, tx)
-
-            return await (tx.product as any).create({
+            const created = await tx.product.create({
                 data: {
                     ...productData,
-                    productCode,
-                    itemNumber: productData.itemNumber?.trim() || null,
+                    productNumber: pnResult.value,
+                    slug,
                     name: productData.name.trim(),
-                    isAvailable: false, // Force false on creation
                     alternativeNames: alternativeNames?.length ? alternativeNames : Prisma.JsonNull,
                     tags: tags?.length ? tags : Prisma.JsonNull,
                 },
-                include: PRODUCT_INCLUDE,
+                include: PRODUCT_INCLUDE as any,
             })
+
+            return created
         })
 
+        revalidatePath('/products')
         revalidatePath('/inventory')
+        if (product) upsertProductToMeilisearch(product.id).catch(console.warn)
         return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to create product:', error)
-        if (error?.code === 'P2002') return { success: false, error: 'رقم الصنف مستخدم بالفعل' }
+        if (error?.code === 'P2002') return { success: false, error: 'رقم المنتج أو الرابط مستخدم بالفعل' }
         return { success: false, error: 'فشل إنشاء المنتج' }
     }
 }
 
-/** Update product fields. productCode is IMMUTABLE — never changes after creation. */
 export async function updateProduct(id: string, data: Partial<ProductInput>) {
     try {
-        const { alternativeNames, tags, ...productData } = data as any
+        await requireAuth()
+        const { alternativeNames, tags, slug: inputSlug, productNumber: inputProductNumber, ...productData } = data as any
 
-        // productCode is IMMUTABLE — strip if accidentally passed
-        delete productData.productCode
+        delete productData.isAvailable
 
-        // Validation: Cannot become available without prices and units
-        if (productData.isAvailable) {
-            const pricesCount = await prisma.productPrice.count({ where: { productId: id } })
-            const unitsCount = await prisma.productUnit.count({ where: { productId: id } })
-            if (pricesCount === 0 || unitsCount === 0) {
-                productData.isAvailable = false
-            }
+        let slug: string | undefined
+        if (inputSlug !== undefined) {
+            slug = await uniqueProductSlug(inputSlug || productData.name || 'product', id)
         }
 
-        // ── Transaction: update product ──────────────────────────────
+        let productNumber: string | undefined
+        if (inputProductNumber !== undefined) {
+            const pnResult = validateProductNumber(inputProductNumber)
+            if (!pnResult.ok) return { success: false, error: pnResult.error }
+            productNumber = pnResult.value
+        }
+
         const product = await prisma.$transaction(async (tx) => {
-            return await (tx.product as any).update({
+            const existing = await tx.product.findUnique({
+                where: { id },
+                select: { productNumber: true },
+            })
+            if (!existing) throw new Error('المنتج غير موجود')
+
+            const updated = await tx.product.update({
                 where: { id },
                 data: {
                     ...productData,
-                    itemNumber: productData.itemNumber !== undefined
-                        ? (productData.itemNumber?.trim() || null)
-                        : undefined,
+                    ...(productNumber !== undefined ? { productNumber } : {}),
+                    slug,
                     alternativeNames: alternativeNames !== undefined
                         ? (alternativeNames?.length ? alternativeNames : Prisma.JsonNull)
                         : undefined,
@@ -87,43 +96,50 @@ export async function updateProduct(id: string, data: Partial<ProductInput>) {
                         ? (tags?.length ? tags : Prisma.JsonNull)
                         : undefined,
                 },
-                include: PRODUCT_INCLUDE,
+                include: PRODUCT_INCLUDE as any,
             })
+
+            if (productNumber !== undefined && productNumber !== existing.productNumber) {
+                await rebuildProductSkuCodes(id, productNumber, tx)
+                return tx.product.findUnique({ where: { id }, include: PRODUCT_INCLUDE as any })
+            }
+
+            return updated
         })
 
         revalidateProduct(id)
+        upsertProductToMeilisearch(id).catch(console.warn)
         return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to update product:', error)
-        if (error?.code === 'P2002') return { success: false, error: 'رقم الصنف مستخدم بالفعل' }
+        if (error?.code === 'P2002') return { success: false, error: 'رقم المنتج أو الرابط مستخدم بالفعل' }
         return { success: false, error: 'فشل تحديث المنتج' }
     }
 }
 
-/** Permanently delete a product and clean up its image folder */
 export async function deleteProduct(id: string) {
     try {
+        await requireAuth()
         const product = await prisma.product.findUnique({
             where: { id },
-            select: { productCode: true, itemNumber: true }
+            select: { productNumber: true }
         })
 
         if (!product) return { success: false, error: 'المنتج غير موجود أو تم حذفه بالفعل' }
 
         await prisma.product.delete({ where: { id } })
 
-        // Clean up image folder using productCode (primary identifier)
-        const folderName = product.productCode || product.itemNumber
-        if (folderName) {
+        if (product.productNumber) {
             try {
                 const { deleteProductFolder } = await import('../upload')
-                await deleteProductFolder(folderName)
-            } catch {
-                // Non-fatal: cleanup failure should not block deletion
-            }
+                await deleteProductFolder(product.productNumber)
+            } catch { /* non-fatal */ }
         }
 
+        revalidatePath('/products')
         revalidatePath('/inventory')
+        revalidatePath('/items')
+        deleteProductFromMeilisearch(id).catch(console.warn)
         return { success: true }
     } catch (error) {
         console.error('Failed to delete product:', error)
@@ -131,122 +147,18 @@ export async function deleteProduct(id: string) {
     }
 }
 
-/** Duplicate a product with its prices (not variants, not images) */
-export async function duplicateProduct(id: string) {
-    try {
-        const source = await prisma.product.findUnique({
-            where: { id },
-            include: {
-                productPrices: true,
-                category: { select: { code: true } },
-                brandRef: { select: { code: true } },
-            },
-        })
-        if (!source) return { success: false, error: 'المنتج غير موجود' }
-
-        // Resolve codes for new product code
-        const catCode = source.category?.code ?? null
-        const brandCode = source.brandRef?.code ?? null
-
-        const { id: _id, createdAt: _c, updatedAt: _u, productPrices: sourcePrices, productCode: _pc, category: _cat, brandRef: _br, ...sourceData } = source
-
-        const duplicate = await prisma.$transaction(async (tx) => {
-            const newProductCode = await generateProductCode(catCode, brandCode, tx)
-
-            return await (tx.product as any).create({
-                data: {
-                    ...sourceData,
-                    productCode: newProductCode,
-                    itemNumber: null,  // duplicate has no manual itemNumber
-                    name: `${source.name} (نسخة)`,
-                    isAvailable: false,
-                    productPrices: sourcePrices.length > 0 ? {
-                        create: sourcePrices.map(pp => ({
-                            priceLabelId: pp.priceLabelId,
-                            currencyId: pp.currencyId,
-                            value: pp.value,
-                            unitId: pp.unitId,
-                            isAutoCalculated: pp.isAutoCalculated,
-                        }))
-                    } : undefined,
-                },
-                include: PRODUCT_INCLUDE,
-            })
-        })
-
-        revalidatePath('/inventory')
-        return { success: true, data: serializeProduct(duplicate) }
-    } catch (error: any) {
-        console.error('Failed to duplicate product:', error)
-        return { success: false, error: 'فشل نسخ المنتج' }
-    }
-}
-
-/** Toggle product availability (isAvailable field) */
-export async function toggleProductAvailability(id: string, currentStatus: boolean) {
-    try {
-        // Validation: If trying to make available
-        if (!currentStatus) {
-            const productCheck = await prisma.product.findUnique({
-                where: { id },
-                include: {
-                    productPrices: { select: { id: true } },
-                    productUnits: { select: { id: true } }
-                }
-            })
-            
-            if (!productCheck) return { success: false, error: 'المنتج غير موجود' }
-            
-            if (productCheck.productPrices.length === 0 || productCheck.productUnits.length === 0) {
-                return { success: false, error: 'لا يمكن إتاحة المنتج: يجب إضافة وحدة قياس وتسعيرة أولاً' }
-            }
-        }
-
-        await prisma.product.update({
-            where: { id },
-            data: { isAvailable: !currentStatus },
-        })
-        const updated = await requireProduct(id)
-        revalidateProduct(id)
-        return { success: true, data: serializeProduct(updated) }
-    } catch (error) {
-        console.error('Failed to toggle availability:', error)
-        return { success: false, error: 'فشل تحديث حالة التوفر' }
-    }
-}
-
-/** Update product description only */
-export async function updateProductDescription(id: string, description: string) {
-    try {
-        await prisma.product.update({
-            where: { id },
-            data: { description },
-        })
-        const updated = await requireProduct(id)
-        revalidateProduct(id)
-        return { success: true, data: serializeProduct(updated) }
-    } catch (error) {
-        console.error('Failed to update description:', error)
-        return { success: false, error: 'فشل تحديث الوصف' }
-    }
-}
-
-/** Toggle "new" tag on a product */
 export async function toggleProductNewTag(id: string, isNew: boolean) {
     try {
+        await requireAuth()
         const product = await prisma.product.findUnique({
             where: { id },
             select: { tags: true }
         })
-        
         if (!product) return { success: false, error: 'المنتج غير موجود' }
 
         let currentTags = Array.isArray(product.tags) ? [...product.tags] : []
-        
         if (isNew) {
-            if (!currentTags.includes('new')) {
-                currentTags.push('new')
-            }
+            if (!currentTags.includes('new')) currentTags.push('new')
         } else {
             currentTags = currentTags.filter(tag => tag !== 'new')
         }
@@ -255,9 +167,10 @@ export async function toggleProductNewTag(id: string, isNew: boolean) {
             where: { id },
             data: { tags: currentTags.length > 0 ? currentTags : Prisma.JsonNull },
         })
-        
+
         const updated = await requireProduct(id)
         revalidateProduct(id)
+        upsertProductToMeilisearch(id).catch(console.warn)
         return { success: true, data: serializeProduct(updated) }
     } catch (error) {
         console.error('Failed to toggle new tag:', error)

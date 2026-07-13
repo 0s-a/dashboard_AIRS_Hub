@@ -30,8 +30,8 @@ components/{domain}/*-sheet.tsx
 ```
 
 - **ممنوع:** `columns.tsx` داخل `app/` أو جذر `components/`
-- استثناء مؤقت: `components/columns.tsx` (عملاء) — يُنقل لاحقاً
-- نموذج CRUD: `components/colors/`
+- نموذج CRUD: `components/categories/`
+- جداول: `.cursor/rules/datatable.mdc` — نموذج server: `products/`
 
 ## Dashboard Shell
 

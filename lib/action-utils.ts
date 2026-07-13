@@ -137,21 +137,14 @@ export async function generateItemNumber(
 }
 
 /**
- * Resolve unit price and currency for a product + price label combo.
- * Always prefers the default currency (isDefault=true) over other currencies.
- * Falls back to any available price if no default-currency price exists.
+ * Resolve unit price for a product + price label combo.
+ * Catalog prices are always in the system default currency.
  */
-export async function resolveSkuPrice(skuId: string, priceLabelId: string, unitId?: string) {
-    const baseWhere = { skuId, priceLabelId, ...(unitId ? { unitId } : {}) }
-
-    const defaultCurrencyPrice = await prisma.productPrice.findFirst({
-        where: { ...baseWhere, currency: { isDefault: true } },
-        include: { currency: true, unit: true },
-    })
-    if (defaultCurrencyPrice) return defaultCurrencyPrice
+export async function resolveProductPrice(productId: string, priceLabelId: string, unitId?: string) {
+    const baseWhere = { productId, priceLabelId, ...(unitId ? { unitId } : {}) }
 
     return prisma.productPrice.findFirst({
         where: baseWhere,
-        include: { currency: true, unit: true },
+        include: { unit: true, priceLabel: true },
     })
 }

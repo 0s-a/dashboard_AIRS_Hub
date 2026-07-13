@@ -31,10 +31,16 @@ export const columns: ColumnDef<Category>[] = [
     {
         accessorKey: "code",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'الكود...' },
-        header: () => <div className="text-start pe-0">الكود</div>,
+        meta: {
+            filterType: 'text' as const,
+            filterPlaceholder: 'الكود...',
+            cellVariant: 'code' as const,
+            align: 'start' as const,
+        },
+        header: "الكود",
+        size: 120,
         cell: ({ row }) => (
-            <div className="font-mono text-sm font-bold tracking-widest bg-primary/10 text-primary rounded-md px-2 py-1 inline-block">
+            <div className="font-bold tracking-widest bg-primary/10 text-primary rounded-md px-2 py-1 inline-block truncate">
                 {row.original.code}
             </div>
         ),
@@ -42,26 +48,30 @@ export const columns: ColumnDef<Category>[] = [
     {
         accessorKey: "name",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم التصنيف...' },
-        header: () => <div className="text-start pe-0">التصنيف</div>,
-        cell: ({ row }) => {
-            const icon = row.original.icon
-            const name = row.original.name
-            return (
-                <div className="flex items-center gap-2">
-                    {icon && <span className="text-xl">{icon}</span>}
-                    <div className="font-medium">{name}</div>
-                </div>
-            )
+        meta: {
+            filterType: 'text' as const,
+            filterPlaceholder: 'اسم التصنيف...',
+            cellVariant: 'text' as const,
+            align: 'start' as const,
         },
+        header: "التصنيف",
+        size: 200,
+        cell: ({ row }) => (
+            <div className="font-medium truncate">{row.original.name}</div>
+        ),
     },
     {
         accessorKey: "description",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const },
-        header: () => <div className="text-start pe-0">الوصف</div>,
+        meta: {
+            filterType: 'text' as const,
+            cellVariant: 'text' as const,
+            align: 'start' as const,
+        },
+        header: "الوصف",
+        size: 280,
         cell: ({ row }) => (
-            <div className="max-w-[300px] truncate text-sm text-muted-foreground">
+            <div className="truncate text-sm text-muted-foreground">
                 {row.original.description || "—"}
             </div>
         ),
@@ -69,7 +79,10 @@ export const columns: ColumnDef<Category>[] = [
     {
         id: "actions",
         enableColumnFilter: false,
-        header: () => <div className="text-start pe-0">الإجراءات</div>,
+        enableSorting: false,
+        meta: { cellVariant: 'actions' as const, sticky: 'actions' as const, align: 'end' as const },
+        header: "الإجراءات",
+        size: 90,
         cell: function ActionsCell({ row }) {
             const router = useRouter()
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)

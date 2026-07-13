@@ -36,16 +36,16 @@ function isValidImageType(file: File): boolean {
  * Build the sub-path for a product image folder.
  * e.g. "products/s-el-001"
  */
-function getProductSubDir(productNumber: string): string {
-    return buildSubPath(STORAGE.productFolder, sanitizeSlug(productNumber))
+function getProductSubDir(folderKey: string): string {
+    return buildSubPath(STORAGE.productFolder, sanitizeSlug(folderKey))
 }
 
 /**
  * Build the sub-path for a product image file.
  * e.g. "products/x-ge-001/01.webp"
  */
-function getProductImageSubPath(productNumber: string, filename: string): string {
-    return buildSubPath(getProductSubDir(productNumber), filename)
+function getProductImageSubPath(folderKey: string, filename: string): string {
+    return buildSubPath(getProductSubDir(folderKey), filename)
 }
 
 // ─── Core Upload ──────────────────────────────────────────────────────────────
@@ -55,14 +55,14 @@ function getProductImageSubPath(productNumber: string, filename: string): string
  *
  * Files are named by order: 01.webp, 02.webp, etc.
  *
- * @param file          - The image file to upload
- * @param productNumber - Product number folder name (e.g. "001")
- * @param order         - 0-based image order (produces filename: 01.webp, 02.webp, ...)
- * @param oldImagePath  - Optional old image path to delete before saving
+ * @param file      - The image file to upload
+ * @param folderKey - Folder key for storage (e.g. itemNumber or product id)
+ * @param order     - 0-based image order (produces filename: 01.webp, 02.webp, ...)
+ * @param oldImagePath - Optional old image path to delete before saving
  */
 export async function uploadProductImage(
     file: File,
-    productNumber: string,
+    folderKey: string,
     order: number = 0,
     oldImagePath?: string | null
 ): Promise<{ success: boolean; url?: string; filename?: string; sizeBytes?: number; width?: number; height?: number; error?: string }> {
@@ -88,12 +88,12 @@ export async function uploadProductImage(
             }
         }
 
-        if (!productNumber?.trim()) {
+        if (!folderKey?.trim()) {
             return { success: false, error: 'رمز المنتج مطلوب — يُرجى إدخال رمز المنتج لتحديد مجلد الحفظ' }
         }
 
         // ── Prepare paths ────────────────────────────────────────────────────
-        const dirSubPath = getProductSubDir(productNumber)
+        const dirSubPath = getProductSubDir(folderKey)
         const uploadDir = toDiskDir(dirSubPath)
         await mkdir(uploadDir, { recursive: true })
 
@@ -119,7 +119,7 @@ export async function uploadProductImage(
         await writeFile(filePath, buffer)
 
         // Sub-path for DB storage (no prefix)
-        const subPath = getProductImageSubPath(productNumber, filename)
+        const subPath = getProductImageSubPath(folderKey, filename)
 
         const displayUrl = toDisplayUrl(subPath)
         console.log(
@@ -182,13 +182,13 @@ export async function deleteProductImage(
  * Used when deleting a product.
  */
 export async function deleteProductFolder(
-    productNumber: string
+    folderKey: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
         await requireAuth()
-        if (!productNumber?.trim()) return { success: true }
+        if (!folderKey?.trim()) return { success: true }
 
-        const folderPath = toDiskDir(getProductSubDir(productNumber))
+        const folderPath = toDiskDir(getProductSubDir(folderKey))
         if (existsSync(folderPath)) {
             await rm(folderPath, { recursive: true, force: true })
             console.log(`✓ Product folder deleted: ${folderPath}`)

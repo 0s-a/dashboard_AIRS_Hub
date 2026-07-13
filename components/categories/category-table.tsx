@@ -12,5 +12,5 @@ interface CategoryTableProps {
 }
 
 export function CategoryTable({ data, onRefresh }: CategoryTableProps) {
-    return <DataTable columns={columns} data={data} onRefresh={onRefresh} />
+    return <DataTable columns={columns} data={data} onRefresh={onRefresh} searchPlaceholder="ابحث عن تصنيف..." />
 }

@@ -124,7 +124,7 @@ function ProductRow({ product, onToggle }: { product: NewTagProduct; onToggle: (
 
             {/* Product Number */}
             <td className="px-4 py-3 w-[150px]">
-                <span className="text-xs font-mono text-muted-foreground">{product.productNumber}</span>
+                <span className="text-xs font-mono text-muted-foreground">{product.itemNumber ?? '—'}</span>
             </td>
         </tr>
     )
@@ -264,7 +264,7 @@ export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTabl
                                 <th className="px-4 py-3 w-[70px]" />
                                 <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider">الاسم</th>
                                 <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider w-[160px]">البراند</th>
-                                <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider w-[150px]">رقم المنتج</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-muted-foreground uppercase tracking-wider w-[150px]">رقم الصنف</th>
                             </tr>
                         </thead>
                         <tbody>

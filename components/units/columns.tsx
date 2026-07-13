@@ -1,16 +1,8 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -22,7 +14,6 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
 import { deleteUnit } from "@/lib/actions/units"
 import { toast } from "sonner"
 import { useState } from "react"
@@ -41,43 +32,54 @@ export const columns: ColumnDef<UnitRow>[] = [
     {
         accessorKey: "itemNumber",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'الرقم...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "الرقم...",
+            cellVariant: "code" as const,
+            align: "start" as const,
+        },
         header: "الرقم",
         cell: ({ row }) => (
-            <span className="text-xs font-mono text-muted-foreground">
-                {row.original.itemNumber}
-            </span>
+            <span className="truncate text-muted-foreground">{row.original.itemNumber}</span>
         ),
         size: 100,
     },
     {
         accessorKey: "name",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم الوحدة...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "اسم الوحدة...",
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
         header: "الوحدة",
         cell: ({ row }) => (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
                 <div className="size-9 rounded-xl bg-linear-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center text-sm font-bold text-primary shrink-0 shadow-xs">
                     {row.original.name.charAt(0)}
                 </div>
-                <div>
-                    <div className="font-medium">{row.original.name}</div>
+                <div className="min-w-0">
+                    <div className="font-medium truncate">{row.original.name}</div>
                     {row.original.pluralName && (
-                        <div className="text-xs text-muted-foreground">{row.original.pluralName}</div>
+                        <div className="text-xs text-muted-foreground truncate">{row.original.pluralName}</div>
                     )}
                 </div>
             </div>
         ),
         size: 250,
     },
-
     {
         accessorKey: "notes",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const },
+        meta: {
+            filterType: "text" as const,
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
         header: "ملاحظات",
         cell: ({ row }) => (
-            <div className="max-w-[250px] truncate text-sm text-muted-foreground">
+            <div className="truncate text-sm text-muted-foreground">
                 {row.original.notes || "—"}
             </div>
         ),
@@ -86,6 +88,8 @@ export const columns: ColumnDef<UnitRow>[] = [
     {
         id: "actions",
         enableColumnFilter: false,
+        enableSorting: false,
+        meta: { cellVariant: "actions" as const, sticky: "actions" as const, align: "end" as const },
         header: "الإجراءات",
         cell: function ActionsCell({ row }) {
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -103,11 +107,11 @@ export const columns: ColumnDef<UnitRow>[] = [
             }
 
             return (
-                <div className="flex items-center gap-1">
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-muted-foreground hover:text-primary" 
+                <div className="flex items-center justify-end gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
                         onClick={() => window.dispatchEvent(new CustomEvent("edit-unit", { detail: unit }))}
                     >
                         <Pencil className="h-4 w-4" />
@@ -141,6 +145,6 @@ export const columns: ColumnDef<UnitRow>[] = [
                 </div>
             )
         },
-        size: 150,
+        size: 100,
     },
 ]

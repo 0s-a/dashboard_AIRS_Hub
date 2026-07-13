@@ -139,9 +139,13 @@ export async function deleteCurrency(id: string) {
     return safeActionWithRevalidation(
         async () => {
             await requireAuth()
-            const linkedCount = await prisma.productPrice.count({ where: { currencyId: id } })
-            if (linkedCount > 0) {
-                throw new Error(`لا يمكن حذف هذه العملة — مرتبطة بـ ${linkedCount} تسعيرة منتج`)
+            const linkedOrderItems = await prisma.orderItem.count({ where: { currencyId: id } })
+            if (linkedOrderItems > 0) {
+                throw new Error(`لا يمكن حذف هذه العملة — مرتبطة بـ ${linkedOrderItems} بند طلب`)
+            }
+            const linkedCustomers = await prisma.customerCurrency.count({ where: { currencyId: id } })
+            if (linkedCustomers > 0) {
+                throw new Error(`لا يمكن حذف هذه العملة — مرتبطة بـ ${linkedCustomers} عميل`)
             }
             await prisma.currency.delete({ where: { id } })
             return null

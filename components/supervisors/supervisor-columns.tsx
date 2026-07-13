@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
     MoreHorizontal, Pencil, Trash2, UserCheck, UserX,
-    Phone, Mail, MessageCircle, Copy, ShieldAlert,
+    Copy, ShieldAlert,
 } from "lucide-react"
 import { toggleSupervisorActive, deleteSupervisor, getSupervisors } from "@/lib/actions/supervisors"
 import { toast } from "sonner"
@@ -61,48 +61,55 @@ function formatDate(date: Date | string | null) {
 
 export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<SupervisorRow>[] {
     return [
-        // ── الاسم ──────────────────────────────────────────────
         {
             accessorKey: "name",
             enableColumnFilter: true,
-            meta: { filterType: 'text' as const, filterPlaceholder: 'ابحث بالاسم...' },
+            meta: {
+                filterType: "text" as const,
+                filterPlaceholder: "ابحث بالاسم...",
+                cellVariant: "text" as const,
+                align: "start" as const,
+            },
             header: "المشرف",
             size: 220, minSize: 160, maxSize: 280,
             cell: ({ row }) => (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                     <div className="size-9 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0">
                         <ShieldAlert className="size-4 text-violet-600" />
                     </div>
                     <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-sm truncate max-w-[160px]">{row.original.name}</span>
+                        <span className="font-bold text-sm truncate">{row.original.name}</span>
                         {row.original.notes && (
-                            <span className="text-[11px] text-muted-foreground truncate max-w-[160px]">{row.original.notes}</span>
+                            <span className="text-[11px] text-muted-foreground truncate">{row.original.notes}</span>
                         )}
                     </div>
                 </div>
             ),
         },
-        // ── معلومات الاتصال ────────────────────────────────────
         {
             id: "contacts",
             enableColumnFilter: true,
-            meta: { filterType: 'text' as const, filterPlaceholder: 'بحث في الاتصال...' },
-            filterFn: (row: any, _: string, v: string) =>
-                (row.original.contacts || []).some((c: any) => c.value.toLowerCase().includes(v.toLowerCase())),
+            meta: {
+                filterType: "text" as const,
+                filterPlaceholder: "بحث في الاتصال...",
+                cellVariant: "text" as const,
+                align: "start" as const,
+            },
+            filterFn: (row, _, v: string) =>
+                (row.original.contacts || []).some((c) => c.value.toLowerCase().includes(v.toLowerCase())),
             header: "معلومات الاتصال",
             size: 240, minSize: 200, maxSize: 300,
             cell: ({ row }) => {
                 const contacts = row.original.contacts || []
-                const phones = contacts.filter((c: any) => c.type === 'phone')
-                const wa = contacts.filter((c: any) => c.type === 'whatsapp')
-                const emails = contacts.filter((c: any) => c.type === 'email')
+                const phones = contacts.filter((c) => c.type === "phone")
+                const wa = contacts.filter((c) => c.type === "whatsapp")
+                const emails = contacts.filter((c) => c.type === "email")
 
                 if (!contacts.length) return <span className="text-muted-foreground/40 text-xs">—</span>
 
                 return (
                     <div className="flex flex-col gap-1 py-1">
-                        {/* Phones */}
-                        {phones.map((phone: any, i: number) => (
+                        {phones.map((phone, i) => (
                             <div key={phone.id || i} className="flex items-center gap-1.5 group/ph text-xs py-0.5">
                                 <a href={`tel:${phone.value}`} className="font-mono text-xs font-medium hover:text-blue-600 transition-colors text-muted-foreground hover:text-foreground" dir="ltr" onClick={e => e.stopPropagation()}>
                                     {formatPhone(phone.value)}
@@ -115,16 +122,15 @@ export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): Colum
                                 {phone.isPrimary && (
                                     <span className="text-[9px] text-blue-600 bg-blue-500/10 px-1 rounded shrink-0">أساسي</span>
                                 )}
-                                <button onClick={e => { e.stopPropagation(); copyToClipboard(phone.value) }} className="opacity-0 group-hover/ph:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
+                                <button type="button" onClick={e => { e.stopPropagation(); copyToClipboard(phone.value) }} className="opacity-0 group-hover/ph:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
                                     <Copy className="h-2.5 w-2.5 text-muted-foreground" />
                                 </button>
                             </div>
                         ))}
 
-                        {/* WhatsApp */}
-                        {wa.map((waItem: any, i: number) => (
+                        {wa.map((waItem, i) => (
                             <div key={waItem.id || i} className="flex items-center gap-1.5 group/wa text-xs py-0.5">
-                                <a href={`https://wa.me/${waItem.value.replace(/\D/g, '').replace(/^0/, '966')}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium hover:text-emerald-600 transition-colors text-muted-foreground hover:text-foreground" dir="ltr" onClick={e => e.stopPropagation()}>
+                                <a href={`https://wa.me/${waItem.value.replace(/\D/g, "").replace(/^0/, "966")}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs font-medium hover:text-emerald-600 transition-colors text-muted-foreground hover:text-foreground" dir="ltr" onClick={e => e.stopPropagation()}>
                                     {formatPhone(waItem.value)}
                                 </a>
                                 <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium shrink-0 opacity-80">(واتساب)</span>
@@ -136,14 +142,13 @@ export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): Colum
                                 {waItem.isPrimary && (
                                     <span className="text-[9px] text-emerald-600 bg-emerald-500/10 px-1 rounded shrink-0">أساسي</span>
                                 )}
-                                <button onClick={e => { e.stopPropagation(); copyToClipboard(waItem.value) }} className="opacity-0 group-hover/wa:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
+                                <button type="button" onClick={e => { e.stopPropagation(); copyToClipboard(waItem.value) }} className="opacity-0 group-hover/wa:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
                                     <Copy className="h-2.5 w-2.5 text-muted-foreground" />
                                 </button>
                             </div>
                         ))}
 
-                        {/* Email */}
-                        {emails.map((email: any, i: number) => (
+                        {emails.map((email, i) => (
                             <div key={email.id || i} className="flex items-center gap-1.5 group/em text-xs py-0.5">
                                 <a href={`mailto:${email.value}`} className="text-xs hover:text-rose-600 transition-colors truncate max-w-[150px] text-muted-foreground hover:text-foreground" onClick={ev => ev.stopPropagation()}>
                                     {email.value}
@@ -156,7 +161,7 @@ export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): Colum
                                 {email.isPrimary && (
                                     <span className="text-[9px] text-rose-600 bg-rose-500/10 px-1 rounded shrink-0">أساسي</span>
                                 )}
-                                <button onClick={ev => { ev.stopPropagation(); copyToClipboard(email.value) }} className="opacity-0 group-hover/em:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
+                                <button type="button" onClick={ev => { ev.stopPropagation(); copyToClipboard(email.value) }} className="opacity-0 group-hover/em:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-muted transition-all shrink-0">
                                     <Copy className="h-2.5 w-2.5 text-muted-foreground" />
                                 </button>
                             </div>
@@ -165,15 +170,15 @@ export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): Colum
                 )
             },
         },
-        // ── الحالة ─────────────────────────────────────────────
         {
             accessorKey: "isActive",
             enableColumnFilter: true,
             meta: {
-                filterType: 'select' as const,
-                filterOptions: [{ label: "نشط", value: "true" }, { label: "معطّل", value: "false" }]
+                filterType: "boolean" as const,
+                booleanLabels: { true: "نشط", false: "معطّل", all: "الكل" },
+                align: "start" as const,
             },
-            filterFn: (row: any, _: string, v: string) => String(row.original.isActive) === v,
+            filterFn: "boolean",
             header: "الحالة",
             size: 110, minSize: 90, maxSize: 130,
             cell: ({ row }) => (
@@ -185,20 +190,24 @@ export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): Colum
                 </Badge>
             ),
         },
-        // ── تاريخ الإنشاء ──────────────────────────────────────
         {
             accessorKey: "createdAt",
+            enableColumnFilter: true,
+            meta: { filterType: "date-range" as const, align: "start" as const },
+            filterFn: "dateRange",
             header: "تاريخ الإضافة",
             size: 140, minSize: 120, maxSize: 170,
             cell: ({ row }) => (
                 <span className="text-xs text-muted-foreground">{formatDate(row.original.createdAt)}</span>
             ),
         },
-        // ── الإجراءات ──────────────────────────────────────────
         {
             id: "actions",
             enableColumnFilter: false,
-            header: "",
+            enableSorting: false,
+            meta: { cellVariant: "actions" as const, sticky: "actions" as const, align: "end" as const },
+            header: "الإجراءات",
+            size: 90,
             cell: ({ row }) => {
                 const s = row.original
 
@@ -207,7 +216,7 @@ export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): Colum
                     if (res.success) {
                         toast.success(s.isActive ? "تم تعطيل المشرف" : "تم تفعيل المشرف")
                         const fresh = await getSupervisors({ activeOnly: false })
-                        if (fresh.success && fresh.data) onRefresh((fresh.data as any).supervisors)
+                        if (fresh.success && fresh.data) onRefresh((fresh.data as { supervisors: SupervisorRow[] }).supervisors)
                     } else {
                         toast.error(res.error)
                     }
@@ -219,7 +228,7 @@ export function supervisorColumns({ onEdit, onRefresh }: ColumnCallbacks): Colum
                     if (res.success) {
                         toast.success("تم حذف المشرف")
                         const fresh = await getSupervisors({ activeOnly: false })
-                        if (fresh.success && fresh.data) onRefresh((fresh.data as any).supervisors)
+                        if (fresh.success && fresh.data) onRefresh((fresh.data as { supervisors: SupervisorRow[] }).supervisors)
                     } else {
                         toast.error(res.error)
                     }

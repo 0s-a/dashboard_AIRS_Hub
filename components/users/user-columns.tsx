@@ -9,13 +9,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { MoreHorizontal, Pencil, Trash2, UserCheck, UserX, ShieldCheck, User } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, UserCheck, UserX } from "lucide-react"
 import { toggleUserActive, deleteUser, getUsers } from "@/lib/actions/users"
 import { toast } from "sonner"
 import { UserAvatar } from "./user-avatar"
@@ -52,37 +46,35 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
     {
         accessorKey: "name",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'ابحث بالاسم...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "ابحث بالاسم...",
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
         header: "المستخدم",
         size: 220,
         minSize: 180,
         maxSize: 280,
         cell: ({ row }) => (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
                 <UserAvatar name={row.original.name} color={row.original.color} size="sm" />
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm truncate max-w-[160px]">{row.original.name}</span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground font-mono">@{row.original.username}</span>
+                <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-sm truncate">{row.original.name}</span>
+                    <span className="text-[11px] text-muted-foreground font-mono truncate">@{row.original.username}</span>
                 </div>
             </div>
         ),
     },
-    // ── الحالة ───────────────────────────────────────────────
     {
         accessorKey: "isActive",
         enableColumnFilter: true,
-        meta: { 
-            filterType: 'select' as const,
-            filterOptions: [
-                { label: "نشط", value: "true" },
-                { label: "معطّل", value: "false" }
-            ]
+        meta: {
+            filterType: "boolean" as const,
+            booleanLabels: { true: "نشط", false: "معطّل", all: "الكل" },
+            align: "start" as const,
         },
-        filterFn: (row: any, _columnId: string, filterValue: string) => {
-            return String(row.original.isActive) === filterValue
-        },
+        filterFn: "boolean",
         header: "الحالة",
         size: 110,
         minSize: 90,
@@ -98,22 +90,11 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
             </Badge>
         ),
     },
-
-
-
-
     {
         accessorKey: "lastLogin",
         enableColumnFilter: true,
-        meta: { filterType: 'date-range' as const },
-        filterFn: (row: any, _columnId: string, filterValue: any) => {
-            const date = row.original.lastLogin ? new Date(row.original.lastLogin) : null
-            if (!date) return false
-            const d = date.toISOString().split('T')[0]
-            if (filterValue.from && d < filterValue.from) return false
-            if (filterValue.to && d > filterValue.to) return false
-            return true
-        },
+        meta: { filterType: "date-range" as const, align: "start" as const },
+        filterFn: "dateRange",
         header: "آخر دخول",
         size: 140,
         minSize: 120,
@@ -127,14 +108,8 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
     {
         accessorKey: "createdAt",
         enableColumnFilter: true,
-        meta: { filterType: 'date-range' as const },
-        filterFn: (row: any, _columnId: string, filterValue: any) => {
-            const date = new Date(row.original.createdAt)
-            const d = date.toISOString().split('T')[0]
-            if (filterValue.from && d < filterValue.from) return false
-            if (filterValue.to && d > filterValue.to) return false
-            return true
-        },
+        meta: { filterType: "date-range" as const, align: "start" as const },
+        filterFn: "dateRange",
         header: "تاريخ الإنشاء",
         size: 150,
         minSize: 130,
@@ -145,11 +120,13 @@ export function userColumns({ onEdit, onRefresh }: ColumnCallbacks): ColumnDef<U
             </span>
         ),
     },
-    // ── عمود الإجراءات ───────────────────────────────────────
     {
         id: "actions",
         enableColumnFilter: false,
-        header: "",
+        enableSorting: false,
+        meta: { cellVariant: "actions" as const, sticky: "actions" as const, align: "end" as const },
+        header: "الإجراءات",
+        size: 90,
         cell: ({ row }) => {
             const user = row.original
 

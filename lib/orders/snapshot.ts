@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import { resolveSkuPrice } from '@/lib/action-utils'
+import { resolveProductPrice } from '@/lib/action-utils'
+import { convertFromDefault } from '@/lib/currency-utils'
 
 export interface SnapshotInput {
     customerId?: string | null
     productId: string
-    skuId?: string | null
     unitId?: string | null
     unitPrice?: number | null
     currencyId?: string | null
@@ -17,14 +17,46 @@ export interface SnapshotResult {
     priceLabelId: string | null
 }
 
-async function resolveDefaultSkuId(productId: string, skuId?: string | null): Promise<string | null> {
-    if (skuId) return skuId
-    const sku = await prisma.sKU.findFirst({
-        where: { skc: { productId } },
-        orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
-        select: { id: true },
-    })
-    return sku?.id ?? null
+async function resolveTargetCurrency(input: SnapshotInput) {
+    if (input.currencyId) {
+        return prisma.currency.findUnique({ where: { id: input.currencyId } })
+    }
+
+    if (input.customerId) {
+        const customerCurrency = await prisma.customerCurrency.findFirst({
+            where: { customerId: input.customerId },
+            include: { currency: true },
+            orderBy: { assignedAt: 'asc' },
+        })
+        if (customerCurrency?.currency) return customerCurrency.currency
+    }
+
+    return prisma.currency.findFirst({ where: { isDefault: true } })
+}
+
+async function freezeConvertedPrice(
+    valueInDefault: number,
+    priceLabelId: string,
+    input: SnapshotInput
+): Promise<SnapshotResult> {
+    const target = await resolveTargetCurrency(input)
+    const unitPrice = convertFromDefault(valueInDefault, target)
+    return {
+        unitPrice,
+        currencyId: target?.id ?? null,
+        priceLabelId,
+    }
+}
+
+async function tryLabelPrice(
+    productId: string,
+    priceLabelId: string,
+    unitId: string | null | undefined,
+    input: SnapshotInput
+): Promise<SnapshotResult | null> {
+    const price = await resolveProductPrice(productId, priceLabelId, unitId ?? undefined)
+    if (!price) return null
+    return freezeConvertedPrice(Number(price.value), price.priceLabelId, input)
 }
 
 export async function resolveItemSnapshot(input: SnapshotInput): Promise<SnapshotResult> {
@@ -36,9 +68,11 @@ export async function resolveItemSnapshot(input: SnapshotInput): Promise<Snapsho
         }
     }
 
-    const skuId = await resolveDefaultSkuId(input.productId, input.skuId)
-    if (!skuId) {
-        return { unitPrice: null, currencyId: null, priceLabelId: null }
+    const { productId } = input
+
+    if (input.priceLabelId) {
+        const fromExplicit = await tryLabelPrice(productId, input.priceLabelId, input.unitId, input)
+        if (fromExplicit) return fromExplicit
     }
 
     if (input.customerId) {
@@ -47,18 +81,13 @@ export async function resolveItemSnapshot(input: SnapshotInput): Promise<Snapsho
             select: { priceLabelId: true },
         })
         if (customer?.priceLabelId) {
-            const price = await resolveSkuPrice(
-                skuId,
+            const fromCustomer = await tryLabelPrice(
+                productId,
                 customer.priceLabelId,
-                input.unitId ?? undefined
+                input.unitId,
+                input
             )
-            if (price) {
-                return {
-                    unitPrice: Number(price.value),
-                    currencyId: price.currencyId,
-                    priceLabelId: price.priceLabelId,
-                }
-            }
+            if (fromCustomer) return fromCustomer
         }
     }
 
@@ -67,37 +96,19 @@ export async function resolveItemSnapshot(input: SnapshotInput): Promise<Snapsho
         select: { id: true },
     })
     if (defaultLabel) {
-        const price = await resolveSkuPrice(
-            skuId,
-            defaultLabel.id,
-            input.unitId ?? undefined
-        )
-        if (price) {
-            return {
-                unitPrice: Number(price.value),
-                currencyId: price.currencyId,
-                priceLabelId: price.priceLabelId,
-            }
-        }
+        const fromDefault = await tryLabelPrice(productId, defaultLabel.id, input.unitId, input)
+        if (fromDefault) return fromDefault
     }
 
-    const baseWhere = {
-        skuId,
-        ...(input.unitId ? { unitId: input.unitId } : {}),
-    }
-
-    const anyPrice =
-        (await prisma.productPrice.findFirst({
-            where: { ...baseWhere, currency: { isDefault: true } },
-        })) ??
-        (await prisma.productPrice.findFirst({ where: baseWhere }))
+    const anyPrice = await prisma.productPrice.findFirst({
+        where: {
+            productId,
+            ...(input.unitId ? { unitId: input.unitId } : {}),
+        },
+    })
 
     if (anyPrice) {
-        return {
-            unitPrice: Number(anyPrice.value),
-            currencyId: anyPrice.currencyId,
-            priceLabelId: anyPrice.priceLabelId,
-        }
+        return freezeConvertedPrice(Number(anyPrice.value), anyPrice.priceLabelId, input)
     }
 
     return { unitPrice: null, currencyId: null, priceLabelId: null }

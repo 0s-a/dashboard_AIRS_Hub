@@ -10,5 +10,5 @@ interface PriceLabelTableProps {
 }
 
 export function PriceLabelTable({ data, onRefresh }: PriceLabelTableProps) {
-    return <DataTable columns={columns} data={data} onRefresh={onRefresh} />
+    return <DataTable columns={columns} data={data} onRefresh={onRefresh} searchPlaceholder="ابحث عن تسعيرة..." />
 }

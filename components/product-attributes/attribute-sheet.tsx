@@ -7,13 +7,13 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet"
-import { AttributeForm } from "./attribute-form"
-import { ProductAttribute } from "@prisma/client"
+import { ProductAttributeForm } from "./attribute-form"
+import type { SerializedProductAttributeCatalog } from "@/lib/types/product-attribute"
 
 interface AttributeSheetProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    attribute?: ProductAttribute
+    attribute?: SerializedProductAttributeCatalog
 }
 
 export function AttributeSheet({ open, onOpenChange, attribute }: AttributeSheetProps) {
@@ -21,20 +21,13 @@ export function AttributeSheet({ open, onOpenChange, attribute }: AttributeSheet
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="left" className="sm:max-w-lg overflow-y-auto">
                 <SheetHeader>
-                    <SheetTitle>
-                        {attribute ? "تعديل الصفة" : "إضافة صفة جديدة"}
-                    </SheetTitle>
+                    <SheetTitle>{attribute ? "تعديل الصفة" : "إضافة صفة جديدة"}</SheetTitle>
                     <SheetDescription>
-                        {attribute
-                            ? "قم بتحديث بيانات الصفة"
-                            : "أضف صفة جديدة لكتالوج خصائص المنتجات"}
+                        {attribute ? "قم بتحديث بيانات الصفة" : "أضف صفة جديدة لكتالوج المنتجات"}
                     </SheetDescription>
                 </SheetHeader>
                 <div className="mt-6">
-                    <AttributeForm
-                        attribute={attribute}
-                        onSuccess={() => onOpenChange(false)}
-                    />
+                    <ProductAttributeForm attribute={attribute} onSuccess={() => onOpenChange(false)} />
                 </div>
             </SheetContent>
         </Sheet>

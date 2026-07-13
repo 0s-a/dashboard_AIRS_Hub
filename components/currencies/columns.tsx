@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import type { SerializedCurrency } from "@/app/(dashboard)/currencies/page"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, Star, StarOff, ArrowLeftRight, TrendingDown } from "lucide-react"
+import { Edit, Trash2, Star, StarOff, ArrowLeftRight } from "lucide-react"
 import { deleteCurrency, setDefaultCurrency } from "@/lib/actions/currencies"
 import { toast } from "sonner"
 import {
@@ -23,10 +23,15 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     {
         accessorKey: "itemNumber",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'الرقم...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "الرقم...",
+            cellVariant: "code" as const,
+            align: "start" as const,
+        },
         header: "الرقم",
         cell: ({ row }) => (
-            <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+            <span className="truncate text-muted-foreground bg-muted/50 px-2 py-1 rounded">
                 {row.original.itemNumber}
             </span>
         ),
@@ -35,29 +40,42 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     {
         accessorKey: "name",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم العملة...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "اسم العملة...",
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
         header: "العملة",
         cell: ({ row }) => (
-            <span className="font-medium text-sm">{row.original.name}</span>
+            <span className="font-medium text-sm truncate">{row.original.name}</span>
         ),
         size: 200,
     },
     {
         accessorKey: "code",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'الكود...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "الكود...",
+            cellVariant: "code" as const,
+            align: "start" as const,
+        },
         header: "الكود (ISO)",
         cell: ({ row }) => (
-            <span className="font-mono text-sm text-muted-foreground">
-                {row.original.code}
-            </span>
+            <span className="truncate text-muted-foreground">{row.original.code}</span>
         ),
         size: 140,
     },
     {
         accessorKey: "symbol",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'الرمز...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "الرمز...",
+            cellVariant: "code" as const,
+            align: "start" as const,
+        },
         header: "الرمز",
         cell: ({ row }) => (
             <span className="font-semibold text-sm text-primary/80">{row.original.symbol}</span>
@@ -67,6 +85,7 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     {
         accessorKey: "exchangeRate",
         enableColumnFilter: false,
+        meta: { cellVariant: "number" as const, align: "start" as const },
         header: () => (
             <div className="flex items-center gap-1.5">
                 <ArrowLeftRight className="size-3.5 text-muted-foreground" />
@@ -112,15 +131,13 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
 
             return (
                 <div className="space-y-0.5">
-                    {/* Rate display: how many of this currency = 1 of base */}
                     <div className="flex items-baseline gap-1.5">
                         <span className="text-xs text-muted-foreground">1 {baseSymbol} =</span>
-                        <span className="font-mono font-bold text-sm tabular-nums">
+                        <span className="font-bold text-sm tabular-nums">
                             {rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                         </span>
                         <span className="text-xs font-semibold text-muted-foreground">{c.symbol}</span>
                     </div>
-                    {/* Inverse */}
                     <div className="text-[10px] text-muted-foreground/50 font-mono">
                         1 {c.symbol} = {(1 / rate).toFixed(6)} {baseSymbol}
                     </div>
@@ -132,11 +149,13 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
     {
         id: "actions",
         enableColumnFilter: false,
+        enableSorting: false,
+        meta: { cellVariant: "actions" as const, sticky: "actions" as const, align: "end" as const },
         header: "الإجراءات",
         cell: ({ row }) => {
             const c = row.original
             return (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => dispatchEdit(c)}>
                         <Edit className="h-4 w-4" />
                     </Button>
@@ -148,7 +167,7 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>حذف العملة "{c.name}"</AlertDialogTitle>
+                                <AlertDialogTitle>حذف العملة &quot;{c.name}&quot;</AlertDialogTitle>
                                 <AlertDialogDescription>
                                     هذا الإجراء لا يمكن التراجع عنه. هل أنت متأكد من حذف هذه العملة؟
                                 </AlertDialogDescription>
@@ -192,6 +211,6 @@ export const columns: ColumnDef<SerializedCurrency>[] = [
                 </div>
             )
         },
-        size: 150,
-    }
+        size: 120,
+    },
 ]

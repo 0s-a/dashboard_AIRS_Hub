@@ -85,22 +85,23 @@
 | `lib/meilisearch.ts` | عميل Meilisearch |
 | `lib/prisma-includes.ts` | Prisma include/select constants |
 | `prisma/schema.prisma` | مصدر الحقيقة للبيانات |
-| `app/(dashboard)/product-attributes/` | كتالوج أسماء صفات المنتجات (`ProductAttribute`) |
-| `lib/actions/product-attributes.ts` | CRUD خصائص المنتجات |
+| `app/(dashboard)/product-attributes/` | كتالوج صفات المنتج (`ProductAttribute`) |
+| `lib/actions/product-attributes.ts` | CRUD صفات المنتج |
 
 ## قواعد التسعير
 
 - التسعير عبر **PriceLabel** وليس tiers ثابتة (RETAIL/WHOLESALE/VIP في README قديم — تجاهله)
-- `ProductPrice` = مفتاح فريد: `productId + priceLabelId + currencyId + unitId`
-- كل عميل له `priceLabelId` اختياري + عملات عبر `CustomerCurrency`
+- `ProductPrice` = مفتاح فريد: `productId + priceLabelId + unitId` (بالعملة الافتراضية دائماً)
+- التحويل لعملات أخرى عبر `exchangeRate` في `lib/currency-utils.ts` (`convertFromDefault`)
+- كل عميل له `priceLabelId` اختياري + عملات عبر `CustomerCurrency` (تفضيل عرض)
 - عند إنشاء طلب: **snapshot إلزامي** في `OrderItem`:
-  - `unitPrice`, `currencyId`, `priceLabelId`
+ - `unitPrice`, `currencyId`, `priceLabelId` (بعد التحويل إن لزم)
 - عرض السعر: `resolveItemPrice()` في `lib/order-utils.ts`
-  1. snapshot (unitPrice) — الأولوية
-  2. تسعيرة العميل من ProductPrice
-  3. التسعيرة الافتراضية (isDefault)
-  4. أي سعر بالعملة الافتراضية
-- Bot check-price: `app/api/v1/bot/check-price/route.ts` يفلتر بـ `customer.priceLabelId`
+ 1. snapshot (unitPrice) — الأولوية
+ 2. تسعيرة العميل من ProductPrice
+ 3. التسعيرة الافتراضية (isDefault)
+ 4. أي سعر
+- Bot check-price: يفلتر بـ `customer.priceLabelId` ويحوّل لعملات العميل
 
 ## قواعد الطلبات
 

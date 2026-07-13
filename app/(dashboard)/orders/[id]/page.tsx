@@ -23,7 +23,7 @@ export default async function OrderDetailPage({ params }: Props) {
         getOrderById(id),
         getCustomers(),
         prisma.product.findMany({
-            select: { id: true, name: true, productNumber: true },
+            select: { id: true, name: true, itemNumber: true },
             orderBy: { name: "asc" },
         }),
         getDefaultCurrency(),
@@ -195,7 +195,7 @@ export default async function OrderDetailPage({ params }: Props) {
                 {/* Header row */}
                 <div className="grid grid-cols-[1fr_80px_100px_100px_120px] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-semibold text-muted-foreground border-b border-border/30">
                     <span>المنتج</span>
-                    <span className="text-center">المتغير</span>
+                    <span className="text-center">المواصفة</span>
                     <span className="text-center">الكمية</span>
                     <span className="text-center">سعر الوحدة</span>
                     <span className="text-end">الإجمالي</span>
@@ -225,22 +225,20 @@ export default async function OrderDetailPage({ params }: Props) {
                                         )}
                                     </div>
                                 </div>
-                                {/* SKU / SKC */}
+                                {/* Attributes */}
                                 <div className="flex items-center justify-center gap-1.5">
-                                    {item.sku ? (
-                                        <>
-                                            {item.sku.skc?.color?.hexCode && (
-                                                <span
-                                                    className="size-4 rounded-full border border-black/10 shrink-0"
-                                                    style={{ backgroundColor: item.sku.skc.color.hexCode }}
-                                                />
-                                            )}
-                                            <span className="text-xs text-muted-foreground truncate max-w-[50px]">
-                                                {[item.sku.skc?.color?.name, item.sku.sizeLabel].filter(Boolean).join(' / ') || item.sku.skuCode}
-                                            </span>
-                                        </>
+                                    {item.product?.productAttributes?.length ? (
+                                        <span className="text-xs text-muted-foreground truncate max-w-[90px]" title={
+                                            item.product.productAttributes.map((a: { value: string }) => a.value).join(' · ')
+                                        }>
+                                            {item.product.productAttributes.map((a: { value: string }) => a.value).filter(Boolean).join(' / ')
+                                                || item.product.itemNumber
+                                                || '—'}
+                                        </span>
                                     ) : (
-                                        <span className="text-muted-foreground text-xs">—</span>
+                                        <span className="text-muted-foreground text-xs">
+                                            {item.product?.itemNumber || '—'}
+                                        </span>
                                     )}
                                 </div>
                                 {/* Quantity */}

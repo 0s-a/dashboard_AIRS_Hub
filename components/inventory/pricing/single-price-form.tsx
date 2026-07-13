@@ -16,46 +16,41 @@ import {
 } from "@/components/ui/select"
 
 // ─────────────────────────────────────────────────────────────
-// Single Price Form — Add a custom price for specific unit/currency/label
+// Single Price Form — Add a custom price (default currency only)
 // ─────────────────────────────────────────────────────────────
 
-type CurrencyOption = { id: string; name: string; symbol: string }
-
 interface SinglePriceFormProps {
-    skuId: string
+    productId: string
     productUnits: ProductUnitEntry[]
     priceLabels: { id: string; name: string; isDefault?: boolean }[]
-    currencies: CurrencyOption[]
+    defaultCurrencySymbol?: string
     existingPrices: SerializedPrice[]
     onComplete: (newPrices: SerializedPrice[]) => void
     onCancel: () => void
 }
 
 export function SinglePriceForm({
-    skuId, productUnits, priceLabels, currencies, existingPrices, onComplete, onCancel
+    productId, productUnits, priceLabels, defaultCurrencySymbol, existingPrices, onComplete, onCancel
 }: SinglePriceFormProps) {
     const [isPending, startTransition] = useTransition()
     const defaultLabel = priceLabels.find(pl => pl.isDefault)
     const [labelId, setLabelId] = useState(defaultLabel?.id ?? "")
-    const [currencyId, setCurrencyId] = useState("")
     const [unitId, setUnitId] = useState("")
     const [value, setValue] = useState("")
 
     const comboExists =
-        labelId && currencyId && unitId &&
-        existingPrices.some(p => p.priceLabelId === labelId && p.currencyId === currencyId && p.unitId === unitId)
+        labelId && unitId &&
+        existingPrices.some(p => p.priceLabelId === labelId && p.unitId === unitId)
 
     const handleSubmit = () => {
         const val = parseFloat(value)
         if (!labelId) return toast.error("مسمى التسعيرة مطلوب")
-        if (!currencyId) return toast.error("العملة مطلوبة")
         if (!unitId) return toast.error("الوحدة مطلوبة")
         if (isNaN(val) || val < 0) return toast.error("السعر غير صحيح")
 
         startTransition(async () => {
-            const res = await addProductPrice(skuId, {
+            const res = await addProductPrice(productId, {
                 priceLabelId: labelId,
-                currencyId,
                 unitId,
                 value: val,
                 isAutoCalculated: false,
@@ -71,7 +66,6 @@ export function SinglePriceForm({
 
     return (
         <div className="p-6 bg-linear-to-b from-muted/5 to-transparent border-b border-border/50 animate-in fade-in slide-in-from-top-4 duration-300">
-            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                     <div className="size-10 rounded-xl bg-muted/10 border border-border/50 flex items-center justify-center">
@@ -79,7 +73,9 @@ export function SinglePriceForm({
                     </div>
                     <div>
                         <h3 className="font-bold text-base">إضافة تسعيرة مخصصة</h3>
-                        <p className="text-[10px] text-muted-foreground">تحديد سعر محدد لوحدة وعملة وقائمة بعينها</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            السعر يُحفظ بالعملة الافتراضية{defaultCurrencySymbol ? ` (${defaultCurrencySymbol})` : ''}
+                        </p>
                     </div>
                 </div>
                 <Button size="icon" variant="ghost" className="rounded-full h-8 w-8" onClick={onCancel}>
@@ -87,8 +83,7 @@ export function SinglePriceForm({
                 </Button>
             </div>
 
-            {/* Form fields */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground/80">القائمة</label>
                     <Select value={labelId} onValueChange={setLabelId}>
@@ -97,17 +92,6 @@ export function SinglePriceForm({
                         </SelectTrigger>
                         <SelectContent>
                             {priceLabels.map(pl => <SelectItem key={pl.id} value={pl.id}>{pl.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-muted-foreground/80">العملة</label>
-                    <Select value={currencyId} onValueChange={setCurrencyId}>
-                        <SelectTrigger className="h-10 rounded-xl bg-background border-border/50">
-                            <SelectValue placeholder="اختر العملة" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {currencies.map(c => <SelectItem key={c.id} value={c.id}>{c.symbol} — {c.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
@@ -123,7 +107,9 @@ export function SinglePriceForm({
                     </Select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-muted-foreground/80">السعر</label>
+                    <label className="text-[11px] font-bold text-muted-foreground/80">
+                        السعر{defaultCurrencySymbol ? ` (${defaultCurrencySymbol})` : ''}
+                    </label>
                     <Input
                         type="number" step="0.01" min="0" autoFocus
                         value={value} onChange={(e) => setValue(e.target.value)}
@@ -133,20 +119,17 @@ export function SinglePriceForm({
                 </div>
             </div>
 
-            {/* Duplicate warning */}
             {comboExists && (
                 <div className="mt-4 flex items-start gap-2 text-[10px] text-amber-600 bg-amber-50/50 border border-amber-200/50 rounded-xl px-4 py-3">
-                    <span>⚠️</span>
-                    <span>هذه التسعيرة موجودة مسبقاً في هذه القائمة، الحفظ سيؤدي لتكرار السعر لهذه الوحدة والعملة.</span>
+                    <span>هذه التسعيرة موجودة مسبقاً لهذه الوحدة والقائمة.</span>
                 </div>
             )}
 
-            {/* Actions */}
             <div className="flex items-center gap-3 mt-6">
                 <Button
                     size="sm" className="rounded-xl px-6"
                     onClick={handleSubmit}
-                    disabled={isPending || !labelId || !currencyId || !unitId || !value}
+                    disabled={isPending || !labelId || !unitId || !value}
                 >
                     {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                     حفظ السعر

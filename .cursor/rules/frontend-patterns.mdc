@@ -8,21 +8,22 @@ alwaysApply: false
 
 ## CRUD Catalog
 
-نموذج مرجعي: `components/colors/` — form + sheet + table + columns
+نموذج مرجعي: `components/categories/` — form + sheet + table + columns
 
 ## الجداول
+
+تفاصيل كاملة: `.cursor/rules/datatable.mdc`
 
 | الوضع | متى | الإعداد |
 |-------|-----|---------|
 | Client | كتالوجات صغيرة | `DataTable` مع pagination مدمج |
-| Server | قوائم كبيرة | `showPagination={false}` + `ServerPagination` + debounce 350ms |
+| Server | قوائم كبيرة | `mode="server"` + `ServerPagination` + debounce 350ms |
 
-- `*-table.tsx` — غلاف رفيع حول `components/ui/data-table.tsx`
-- رأس العمود: `<div className="text-start pe-0">العنوان</div>`
-- فلاتر: `meta: { filterType, filterPlaceholder }` + `enableColumnFilter: true`
-- حذف: `AlertDialog` تأكيد عربي قبل `deleteX()`
-- تعديل: `createColumns({ onEdit, onDelete })` — **لا `CustomEvent`** في كود جديد
-
+- `*-table.tsx` — غلاف رفيع حول `components/ui/data-table`
+- فلاتر الأعمدة دائماً ظاهرة + بحث عام
+- `meta.cellVariant` / `align` + `filterFn` المسجّلة — انظر قاعدة DataTable
+- حذف: `AlertDialog` عربي؛ **لا `CustomEvent`** في كود جديد
+- استثناءات: import-table، comparison-table، new-tags-table
 ## النماذج
 
 - `react-hook-form` + `zodResolver` + shadcn `Form`
@@ -40,7 +41,7 @@ alwaysApply: false
 ## حالات UI
 
 - Empty: مدمج في `DataTable` (نص عربي)
-- Loading: `Loader2` أو `Skeleton`
+- Loading: `isLoading` على DataTable، أو `Loader2` / Skeleton
 - فشل fetch: `toast.error` — لا صمت عند `res.success === false`
 
 ## الصور

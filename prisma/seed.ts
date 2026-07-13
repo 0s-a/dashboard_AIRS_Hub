@@ -68,25 +68,32 @@ const PRICE_LABELS = [
     { itemNumber: 'PL-005', name: 'سعر العرض',    customerType: null,         isDefault: false },
 ] as const
 
-const COLORS = [
-    { code: 'RD', name: 'أحمر',     hexCode: '#EF4444', order: 1 },
-    { code: 'BL', name: 'أزرق',     hexCode: '#3B82F6', order: 2 },
-    { code: 'GR', name: 'أخضر',     hexCode: '#22C55E', order: 3 },
-    { code: 'YL', name: 'أصفر',     hexCode: '#EAB308', order: 4 },
-    { code: 'BK', name: 'أسود',     hexCode: '#171717', order: 5 },
-    { code: 'WH', name: 'أبيض',     hexCode: '#FFFFFF', order: 6 },
-    { code: 'GY', name: 'رمادي',    hexCode: '#6B7280', order: 7 },
-    { code: 'BR', name: 'بني',      hexCode: '#92400E', order: 8 },
-    { code: 'OR', name: 'برتقالي',  hexCode: '#F97316', order: 9 },
-    { code: 'PK', name: 'وردي',     hexCode: '#EC4899', order: 10 },
-    { code: 'PR', name: 'بنفسجي',   hexCode: '#A855F7', order: 11 },
-    { code: 'CY', name: 'سماوي',    hexCode: '#06B6D4', order: 12 },
-    { code: 'GD', name: 'ذهبي',     hexCode: '#D97706', order: 13 },
-    { code: 'SV', name: 'فضي',      hexCode: '#9CA3AF', order: 14 },
-    { code: 'NV', name: 'كحلي',     hexCode: '#1E3A5F', order: 15 },
-    { code: 'OL', name: 'زيتي',     hexCode: '#65A30D', order: 16 },
-    { code: 'IN', name: 'نيلي',     hexCode: '#1D4ED8', order: 17 },
-    { code: 'ST', name: 'قياسي',    hexCode: '#9CA3AF', order: 0 },
+const PRODUCT_ATTRIBUTES = [
+    {
+        code: 'color',
+        name: 'اللون',
+        examples: ['أحمر', 'أزرق', 'أخضر', 'أسود', 'أبيض', 'قياسي'],
+    },
+    {
+        code: 'size',
+        name: 'المقاس',
+        examples: ['XS', 'S', 'M', 'L', 'XL', '2XL', '36', '38', '40', '42'],
+    },
+    {
+        code: 'capacity',
+        name: 'السعة',
+        examples: ['30ml', '50ml', '100ml', '250ml', '500ml', '1L'],
+    },
+    {
+        code: 'volume',
+        name: 'الحجم',
+        examples: ['صغير', 'وسط', 'كبير'],
+    },
+    {
+        code: 'weight',
+        name: 'الوزن',
+        examples: ['100g', '250g', '500g', '1kg', '2kg', '5kg'],
+    },
 ] as const
 
 // ─────────────────────────────────────────────────────────────
@@ -135,7 +142,7 @@ async function main() {
     log('💵', 'Seeding Currencies...')
     for (const cur of CURRENCIES) {
         await prisma.currency.upsert({
-            where:  { itemNumber: cur.itemNumber },
+            where:  { code: cur.code },
             update: {},
             create: cur,
         })
@@ -166,24 +173,51 @@ async function main() {
         logItem(pl.name)
     }
 
-    // ── 5b. Colors ─────────────────────────────────────────────
+    // ── 5b. Product Attributes ─────────────────────────────────
 
-    log('🎨', 'Seeding Colors...')
-    for (const color of COLORS) {
-        await prisma.color.upsert({
-            where:  { code: color.code },
-            update: {},
-            create: color,
+    log('🏷️', 'Seeding Product Attributes...')
+    const seededAttributes: Record<string, string> = {}
+    for (const attr of PRODUCT_ATTRIBUTES) {
+        const row = await prisma.productAttribute.upsert({
+            where: { code: attr.code },
+            update: {
+                name: attr.name,
+                examples: [...attr.examples],
+            },
+            create: {
+                code: attr.code,
+                name: attr.name,
+                examples: [...attr.examples],
+            },
         })
-        logItem(`${color.name} (${color.code})`)
+        seededAttributes[attr.code] = row.id
+        logItem(`${attr.name} (${attr.code})`)
     }
 
-    const defaultColor = await prisma.color.findUniqueOrThrow({ where: { code: 'ST' } })
+    // ── 6. Sample Brand + Category + Product ───────────────────
 
-    // ── 6. Sample Product (Test Only) ─────────────────────────
-    //
-    // هذا المنتج للاختبار فقط — رقم المنتج "001" (3 خانات يدوية).
-    // في الإنتاج، يُدخل رقم المنتج عند الإنشاء من الواجهة.
+    log('🏷️', 'Seeding Sample Brand & Category...')
+    const sampleBrand = await prisma.brand.upsert({
+        where: { code: 'TS' },
+        update: {},
+        create: {
+            name: 'براند اختبار',
+            code: 'TS',
+            description: 'براند تجريبي',
+        },
+    })
+    logItem(`${sampleBrand.name} (${sampleBrand.code})`)
+
+    const sampleCategory = await prisma.category.upsert({
+        where: { code: 'GEN' },
+        update: {},
+        create: {
+            name: 'عام',
+            code: 'GEN',
+            description: 'تصنيف تجريبي',
+        },
+    })
+    logItem(`${sampleCategory.name} (${sampleCategory.code})`)
 
     log('📦', 'Seeding Sample Product...')
 
@@ -197,73 +231,73 @@ async function main() {
     }
 
     const sampleProduct = await prisma.product.upsert({
-        where:  { productNumber: '001' },
-        update: {},
-        create: {
-            productNumber: '001',
-            slug:        'test-product',
-            name:        'منتج اختبار',
-            description: 'منتج تجريبي — يمكن حذفه بعد التشغيل الأول',
+        where: { itemNumber: 'TEST-001' },
+        update: {
+            brandId: sampleBrand.id,
+            categoryId: sampleCategory.id,
         },
-    })
-
-    const sampleSkc = await prisma.sKC.upsert({
-        where: { productId_colorId: { productId: sampleProduct.id, colorId: defaultColor.id } },
-        update: {},
         create: {
-            productId: sampleProduct.id,
-            colorId: defaultColor.id,
             itemNumber: 'TEST-001',
-            isDefault: true,
+            slug: 'test-product-st',
+            name: 'منتج اختبار',
+            description: 'منتج تجريبي — يمكن حذفه بعد التشغيل الأول',
+            brandId: sampleBrand.id,
+            categoryId: sampleCategory.id,
+            isAvailable: true,
         },
     })
 
-    const sampleSku = await prisma.sKU.upsert({
-        where: { skuCode: '001-ST' },
-        update: {},
-        create: {
-            skcId: sampleSkc.id,
-            skuCode: '001-ST',
-            isDefault: true,
-        },
-    })
+    if (seededAttributes.color) {
+        await prisma.productAttributeValue.upsert({
+            where: {
+                productId_attributeId: {
+                    productId: sampleProduct.id,
+                    attributeId: seededAttributes.color,
+                },
+            },
+            update: { value: 'قياسي' },
+            create: {
+                productId: sampleProduct.id,
+                attributeId: seededAttributes.color,
+                value: 'قياسي',
+            },
+        })
+    }
 
     await prisma.productUnit.upsert({
         where: {
             productId_unitId: {
                 productId: sampleProduct.id,
-                unitId:    defaultUnit.id,
+                unitId: defaultUnit.id,
             },
         },
         update: {},
         create: {
-            productId:        sampleProduct.id,
-            unitId:           defaultUnit.id,
-            isBase:           true,
+            productId: sampleProduct.id,
+            unitId: defaultUnit.id,
+            isBase: true,
             conversionFactor: 1,
         },
     })
 
     await prisma.productPrice.upsert({
         where: {
-            skuId_priceLabelId_currencyId_unitId: {
-                skuId:        sampleSku.id,
+            productId_priceLabelId_unitId: {
+                productId: sampleProduct.id,
                 priceLabelId: defaultPriceLabel.id,
-                currencyId:   defaultCurrency.id,
-                unitId:       defaultUnit.id,
+                unitId: defaultUnit.id,
             },
         },
         update: {},
         create: {
-            skuId:        sampleSku.id,
+            productId: sampleProduct.id,
             priceLabelId: defaultPriceLabel.id,
-            currencyId:   defaultCurrency.id,
-            unitId:       defaultUnit.id,
-            value:        100.00,
+            unitId: defaultUnit.id,
+            value: 100.00,
         },
     })
 
-    logItem(`${sampleProduct.name} (${sampleProduct.productNumber})`)
+    logItem(`${sampleProduct.name} (${sampleProduct.itemNumber})`)
 
     // ── 7. Sample Customer (Test Only) ────────────────────────
 

@@ -52,7 +52,6 @@ interface HeaderProps {
 const routeMap: Record<string, string> = {
     "/": "لوحة التحكم",
     "/products": "المنتجات",
-    "/items": "الأصناف",
     "/inventory": "المنتجات",
     "/inventory/new-tags": "المنتجات الجديدة",
     "/categories": "التصنيفات",

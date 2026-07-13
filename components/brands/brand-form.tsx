@@ -17,6 +17,9 @@ import {
 } from "@/components/ui/form"
 import { createBrand, updateBrand } from "@/lib/actions/brands"
 import type { BrandFormData } from "@/lib/types/brand"
+import { BRAND_CODE_CONFIG } from "@/lib/config/product-number.config"
+
+const brandCodeLength = BRAND_CODE_CONFIG.length
 
 // ─── Validation Schema ─────────────────────────────────────────
 
@@ -27,8 +30,8 @@ const brandSchema = z.object({
 
     code: z
         .string()
-        .length(1, "الكود يجب أن يكون حرفاً أو رقماً واحداً")
-        .regex(/^[A-Za-z0-9]{1}$/, "الكود يجب أن يحتوي على حرف إنجليزي أو رقم فقط"),
+        .length(brandCodeLength, `الكود يجب أن يكون ${brandCodeLength} خانات بالضبط`)
+        .regex(BRAND_CODE_CONFIG.pattern, "الكود يجب أن يحتوي على أحرف إنجليزية أو أرقام فقط"),
 
     description: z
         .string()
@@ -135,16 +138,16 @@ export function BrandForm({ brand, onSuccess }: BrandFormProps) {
                                     <FormControl>
                                         <Input
                                             {...field}
-                                            placeholder="S"
+                                            placeholder="SM"
                                             dir="ltr"
-                                            maxLength={1}
-                                            className="font-mono uppercase w-16 tracking-widest focus-visible:ring-primary/20"
+                                            maxLength={brandCodeLength}
+                                            className="font-mono uppercase w-20 tracking-widest focus-visible:ring-primary/20"
                                             // Auto-uppercase as the user types
                                             onChange={e => field.onChange(e.target.value.toUpperCase())}
                                         />
                                     </FormControl>
                                     <FormDescription className="text-[11px]">
-                                        حرف أو رقم إنجليزي واحد — يُستخدم في رقم المنتج
+                                        حرفان أو رقمان إنجليزيان — يُستخدم في كود المنتج
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>

@@ -28,11 +28,11 @@ export function getMeilisearchClient(): Meilisearch {
 export const MEILI_SETTINGS = {
     searchableAttributes: [
         'name',
-        'productNumber',
-        'itemNumbers',
+        'itemNumber',
         'description',
         'brand',
         'category',
+        'attributeText',
         'alternativeNames',
         'tags',
     ],

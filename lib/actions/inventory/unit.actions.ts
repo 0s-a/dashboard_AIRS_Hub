@@ -33,8 +33,8 @@ export async function setProductUnits(
                     })),
                 })
             } else {
-                await tx.sKC.updateMany({
-                    where: { productId },
+                await tx.product.update({
+                    where: { id: productId },
                     data: { isAvailable: false },
                 })
             }

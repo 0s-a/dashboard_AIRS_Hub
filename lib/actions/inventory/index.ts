@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 
 // Types (re-exported so consumers can import from one place)
-export type { ProductInput, SerializedPrice, SerializedProduct, SerializedCategory, ProductUnitEntry, PaginationMeta, ProductsFilters } from '@/lib/types/product'
+export type { ProductInput, SerializedPrice, SerializedProduct, SerializedCategory, SerializedProductAttribute, ProductUnitEntry, PaginationMeta, ProductsFilters } from '@/lib/types/product'
 
 // Queries (read-only)
 export {
@@ -21,6 +21,7 @@ export {
     createProduct,
     updateProduct,
     deleteProduct,
+    toggleProductAvailability,
     toggleProductNewTag,
 } from './product.actions'
 

@@ -26,7 +26,7 @@ export async function getNotifications(filters?: {
             },
             include: {
                 product: {
-                    select: { id: true, name: true, productNumber: true },
+                    select: { id: true, name: true, itemNumber: true },
                 },
                 customer: {
                     select: { id: true, name: true },

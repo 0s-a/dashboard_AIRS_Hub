@@ -27,7 +27,7 @@ export default async function ProductsPage() {
                         </h1>
                     </div>
                     <p className="text-muted-foreground text-sm sm:text-base max-w-lg pr-1">
-                        إدارة المنتجات الأساسية — الأصناف والتسعير من صفحة الأصناف.
+                        إدارة المنتجات — البيانات، الصور، الوحدات، والتسعير من صفحة واحدة.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 relative z-10">

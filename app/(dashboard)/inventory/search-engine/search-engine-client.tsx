@@ -49,14 +49,12 @@ interface SyncResult {
 
 interface SearchHit {
     id:           string
-    productNumber: string
     itemNumber:   string | null
     name:         string
     brand:        string | null
     category:     string | null
     isAvailable:  boolean
     minPrice:     number | null
-    variantCount: number
     primaryImage: string | null
 }
 
@@ -484,7 +482,7 @@ function SearchHitRow({ hit, rank }: { hit: SearchHit; rank: number }) {
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{hit.name}</p>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <code className="font-mono">{hit.productNumber}</code>
+                    <code className="font-mono">{hit.itemNumber ?? '—'}</code>
                     {hit.brand && <><span>·</span><span>{hit.brand}</span></>}
                     {hit.category && <><span>·</span><span>{hit.category}</span></>}
                 </div>

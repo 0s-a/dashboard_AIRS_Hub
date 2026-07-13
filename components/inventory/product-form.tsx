@@ -1,11 +1,21 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import * as z from "zod"
 import React, { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, X, Trash2, Plus, Hash, Package, FileText, Settings, Tags, Scale, Palette, ChevronDown } from "lucide-react"
+import {
+    Loader2,
+    X,
+    Plus,
+    Hash,
+    Package,
+    Tags,
+    Scale,
+    ImageIcon,
+    Tag,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -32,83 +42,97 @@ import {
 } from "@/components/ui/select"
 
 import { createProduct, updateProduct } from "@/lib/actions/inventory"
-import { addSKCsBatch } from "@/lib/actions/skc"
 import { getCategories } from "@/lib/actions/categories"
 import { getBrands } from "@/lib/actions/brands"
 import { getUnits } from "@/lib/actions/units"
+import { getProductAttributes } from "@/lib/actions/product-attributes"
+import { getProductImages } from "@/lib/actions/product-images"
+import type { ProductImageRecord } from "@/lib/actions/product-images"
 import { UnitsPanel } from "@/components/inventory/pricing/units-panel"
-import { ColorChipPicker } from "@/components/inventory/color-chip-picker"
+import { PriceListPanel } from "@/components/inventory/pricing/price-list-panel"
+import {
+    ProductAttributesField,
+    type AttributeDraft,
+    type CatalogAttribute,
+} from "@/components/inventory/product-attributes-field"
+import { ImageGalleryUpload } from "@/components/ui/image-gallery-upload"
+import { useProductPricing } from "@/hooks/use-product-pricing"
 import type { SerializedProduct } from "@/lib/actions/inventory"
 import type { ProductUnitEntry } from "@/lib/types/product"
-import { SKU_SPEC_CONFIGS, DEFAULT_SKU_SPEC_KIND } from "@/lib/config/sku-spec.config"
-import type { SkuSpecKind } from "@/lib/config/sku-spec.config"
-
-// ─── Schema ──────────────────────────────────────────────────
+import { INVENTORY_LABELS } from "@/lib/config/inventory-labels"
 
 const formSchema = z.object({
     name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
-    productNumber: z.string()
-        .length(3, { message: "رقم المنتج: 3 خانات بالضبط" })
-        .regex(/^[A-Za-z0-9]{3}$/, { message: "3 أحرف أو أرقام إنجليزية فقط" })
-        .transform(v => v.toUpperCase()),
-    slug: z.string().optional().nullable(),
-    brandId: z.string().optional().nullable(),
+    brandId: z.string().min(1, { message: "البراند مطلوب" }),
+    categoryId: z.string().min(1, { message: "التصنيف مطلوب" }),
+    itemNumber: z.string().trim().min(1, { message: "رقم الصنف مطلوب" }),
     description: z.string().optional().nullable(),
-    categoryId: z.string().optional().nullable(),
-    alternativeNames: z.array(z.string().min(1, "الاسم البديل لا يمكن أن يكون فارغاً")).optional(),
     tags: z.array(z.string().min(1, "التاغ لا يمكن أن يكون فارغاً")).optional(),
-    colorIds: z.array(z.string()).optional().default([]),
-    skuSpecKind: z.enum(['size', 'packaging', 'length', 'free']).optional().default('free'),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
-// ─── Option types ────────────────────────────────────────────
-
-type CategoryOption = { id: string; name: string; code: string; icon: string | null; parentId?: string | null }
+type CategoryOption = { id: string; name: string; code: string }
 type BrandOption = { id: string; name: string; code: string }
-
-function flattenCategoryTree(
-    categories: CategoryOption[],
-    parentId: string | null = null,
-    depth = 0
-): { id: string; label: string }[] {
-    return categories
-        .filter(c => (c.parentId ?? null) === parentId)
-        .flatMap(c => [
-            { id: c.id, label: `${"—".repeat(depth)}${depth > 0 ? " " : ""}${c.name}` },
-            ...flattenCategoryTree(categories, c.id, depth + 1),
-        ])
-}
-
-// ─── Props ───────────────────────────────────────────────────
 
 interface ProductFormProps {
     product?: SerializedProduct
     onSuccess?: () => void
 }
 
-// ─── Component ───────────────────────────────────────────────
+function toAttributeDrafts(
+    product?: SerializedProduct
+): AttributeDraft[] {
+    return (product?.productAttributes ?? []).map(a => ({
+        key: a.id,
+        attributeId: a.attributeId,
+        value: a.value,
+    }))
+}
 
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [categories, setCategories] = useState<CategoryOption[]>([])
     const [brands, setBrands] = useState<BrandOption[]>([])
+    const [attributeCatalog, setAttributeCatalog] = useState<CatalogAttribute[]>([])
+    const [attributeDrafts, setAttributeDrafts] = useState<AttributeDraft[]>(() => toAttributeDrafts(product))
     const [sysUnits, setSysUnits] = useState<{ id: string; name: string; pluralName?: string | null }[]>([])
     const [productUnits, setProductUnits] = useState<ProductUnitEntry[]>(product?.productUnits ?? [])
+    const [images, setImages] = useState<ProductImageRecord[]>([])
     const [isLoadingOptions, setIsLoadingOptions] = useState(true)
 
-    // Load dropdown options on mount
+    const {
+        prices,
+        setPrices,
+        priceLabels,
+        currencies,
+        isLoading: pricingLoading,
+    } = useProductPricing({
+        initialPrices: product?.productPrices ?? [],
+        initialUnits: product?.productUnits ?? [],
+    })
+
     useEffect(() => {
         async function loadOptions() {
-            const [catRes, brandRes, unitsRes] = await Promise.all([
+            const [catRes, brandRes, attrsRes, unitsRes] = await Promise.all([
                 getCategories(),
                 getBrands(),
+                getProductAttributes(),
                 product ? getUnits() : Promise.resolve({ success: true, data: [] }),
             ])
             if (catRes.success && catRes.data) setCategories(catRes.data as CategoryOption[])
             if (brandRes.success && brandRes.data) setBrands(brandRes.data as BrandOption[])
+            if (attrsRes.success && attrsRes.data) {
+                setAttributeCatalog(
+                    attrsRes.data.map(a => ({
+                        id: a.id,
+                        code: a.code,
+                        name: a.name,
+                        examples: a.examples ?? [],
+                    }))
+                )
+            }
             if (unitsRes.success && unitsRes.data) setSysUnits(unitsRes.data as typeof sysUnits)
             setIsLoadingOptions(false)
         }
@@ -116,45 +140,55 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
     }, [product])
 
     useEffect(() => {
+        if (!product?.id) return
+        void getProductImages(product.id).then(res => {
+            if (res.success) setImages(res.data)
+        })
+    }, [product?.id])
+
+    useEffect(() => {
         if (product?.productUnits) setProductUnits(product.productUnits)
     }, [product])
 
-    // ── Form setup ───────────────────────────────────────────
+    useEffect(() => {
+        if (product?.productPrices) setPrices(product.productPrices)
+    }, [product, setPrices])
+
+    useEffect(() => {
+        setAttributeDrafts(toAttributeDrafts(product))
+    }, [product])
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema) as any,
         defaultValues: {
-            name:             product?.name ?? "",
-            productNumber:    product?.productNumber ?? "",
-            slug:             product?.slug ?? "",
-            brandId:          product?.brandId ?? null,
-            description:      product?.description ?? "",
-            categoryId:       product?.categoryId ?? "",
-            alternativeNames: (product?.alternativeNames as string[]) ?? [],
-            tags:             (product?.tags as string[]) ?? [],
-            colorIds:         [],
-            skuSpecKind:      (product?.skuSpecKind as SkuSpecKind) ?? DEFAULT_SKU_SPEC_KIND,
+            name: product?.name ?? "",
+            brandId: product?.brandId ?? "",
+            categoryId: product?.categoryId ?? "",
+            itemNumber: product?.itemNumber ?? "",
+            description: product?.description ?? "",
+            tags: (product?.tags as string[]) ?? [],
         },
     })
 
-    const watchedProductNumber = form.watch("productNumber")
-
-    const {
-        fields: alternativeNameFields,
-        append: appendAlternativeName,
-        remove: removeAlternativeName,
-    } = useFieldArray({
-        control: form.control as any,
-        name: "alternativeNames",
-    })
-
-    // ── Submit handler ───────────────────────────────────────
-
     async function onSubmit(values: FormValues) {
-        const { colorIds, ...rest } = values
+        const incomplete = attributeDrafts.some(d => d.attributeId && !d.value.trim())
+        if (incomplete) {
+            toast.error("أكمل قيم الصفات", { description: "كل صفة مضافة يجب أن تحتوي على قيمة" })
+            return
+        }
+
+        const productAttributes = attributeDrafts
+            .filter(d => d.attributeId && d.value.trim())
+            .map(d => ({ attributeId: d.attributeId, value: d.value.trim() }))
+
         const payload = {
-            ...rest,
-            slug: rest.slug?.trim() || undefined,
+            name: values.name.trim(),
+            brandId: values.brandId.trim(),
+            categoryId: values.categoryId.trim(),
+            itemNumber: values.itemNumber.trim(),
+            description: values.description?.trim() || null,
+            tags: values.tags,
+            productAttributes,
         }
 
         startTransition(async () => {
@@ -162,194 +196,82 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                 if (product) {
                     const res = await updateProduct(product.id, payload)
                     if (res.success) {
-                        toast.success('تم تحديث المنتج', {
-                            description: `تم حفظ التغييرات على المنتج "${values.name}" بنجاح`,
+                        toast.success("تم تحديث المنتج", {
+                            description: `تم حفظ التغييرات على "${values.name}" بنجاح`,
                         })
                         onSuccess?.()
                         router.refresh()
                     } else {
-                        toast.error('فشل الحفظ', { description: res.error || 'تعذّر حفظ بيانات المنتج' })
+                        toast.error("فشل الحفظ", { description: res.error || "تعذّر حفظ بيانات المنتج" })
                     }
                     return
                 }
 
                 const res = await createProduct(payload)
                 if (!res.success || !res.data) {
-                    toast.error('فشل الحفظ', { description: res.error || 'تعذّر حفظ بيانات المنتج' })
+                    toast.error("فشل الحفظ", { description: res.error || "تعذّر حفظ بيانات المنتج" })
                     return
                 }
 
-                const productId = res.data.id
-                let createdSkcs = 0
-
-                if (colorIds && colorIds.length > 0) {
-                    const batch = await addSKCsBatch(productId, colorIds)
-                    if (batch.success && batch.data) {
-                        createdSkcs = batch.data.created
-                        if (batch.data.skipped > 0) {
-                            toast.warning(`تم تخطي ${batch.data.skipped.toLocaleString("ar-YE")} لون مكرر`)
-                        }
-                    } else {
-                        toast.warning('تم إنشاء المنتج لكن فشل إضافة بعض الألوان', {
-                            description: batch.error || 'يمكنك إضافتها من صفحة الأصناف',
-                        })
-                    }
-                }
-
-                if (createdSkcs > 0) {
-                    toast.success('تم إنشاء المنتج', {
-                        description: `تم إنشاء "${values.name}" مع ${createdSkcs.toLocaleString("ar-YE")} ${createdSkcs === 1 ? "صنف" : "أصناف"}`,
-                    })
-                } else {
-                    toast.success('تم إنشاء المنتج', {
-                        description: `تم إنشاء المنتج "${values.name}" — يمكنك إضافة الألوان من صفحة الأصناف`,
-                    })
-                }
-
+                toast.success("تم إنشاء المنتج", {
+                    description: `تم إنشاء "${values.name}" — يمكنك إضافة الصور والتسعير`,
+                })
                 onSuccess?.()
-                if (createdSkcs > 0) {
-                    router.push(`/items?productId=${productId}`)
-                } else {
-                    router.refresh()
-                }
+                router.push(`/products/${res.data.id}`)
             } catch {
-                toast.error('خطأ غير متوقع', { description: 'تعذّر الاتصال بالخادم، يُرجى التحقق من الاتصال والمحاولة مجدداً' })
+                toast.error("خطأ غير متوقع", {
+                    description: "تعذّر الاتصال بالخادم، يُرجى التحقق من الاتصال والمحاولة مجدداً",
+                })
             }
         })
     }
 
     function onInvalid() {
         toast.error("راجع البيانات المدخلة", {
-            description: "توجد حقول إجبارية لم تقم بتعبئتها أو تم تعبئتها بشكل خاطئ."
+            description: "توجد حقول إجبارية لم تقم بتعبئتها أو تم تعبئتها بشكل خاطئ.",
         })
     }
 
-    const optionalDetailsFields = (
-        <>
-            <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                            <Settings className="h-4 w-4 text-muted-foreground" />
-                            الرابط (slug)
-                        </FormLabel>
-                        <FormControl>
-                            <Input
-                                placeholder="يُولَّد تلقائياً من الاسم إن تُرك فارغاً"
-                                className="font-mono text-sm"
-                                dir="ltr"
-                                {...field}
-                                value={field.value ?? ""}
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>الوصف</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="وصف تفصيلي للمنتج..." className="min-h-[80px]" {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <FormLabel className="flex items-center gap-2">
-                        <Tags className="h-4 w-4 text-muted-foreground" />
-                        الأسماء البديلة
-                    </FormLabel>
-                    <Button type="button" variant="outline" size="sm" onClick={() => appendAlternativeName("" as any)}>
-                        <Plus className="h-3.5 w-3.5 ml-1" />
-                        إضافة
-                    </Button>
-                </div>
-                {alternativeNameFields.map((field, index) => (
-                    <div key={field.id} className="flex items-center gap-2">
-                        <FormField
-                            control={form.control}
-                            name={`alternativeNames.${index}`}
-                            render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <FormControl>
-                                        <Input placeholder="اسم بديل..." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeAlternativeName(index)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                ))}
-            </div>
-            <TagsField control={form.control} />
-        </>
-    )
+    const refreshImages = () => {
+        if (!product?.id) return
+        void getProductImages(product.id).then(res => {
+            if (res.success) setImages(res.data)
+        })
+        router.refresh()
+    }
 
-    const createFormContent = (
+    const basicFields = (
         <div className="space-y-5">
-            <div className="grid grid-cols-3 gap-3">
-                <FormField
-                    control={form.control}
-                    name="productNumber"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-xs">رقم المنتج</FormLabel>
-                            <FormControl>
-                                <Input
-                                    placeholder="001"
-                                    className="font-mono uppercase"
-                                    maxLength={3}
-                                    dir="ltr"
-                                    {...field}
-                                    onChange={e => field.onChange(e.target.value.toUpperCase())}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        <FormItem className="col-span-2">
-                            <FormLabel className="text-xs">اسم المنتج</FormLabel>
-                            <FormControl>
-                                <Input placeholder="مثال: آيفون 15..." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </div>
+            <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>اسم المنتج</FormLabel>
+                        <FormControl>
+                            <Input placeholder="مثال: آيفون 15..." className="focus-visible:ring-primary/20" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                     control={form.control}
                     name="categoryId"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-xs">التصنيف</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                            <FormLabel>التصنيف <span className="text-destructive">*</span></FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || undefined}>
                                 <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={isLoadingOptions ? "..." : "اختياري"} />
+                                    <SelectTrigger className="w-full focus:ring-primary/20">
+                                        <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر التصنيف"} />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    {flattenCategoryTree(categories).map(cat => (
-                                        <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                                    {categories.map(cat => (
+                                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -362,18 +284,17 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                     name="brandId"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-xs">البراند</FormLabel>
+                            <FormLabel>البراند <span className="text-destructive">*</span></FormLabel>
                             <Select
-                                onValueChange={v => field.onChange(v === "none" ? null : v)}
-                                value={field.value ?? "none"}
+                                onValueChange={field.onChange}
+                                value={field.value || undefined}
                             >
                                 <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={isLoadingOptions ? "..." : "اختياري"} />
+                                    <SelectTrigger className="w-full focus:ring-primary/20">
+                                        <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر البراند"} />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="none">بدون براند</SelectItem>
                                     {brands.map(b => (
                                         <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                                     ))}
@@ -387,265 +308,139 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
 
             <FormField
                 control={form.control}
-                name="skuSpecKind"
+                name="itemNumber"
                 render={({ field }) => (
                     <FormItem>
-                        <FormLabel className="text-xs">نوع مواصفة الصنف</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? DEFAULT_SKU_SPEC_KIND}>
-                            <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="اختر النوع" />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {SKU_SPEC_CONFIGS.map(cfg => (
-                                    <SelectItem key={cfg.value} value={cfg.value}>
-                                        {cfg.label} — {cfg.pluralLabel}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <FormDescription className="text-xs">
-                            يحدد تسمية الحقل عند إضافة الأصناف (مقاس، عبوة، طول…)
-                        </FormDescription>
+                        <FormLabel>{INVENTORY_LABELS.itemNumber} <span className="text-destructive">*</span></FormLabel>
+                        <FormControl>
+                            <Input
+                                placeholder="مثال: TEST-001"
+                                className="font-mono text-sm"
+                                dir="ltr"
+                                {...field}
+                                value={field.value ?? ""}
+                            />
+                        </FormControl>
+                        <FormDescription className="text-xs">إلزامي وفريد — لا يمكن تكراره بين المنتجات</FormDescription>
                         <FormMessage />
                     </FormItem>
                 )}
             />
 
-            <div className="space-y-2">
-                <FormLabel className="flex items-center gap-2 text-sm">
-                    <Palette className="h-4 w-4 text-muted-foreground" />
-                    الألوان
-                    <span className="text-xs text-muted-foreground font-normal">(اختياري)</span>
-                </FormLabel>
-                <p className="text-xs text-muted-foreground">
-                    يمكنك إضافة الأصناف لاحقاً من صفحة الأصناف
-                </p>
-                <FormField
-                    control={form.control}
-                    name="colorIds"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormControl>
-                                <ColorChipPicker
-                                    selected={field.value ?? []}
-                                    onChange={field.onChange}
-                                    productNumber={watchedProductNumber}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </div>
+            <ProductAttributesField
+                catalog={attributeCatalog}
+                value={attributeDrafts}
+                onChange={setAttributeDrafts}
+                disabled={isLoadingOptions}
+            />
 
-            <details className="group rounded-lg border border-border/60">
-                <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-medium list-none">
-                    <span className="text-muted-foreground">تفاصيل إضافية (اختياري)</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="space-y-4 border-t border-border/60 px-4 py-4">
-                    {optionalDetailsFields}
+            <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>الوصف</FormLabel>
+                        <FormControl>
+                            <Textarea
+                                placeholder="وصف تفصيلي للمنتج..."
+                                className="min-h-[80px]"
+                                {...field}
+                                value={field.value ?? ""}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+            <TagsField control={form.control} />
+        </div>
+    )
+
+    const submitBar = (
+        <div className={product ? "fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/80 backdrop-blur-xl border-t shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]" : "flex gap-3 pt-2"}>
+            <div className={product ? "container max-w-5xl mx-auto flex items-center justify-between" : "flex gap-3 w-full"}>
+                {product && (
+                    <div className="hidden sm:block">
+                        <p className="text-sm font-medium">تحديث بيانات المنتج</p>
+                        <p className="text-xs text-muted-foreground">تأكد من صحة البيانات قبل الحفظ</p>
+                    </div>
+                )}
+                <div className={`flex items-center gap-3 ${product ? "w-full sm:w-auto" : "w-full"}`}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => router.back()}
+                        className={product ? "flex-1 sm:flex-none border-dashed" : "flex-1"}
+                    >
+                        إلغاء
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={isPending}
+                        className={product ? "flex-1 sm:flex-none bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md" : "flex-1"}
+                    >
+                        {isPending && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
+                        {product ? "حفظ التعديلات" : "إضافة المنتج"}
+                    </Button>
                 </div>
-            </details>
-
-            <div className="flex gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
-                    إلغاء
-                </Button>
-                <Button type="submit" disabled={isPending} className="flex-1">
-                    {isPending && <Loader2 className="h-4 w-4 ml-2 animate-spin" />}
-                    إضافة المنتج
-                </Button>
             </div>
         </div>
     )
 
-    const dataCards = (
-        <>
-                {/* ─── Card 1: Basic Info ──────────────────────── */}
-                <Card className="border-border/50 shadow-sm hover:border-primary/20 transition-all duration-300">
-                    <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
-                        <div className="flex items-center gap-2">
-                            <Package className="w-5 h-5 text-primary" />
-                            <CardTitle className="text-lg">البيانات الأساسية</CardTitle>
-                        </div>
-                        <CardDescription>أدخل بيانات المنتج الأساسية ومواصفاته</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                        <FormField
-                            control={form.control}
-                            name="productNumber"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="flex items-center gap-2">
-                                        <Hash className="h-4 w-4 text-muted-foreground" />
-                                        رقم المنتج
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            placeholder="مثال: 001"
-                                            className="font-mono text-sm uppercase tracking-widest focus-visible:ring-primary/20 max-w-[120px]"
-                                            maxLength={3}
-                                            dir="ltr"
-                                            {...field}
-                                            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                        />
-                                    </FormControl>
-                                    <p className="text-[11px] text-muted-foreground">3 خانات — أحرف أو أرقام إنجليزية، فريد لكل منتج</p>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>اسم المنتج</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="مثال: آيفون 15..." className="focus-visible:ring-primary/20" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Category + Brand */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FormField
-                                control={form.control}
-                                name="categoryId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>التصنيف</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
-                                            <FormControl>
-                                                <SelectTrigger className="w-full focus:ring-primary/20">
-                                                    <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر التصنيف"} />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {categories.length === 0 ? (
-                                                    <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                                                        لا توجد تصنيفات
-                                                    </div>
-                                                ) : (
-                                                    flattenCategoryTree(categories).map((cat) => (
-                                                        <SelectItem key={cat.id} value={cat.id}>
-                                                            {cat.label}
-                                                        </SelectItem>
-                                                    ))
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="brandId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>البراند</FormLabel>
-                                        <Select
-                                            onValueChange={v => field.onChange(v === "none" ? null : v)}
-                                            value={field.value ?? "none"}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger className="w-full focus:ring-primary/20">
-                                                    <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر البراند"} />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="none" className="text-muted-foreground text-sm">
-                                                    بدون براند
-                                                </SelectItem>
-                                                {brands.map(b => (
-                                                    <SelectItem key={b.id} value={b.id}>
-                                                        {b.name}
-                                                        {b.code && (
-                                                            <span className="mr-2 text-xs text-muted-foreground font-mono">{b.code}</span>
-                                                        )}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-
-                        <FormField
-                            control={form.control}
-                            name="skuSpecKind"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>نوع مواصفة الصنف</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value ?? DEFAULT_SKU_SPEC_KIND}>
-                                        <FormControl>
-                                            <SelectTrigger className="w-full focus:ring-primary/20">
-                                                <SelectValue placeholder="اختر النوع" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {SKU_SPEC_CONFIGS.map(cfg => (
-                                                <SelectItem key={cfg.value} value={cfg.value}>
-                                                    {cfg.label} — {cfg.pluralLabel}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormDescription className="text-xs">
-                                        يحدد تسمية الحقل عند إضافة الأصناف (مقاس، عبوة، طول…)
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                    </CardContent>
-                </Card>
-
-                {/* ─── Card 2: Description & Indexing ──────────── */}
-                <Card className="border-border/50 shadow-sm hover:border-primary/20 transition-all duration-300">
-                    <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
-                        <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-primary" />
-                            <CardTitle className="text-lg">تفاصيل وفهرسة</CardTitle>
-                        </div>
-                        <CardDescription>البيانات الوصفية التي تساعد في البحث والأرشفة</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                        {optionalDetailsFields}
-                    </CardContent>
-                </Card>
-        </>
-    )
-
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit as any, onInvalid)} className={product ? "space-y-6 pb-24 relative" : "space-y-4"}>
-
+            <form
+                onSubmit={form.handleSubmit(onSubmit as any, onInvalid)}
+                className={product ? "space-y-6 pb-24 relative" : "space-y-4"}
+            >
                 {product ? (
                     <Tabs defaultValue="data" className="w-full">
-                        <TabsList className="w-full grid grid-cols-2 mb-4">
+                        <TabsList className="w-full grid grid-cols-2 sm:grid-cols-4 mb-4">
                             <TabsTrigger value="data" className="gap-2">
                                 <Package className="h-4 w-4" />
                                 البيانات
                             </TabsTrigger>
+                            <TabsTrigger value="images" className="gap-2">
+                                <ImageIcon className="h-4 w-4" />
+                                الصور
+                            </TabsTrigger>
                             <TabsTrigger value="units" className="gap-2">
                                 <Scale className="h-4 w-4" />
-                                وحدات القياس
+                                الوحدات
+                            </TabsTrigger>
+                            <TabsTrigger value="pricing" className="gap-2">
+                                <Tag className="h-4 w-4" />
+                                التسعير
                             </TabsTrigger>
                         </TabsList>
+
                         <TabsContent value="data" className="space-y-6 mt-0">
-                            {dataCards}
+                            <Card className="border-border/50 shadow-sm">
+                                <CardHeader className="bg-muted/30 border-b border-border/50 pb-4">
+                                    <div className="flex items-center gap-2">
+                                        <Package className="w-5 h-5 text-primary" />
+                                        <CardTitle className="text-lg">البيانات الأساسية</CardTitle>
+                                    </div>
+                                    <CardDescription>اسم المنتج، اللون، المواصفة، والتصنيف</CardDescription>
+                                </CardHeader>
+                                <CardContent className="pt-6">{basicFields}</CardContent>
+                            </Card>
                         </TabsContent>
+
+                        <TabsContent value="images" className="mt-0">
+                            <Card className="border-border/50 shadow-sm">
+                                <CardContent className="pt-6">
+                                    <ImageGalleryUpload
+                                        images={images}
+                                        productId={product.id}
+                                        productItemNumber={product.itemNumber}
+                                        onImagesChange={refreshImages}
+                                    />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
                         <TabsContent value="units" className="mt-0">
                             <UnitsPanel
                                 productId={product.id}
@@ -654,55 +449,45 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                 onUnitsChange={setProductUnits}
                             />
                         </TabsContent>
+
+                        <TabsContent value="pricing" className="mt-0">
+                            {pricingLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                <PriceListPanel
+                                    productId={product.id}
+                                    prices={prices}
+                                    productUnits={productUnits}
+                                    priceLabels={priceLabels}
+                                    currencies={currencies}
+                                    onPricesChange={setPrices}
+                                />
+                            )}
+                        </TabsContent>
                     </Tabs>
                 ) : (
-                    createFormContent
+                    <>
+                        {basicFields}
+                        {submitBar}
+                    </>
                 )}
 
-                {product && (
-                <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/80 backdrop-blur-xl border-t shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
-                    <div className="container max-w-5xl mx-auto flex items-center justify-between">
-                        <div className="hidden sm:block">
-                            <p className="text-sm font-medium">تحديث بيانات المنتج</p>
-                            <p className="text-xs text-muted-foreground">تأكد من صحة البيانات قبل الحفظ</p>
-                        </div>
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => router.back()}
-                                className="flex-1 sm:flex-none border-dashed"
-                            >
-                                إلغاء
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={isPending}
-                                className="flex-1 sm:flex-none bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md"
-                            >
-                                {isPending && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
-                                حفظ التعديلات
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-                )}
-
+                {product && submitBar}
             </form>
         </Form>
     )
 }
 
-// ─── Tags Sub-component (extracted to avoid hook-in-render) ──
-
-function TagsField({ control }: { control: ReturnType<typeof useForm<FormValues>>['control'] }) {
+function TagsField({ control }: { control: ReturnType<typeof useForm<FormValues>>["control"] }) {
     const [tagInput, setTagInput] = useState("")
 
     return (
         <div className="space-y-4 pt-4 border-t">
             <FormLabel className="text-base font-semibold flex items-center gap-2">
                 <Hash className="h-4 w-4 text-violet-500" />
-                الوسوم (Tags)
+                الوسوم
             </FormLabel>
 
             <FormField
@@ -736,12 +521,11 @@ function TagsField({ control }: { control: ReturnType<typeof useForm<FormValues>
                     return (
                         <FormItem>
                             <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-3">
-                                {/* Tag Input */}
                                 <div className="flex items-center gap-2">
                                     <Input
                                         placeholder="اكتب الوسم واضغط Enter..."
                                         value={tagInput}
-                                        onChange={(e) => setTagInput(e.target.value)}
+                                        onChange={e => setTagInput(e.target.value)}
                                         onKeyDown={handleKeyDown}
                                         className="h-9 flex-1"
                                     />
@@ -751,28 +535,27 @@ function TagsField({ control }: { control: ReturnType<typeof useForm<FormValues>
                                         size="sm"
                                         onClick={() => addTag(tagInput)}
                                         disabled={!tagInput.trim()}
-                                        className="h-9 px-3 bg-violet-500/10 border-violet-300 text-violet-700 hover:bg-violet-500/20 hover:text-violet-800 transition-all"
+                                        className="h-9 px-3"
                                     >
                                         <Plus className="h-3.5 w-3.5 mr-1" />
                                         إضافة
                                     </Button>
                                 </div>
 
-                                {/* Tags Display */}
                                 {tags.length > 0 ? (
                                     <div className="flex flex-wrap gap-2">
                                         {tags.map((tag: string, index: number) => (
                                             <Badge
                                                 key={index}
                                                 variant="outline"
-                                                className="px-3 py-1.5 text-sm bg-linear-to-r from-violet-50 to-purple-50 text-violet-800 border-violet-200 hover:from-violet-100 hover:to-purple-100 hover:border-violet-300 transition-all duration-300 animate-in fade-in slide-in-from-left-2 gap-1.5 group"
+                                                className="px-3 py-1.5 text-sm gap-1.5"
                                             >
-                                                <Hash className="h-3 w-3 text-violet-400" />
+                                                <Tags className="h-3 w-3 text-muted-foreground" />
                                                 {tag}
                                                 <button
                                                     type="button"
                                                     onClick={() => removeTag(index)}
-                                                    className="ml-1 text-violet-400 hover:text-destructive transition-colors"
+                                                    className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
                                                 >
                                                     <X className="h-3 w-3" />
                                                 </button>
@@ -781,7 +564,7 @@ function TagsField({ control }: { control: ReturnType<typeof useForm<FormValues>
                                     </div>
                                 ) : (
                                     <p className="text-center py-3 text-muted-foreground text-sm">
-                                        لا توجد وسوم مضافة. اكتب وسماً واضغط Enter أو زر إضافة.
+                                        لا توجد وسوم مضافة
                                     </p>
                                 )}
                             </div>

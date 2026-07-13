@@ -27,21 +27,3 @@ export async function uniqueProductSlug(base: string, excludeId?: string): Promi
     }
     return `${root}-${Date.now()}`
 }
-
-export async function uniqueCategorySlug(base: string, excludeId?: string): Promise<string> {
-    const root = slugify(base)
-    let counter = 0
-    while (counter < 1000) {
-        const candidate = counter === 0 ? root : `${root}-${counter}`
-        const existing = await prisma.category.findFirst({
-            where: {
-                slug: candidate,
-                ...(excludeId ? { NOT: { id: excludeId } } : {}),
-            },
-            select: { id: true },
-        })
-        if (!existing) return candidate
-        counter++
-    }
-    return `${root}-${Date.now()}`
-}

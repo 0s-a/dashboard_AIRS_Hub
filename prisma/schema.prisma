@@ -26,44 +26,60 @@ enum OrderStatus {
   cancelled
 }
 
-enum SkuSpecKind {
-  size
-  packaging
-  length
-  free
-}
-
 // ── Core Business Models ─────────────────────────────────────
 
 model Product {
   id               String                   @id @default(uuid())
-  productNumber    String                   @unique // User-entered 3-char code e.g. "001"
+  itemNumber       String                   @unique // رقم الصنف — إلزامي وفريد
   name             String
   slug             String                   @unique
-  skuSpecKind      SkuSpecKind              @default(free)
-  brandId          String?
-  brandRef         Brand?                   @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  brandId          String
+  brandRef         Brand                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
   description      String?
   alternativeNames Json?
   tags             Json?
-  categoryId       String?
-  category         Category?                @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId       String
+  category         Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  isAvailable      Boolean                  @default(true)
+  order            Int                      @default(0)
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
-  skcs             SKC[]
+  productPrices    ProductPrice[]
+  productImages    ProductImage[]
   productUnits     ProductUnit[]
+  productAttributes ProductAttributeValue[]
   orderItems       OrderItem[]
   notifications    AiNotification[]
   search_vector    Unsupported("tsvector")?
+}
 
-  @@unique([name, brandId])
+model ProductAttribute {
+  id        String                  @id @default(uuid())
+  code      String                  @unique
+  name      String                  @unique
+  examples  Json? // string[] — اقتراحات سريعة للواجهة فقط
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  values    ProductAttributeValue[]
+}
+
+model ProductAttributeValue {
+  id          String           @id @default(uuid())
+  productId   String
+  attributeId String
+  value       String
+  product     Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute   ProductAttribute @relation(fields: [attributeId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, attributeId])
+  @@index([attributeId, value])
 }
 
 model Brand {
   id          String    @id @default(uuid())
   name        String    @unique
-  code        String    @unique // 1-char alphanumeric e.g. "S" — used in product numbers
-  logo        String? // URL path to uploaded logo image
+  code        String    @unique
+  logo        String?
   description String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -71,43 +87,13 @@ model Brand {
 }
 
 model Category {
-  id          String     @id @default(uuid())
-  name        String     @unique
-  code        String     @unique // 2-char alphanumeric e.g. "EL", "A1" — used in item numbers
-  slug        String     @unique
-  parentId    String?
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children    Category[] @relation("CategoryHierarchy")
+  id          String    @id @default(uuid())
+  name        String    @unique
+  code        String    @unique
   description String?
-  icon        String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   products    Product[]
-}
-
-model ProductAttribute {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("ProductAttribute")
-}
-
-model Color {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  name      String   @unique
-  hexCode   String
-  order     Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  skcs      SKC[]
-
-  @@map("Color")
 }
 
 // ── Customer (formerly Person) ───────────────────────────────
@@ -133,7 +119,6 @@ model Customer {
   @@map("Customer")
 }
 
-// Tags — normalized labels for customers
 model Tag {
   id        String        @id @default(uuid())
   name      String        @unique
@@ -141,7 +126,6 @@ model Tag {
   createdAt DateTime      @default(now())
 }
 
-// Junction: Customer <-> Tag (many-to-many)
 model CustomerTag {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -151,8 +135,6 @@ model CustomerTag {
 
   @@id([customerId, tagId])
 }
-
-// ── Supervisor (مشرف — بياناته فقط، لا يسجّل دخول) ──────────
 
 model Supervisor {
   id             String                    @id @default(uuid())
@@ -167,34 +149,24 @@ model Supervisor {
   @@map("Supervisor")
 }
 
-// ── Contact (shared across Supervisor / Customer) ────────────
-
-// Contact information (phone, email, whatsapp) — normalized
 model Contact {
   id           String      @id @default(uuid())
-  // Exactly ONE of the following must be set (enforced at app layer):
   customerId   String?
   customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
   supervisorId String?
   supervisor   Supervisor? @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
 
-  type      String // "phone" | "email" | "whatsapp"
-  value     String // the actual number or email
-  label     String? // "جوال", "عمل", etc.
+  type      String
+  value     String
+  label     String?
   isPrimary Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  // ── Uniqueness Constraints ──────────────────────────────────
-  // 1) Global: same value (phone/email) cannot exist twice in the entire system
   @@unique([value], name: "contact_value_unique")
-  // 2) Per-customer: only ONE contact of each type per customer
-  //    (NULL customerId rows are treated as distinct by PostgreSQL)
   @@unique([customerId, type], name: "contact_customer_type_unique")
-  // 3) Per-supervisor: only ONE contact of each type per supervisor
   @@unique([supervisorId, type], name: "contact_supervisor_type_unique")
 }
 
-// Junction table: Customer <-> Currency
 model CustomerCurrency {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -208,9 +180,9 @@ model CustomerCurrency {
 // ── Product Images ───────────────────────────────────────────
 
 model ProductImage {
-  id      String @id @default(uuid())
-  skcId   String
-  skc     SKC    @relation(fields: [skcId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   url       String
   filename  String
@@ -224,46 +196,8 @@ model ProductImage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([skcId, url])
-  @@index([skcId])
-}
-
-// ── SKC / SKU (SPU inventory hierarchy) ─────────────────────
-
-model SKC {
-  id          String         @id @default(uuid())
-  itemNumber  String?        @unique // Optional manual item code (barcode)
-  attributes  Json?          @db.JsonB // { [ProductAttribute.code]: string }
-  colorId     String
-  color       Color          @relation(fields: [colorId], references: [id], onDelete: Restrict)
-  isDefault   Boolean        @default(false)
-  order       Int            @default(0)
-  isAvailable Boolean        @default(true)
-  productId   String
-  product     Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  skus        SKU[]
-  images      ProductImage[]
-
-  @@unique([productId, colorId])
-}
-
-model SKU {
-  id            String         @id @default(uuid())
-  skuCode       String         @unique
-  sizeLabel     String?
-  isAvailable   Boolean        @default(true)
-  isDefault     Boolean        @default(false)
-  order         Int            @default(0)
-  skcId         String
-  skc           SKC            @relation(fields: [skcId], references: [id], onDelete: Cascade)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  productPrices ProductPrice[]
-  orderItems    OrderItem[]
-
-  @@unique([skcId, sizeLabel])
+  @@unique([productId, url])
+  @@index([productId])
 }
 
 // ── Pricing ──────────────────────────────────────────────────
@@ -272,12 +206,12 @@ model PriceLabel {
   id            String         @id @default(uuid())
   itemNumber    String         @unique
   name          String         @unique
-  customerType  String?        // نوع العميل المناسب: "عميل جملة"، "عميل مفرد"، "VIP"، إلخ
+  customerType  String?
   notes         String?
   isDefault     Boolean        @default(false)
   customers     Customer[]
   productPrices ProductPrice[]
-  orderItems    OrderItem[]    // علاقة عكسية — snapshot
+  orderItems    OrderItem[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -290,21 +224,18 @@ model Currency {
   symbol             String
   isDefault          Boolean            @default(false)
   exchangeRate       Decimal?           @db.Decimal(18, 6)
-  productPrices      ProductPrice[]
   customerCurrencies CustomerCurrency[]
-  orderItems         OrderItem[]        // علاقة عكسية — snapshot
+  orderItems         OrderItem[]
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
 
 model ProductPrice {
   id               String     @id @default(uuid())
-  skuId            String
-  sku              SKU        @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   priceLabelId     String
   priceLabel       PriceLabel @relation(fields: [priceLabelId], references: [id], onDelete: Cascade)
-  currencyId       String
-  currency         Currency   @relation(fields: [currencyId], references: [id], onDelete: Restrict)
   unitId           String
   unit             Unit       @relation(fields: [unitId], references: [id], onDelete: Restrict)
   value            Decimal    @db.Decimal(12, 2)
@@ -312,7 +243,7 @@ model ProductPrice {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  @@unique([skuId, priceLabelId, currencyId, unitId])
+  @@unique([productId, priceLabelId, unitId])
 }
 
 model ProductUnit {
@@ -352,7 +283,7 @@ model Order {
   customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
   status       OrderStatus @default(pending)
   notes        String?
-  deliveryInfo String?     // معلومات التوصيل — نص حر (عنوان، كوريير، ملاحظات)
+  deliveryInfo String?
   items        OrderItem[]
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -367,16 +298,13 @@ model OrderItem {
   id        String    @id @default(uuid())
   orderId   String
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String?
-  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
-  skuId     String?
-  sku       SKU?      @relation(fields: [skuId], references: [id], onDelete: SetNull)
+  productId String
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
   unitId    String?
   unit      Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
   quantity  Int       @default(1)
   notes     String?
 
-  // Snapshot — السعر المُثبَّت وقت إنشاء الطلب (لا يتأثر بتغيير الأسعار لاحقاً)
   unitPrice    Decimal?    @db.Decimal(12, 2)
   currencyId   String?
   currency     Currency?   @relation(fields: [currencyId], references: [id], onDelete: SetNull)
@@ -386,6 +314,7 @@ model OrderItem {
   createdAt DateTime  @default(now())
 
   @@index([orderId])
+  @@index([productId])
   @@index([unitId])
 }
 
@@ -393,7 +322,7 @@ model OrderItem {
 
 model AiNotification {
   id            String    @id @default(uuid())
-  type          String // "out_of_stock" | "not_found"
+  type          String
   searchQuery   String
   productId     String?
   product       Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
@@ -421,8 +350,8 @@ model User {
   id        String    @id @default(uuid())
   name      String
   username  String    @unique
-  password  String // bcrypt hashed
-  color     String    @default("#6366f1") // avatar color
+  password  String
+  color     String    @default("#6366f1")
   isActive  Boolean   @default(true)
   lastLogin DateTime?
   createdAt DateTime  @default(now())

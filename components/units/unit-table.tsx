@@ -9,5 +9,5 @@ interface UnitTableProps {
 }
 
 export function UnitTable({ data, onRefresh }: UnitTableProps) {
-    return <DataTable columns={columns} data={data} onRefresh={onRefresh} />
+    return <DataTable columns={columns} data={data} onRefresh={onRefresh} searchPlaceholder="ابحث عن وحدة..." />
 }

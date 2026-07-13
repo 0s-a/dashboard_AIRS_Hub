@@ -35,7 +35,7 @@ export async function createBrand(data: BrandPayload) {
             await requireAuth()
             const code = data.code.trim().toUpperCase()
             if (!BRAND_CODE_REGEX.test(code)) {
-                throw new Error('كود البراند يجب أن يكون حرفاً أو رقماً واحداً')
+                throw new Error(`كود البراند يجب أن يكون ${BRAND_CODE_CONFIG.length} خانات (أحرف أو أرقام إنجليزية)`)
             }
             return prisma.brand.create({
             data: {
@@ -58,7 +58,7 @@ export async function updateBrand(id: string, data: BrandPayload) {
             await requireAuth()
             const code = data.code.trim().toUpperCase()
             if (!BRAND_CODE_REGEX.test(code)) {
-                throw new Error('كود البراند يجب أن يكون حرفاً أو رقماً واحداً')
+                throw new Error(`كود البراند يجب أن يكون ${BRAND_CODE_CONFIG.length} خانات (أحرف أو أرقام إنجليزية)`)
             }
             return prisma.brand.update({
             where: { id },

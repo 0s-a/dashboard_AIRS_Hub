@@ -42,10 +42,14 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
             const rawRows = currentRows.map(r => ({
                 _id: r._id,
                 name: r.name,
-                productNumber: r.productNumber,
                 itemNumber: r.itemNumber,
                 categoryCode: r.categoryCode,
-                brandCode: r.brandCode
+                brandCode: r.brandCode,
+                color: r.color ?? '',
+                size: r.size ?? '',
+                capacity: r.capacity ?? '',
+                volume: r.volume ?? '',
+                weight: r.weight ?? '',
             }))
             const validated = await validateImportData(rawRows)
             setRows(validated)
@@ -127,7 +131,7 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
     }
 
     const handleDownloadTemplate = () => {
-        const headers = ['name', 'productNumber', 'itemNumber', 'categoryCode', 'brandCode']
+        const headers = ['name', 'itemNumber', 'categoryCode', 'brandCode', 'color', 'size', 'capacity', 'volume', 'weight']
         const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n"
         const encodedUri = encodeURI(csvContent)
         const link = document.createElement("a")

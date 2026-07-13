@@ -165,9 +165,14 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
     return [
         {
             id: "brand",
-            header: () => <div className="text-start pe-0">البراند</div>,
+            header: "البراند",
             enableColumnFilter: true,
-            meta: { filterType: 'text' as const, filterPlaceholder: 'اسم البراند...' },
+            meta: {
+                filterType: 'text' as const,
+                filterPlaceholder: 'اسم البراند...',
+                cellVariant: 'text' as const,
+                align: 'start' as const,
+            },
             filterFn: (row: any, _columnId: string, filterValue: string) => {
                 return row.original.name?.toLowerCase().includes(filterValue.toLowerCase())
             },
@@ -175,7 +180,7 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
             cell: ({ row }) => {
                 const { name, logo } = row.original
                 return (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                         <BrandAvatar name={name} logo={logo} />
                         <span className="font-semibold text-sm text-foreground truncate">{name}</span>
                     </div>
@@ -185,13 +190,18 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
         {
             accessorKey: "code",
             enableColumnFilter: true,
-            meta: { filterType: 'text' as const, filterPlaceholder: 'الكود...' },
-            header: () => <div className="text-start pe-0">الكود</div>,
+            meta: {
+                filterType: 'text' as const,
+                filterPlaceholder: 'الكود...',
+                cellVariant: 'code' as const,
+                align: 'start' as const,
+            },
+            header: "الكود",
             size: 80,
             cell: ({ row }) => (
                 <Badge
                     variant="outline"
-                    className="font-mono text-xs tracking-widest bg-primary/5 border-primary/20 text-primary"
+                    className="text-xs tracking-widest bg-primary/5 border-primary/20 text-primary"
                 >
                     {row.original.code}
                 </Badge>
@@ -200,7 +210,8 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
         {
             id: "products",
             enableColumnFilter: false,
-            header: () => <div className="text-start pe-0">المنتجات</div>,
+            meta: { cellVariant: 'number' as const, align: 'end' as const },
+            header: "المنتجات",
             size: 90,
             cell: ({ row }) => {
                 const count = row.original._count.products
@@ -220,7 +231,9 @@ export function buildColumns(onRefresh: () => void): ColumnDef<BrandRow>[] {
         {
             id: "actions",
             enableColumnFilter: false,
-            header: () => <div className="text-start pe-0">الإجراءات</div>,
+            enableSorting: false,
+            meta: { cellVariant: 'actions' as const, sticky: 'actions' as const, align: 'end' as const },
+            header: "الإجراءات",
             size: 90,
             cell: ({ row }) => <ActionCell brand={row.original} onRefresh={onRefresh} />,
         },

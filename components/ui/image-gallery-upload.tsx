@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import {
-    addSkcImage,
+    addProductImage,
     removeProductImage,
     setPrimaryProductImage,
     reorderProductImages,
@@ -43,7 +43,7 @@ interface UploadingImage {
 
 interface ImageGalleryUploadProps {
     images: ProductImageRecord[]
-    skcId: string
+    productId: string
     productItemNumber: string
     maxImages?: number
     disabled?: boolean
@@ -55,7 +55,7 @@ interface ImageGalleryUploadProps {
 
 export function ImageGalleryUpload({
     images,
-    skcId,
+    productId,
     productItemNumber,
     maxImages = 10,
     disabled = false,
@@ -104,7 +104,7 @@ export function ImageGalleryUpload({
                     prev.map((u) => (u.id === item.id ? { ...u, progress: 30 } : u))
                 )
 
-                const result = await addSkcImage(skcId, item.file)
+                const result = await addProductImage(productId, item.file)
 
                 setUploading((prev) =>
                     prev.map((u) =>
@@ -136,7 +136,7 @@ export function ImageGalleryUpload({
                 prev.filter((u) => !newUploading.find((n) => n.id === u.id))
             )
         },
-        [images, uploading, skcId, maxImages, onImagesChange]
+        [images, uploading, productId, maxImages, onImagesChange]
     )
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({

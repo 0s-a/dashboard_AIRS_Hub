@@ -16,8 +16,7 @@ import {
     Bookmark,
     ShieldCheck,
     Search,
-    SlidersHorizontal,
-    Palette,
+    Tags,
     LucideIcon
 } from "lucide-react"
 
@@ -47,14 +46,12 @@ export const navigationGroups: NavigationGroup[] = [
         title: "المبيعات والمنتجات",
         items: [
             { href: "/orders", label: "الطلبات", icon: ShoppingCart, keywords: "orders sales طلبات مبيعات فاتورة" },
-            { href: "/products", label: "المنتجات", icon: Package, keywords: "products spu منتجات مخزون" },
-            { href: "/items", label: "الأصناف", icon: Layers, keywords: "items skc sku أصناف" },
+            { href: "/products", label: "المنتجات", icon: Package, keywords: "products منتجات مخزون أصناف" },
             { href: "/inventory/new-tags", label: "المنتجات الجديدة", icon: Sparkles, keywords: "new tags جديد" },
             { href: "/inventory/search-engine", label: "محرك البحث", icon: Search, keywords: "search meilisearch بحث" },
             { href: "/categories", label: "التصنيفات", icon: Layers, keywords: "categories تصنيفات أقسام" },
             { href: "/brands", label: "البراندات", icon: Bookmark, keywords: "brands براندات ماركات" },
-            { href: "/colors", label: "الألوان", icon: Palette, keywords: "colors ألوان" },
-            { href: "/product-attributes", label: "خصائص المنتجات", icon: SlidersHorizontal, keywords: "attributes خصائص صفات" },
+            { href: "/product-attributes", label: "صفات المنتج", icon: Tags, keywords: "attributes صفات لون مقاس سعة وزن" },
             { href: "/gallery", label: "معرض الصور", icon: Images, keywords: "gallery images صور معرض" },
         ]
     },

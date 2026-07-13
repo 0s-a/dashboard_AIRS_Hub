@@ -7,28 +7,28 @@ export const ORDER_ITEM_INCLUDE = {
         select: {
             id: true,
             name: true,
-            productNumber: true,
-        },
-    },
-    sku: {
-        select: {
-            id: true,
-            skuCode: true,
-            sizeLabel: true,
-            skc: { select: { id: true, color: { select: { id: true, code: true, name: true, hexCode: true } } } },
+            itemNumber: true,
+            productAttributes: {
+                include: {
+                    attribute: { select: { id: true, code: true, name: true } },
+                },
+                orderBy: { attribute: { name: 'asc' as const } },
+            },
+            productImages: {
+                orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }],
+                select: { url: true, alt: true, isPrimary: true },
+            },
             productPrices: {
-                where: { currency: { isDefault: true } },
                 include: {
                     priceLabel: { select: { id: true, name: true, isDefault: true } },
-                    currency: { select: { id: true, symbol: true, code: true } },
                 },
             },
         },
     },
-    unit:       { select: { id: true, name: true, pluralName: true } },
-    currency:   { select: { id: true, symbol: true, code: true } },
+    unit: { select: { id: true, name: true, pluralName: true } },
+    currency: { select: { id: true, symbol: true, code: true } },
     priceLabel: { select: { id: true, name: true } },
-} as const
+}
 
 export const ORDER_INCLUDE = {
     customer: {
@@ -39,7 +39,7 @@ export const ORDER_INCLUDE = {
         },
     },
     items: { include: ORDER_ITEM_INCLUDE },
-} as const
+}
 
 export const CUSTOMER_INCLUDE = {
     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
@@ -49,22 +49,20 @@ export const CUSTOMER_INCLUDE = {
 } as const
 
 export const PRODUCT_INCLUDE = {
-    category: { select: { id: true, name: true, code: true, icon: true } },
+    category: { select: { id: true, name: true, code: true } },
     brandRef: { select: { id: true, name: true, code: true } },
-    skcs: {
-        orderBy: { order: 'asc' as const },
+    productAttributes: {
         include: {
-            images: { orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }] },
-            skus: {
-                orderBy: { order: 'asc' as const },
-                include: {
-                    productPrices: {
-                        include: { priceLabel: true, currency: true, unit: true },
-                        orderBy: { createdAt: 'asc' as const },
-                    },
-                },
-            },
+            attribute: { select: { id: true, code: true, name: true, examples: true } },
         },
+        orderBy: { attribute: { name: 'asc' as const } },
+    },
+    productImages: {
+        orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }],
+    },
+    productPrices: {
+        include: { priceLabel: true, unit: true },
+        orderBy: { createdAt: 'asc' as const },
     },
     productUnits: {
         include: { unit: true },

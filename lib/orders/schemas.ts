@@ -6,7 +6,6 @@ const uuid = z.string().uuid()
 export const OrderItemInputSchema = z.object({
     productId: uuid,
     quantity: z.number().int().min(1).default(1),
-    skuId: uuid.optional().nullable(),
     unitId: uuid.optional().nullable(),
     notes: z.string().optional().nullable(),
     unitPrice: z.number().nonnegative().optional().nullable(),
@@ -45,7 +44,6 @@ export const AddOrderItemSchema = OrderItemInputSchema
 
 export const UpdateOrderItemSchema = z.object({
     quantity: z.number().int().min(1).optional(),
-    skuId: uuid.nullable().optional(),
     unitId: uuid.nullable().optional(),
     notes: z.string().nullable().optional(),
 })

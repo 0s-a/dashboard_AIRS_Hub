@@ -219,8 +219,8 @@ export default function NotificationsPage() {
         const q = productSearch.toLowerCase()
         return allProducts.filter(p =>
             p.name?.toLowerCase().includes(q) ||
-            p.productNumber?.toLowerCase().includes(q) ||
-            p.brand?.toLowerCase().includes(q)
+            p.itemNumber?.toLowerCase().includes(q) ||
+            p.brandRef?.name?.toLowerCase().includes(q)
         ).slice(0, 20)
     }, [allProducts, productSearch])
     const handleLinkProduct = async () => {
@@ -602,7 +602,7 @@ export default function NotificationsPage() {
                                                                 {notif.productName}
                                                                 {notif.product && (
                                                                     <Link
-                                                                        href={`/items?productId=${notif.product.id}`}
+                                                                        href={`/products/${notif.product.id}`}
                                                                         className="text-primary hover:underline mr-1.5"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >
@@ -632,7 +632,7 @@ export default function NotificationsPage() {
                                                                 asChild
                                                             >
                                                                 <Link
-                                                                    href={`/items?productId=${notif.product.id}`}
+                                                                    href={`/products/${notif.product.id}`}
                                                                     onClick={(e) => e.stopPropagation()}
                                                                 >
                                                                     <Package className="h-3.5 w-3.5" />
@@ -744,7 +744,7 @@ export default function NotificationsPage() {
                                         <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold truncate text-xs">{product.name}</p>
-                                            <p className="text-[10px] text-muted-foreground font-mono">{product.productNumber}</p>
+                                            <p className="text-[10px] text-muted-foreground font-mono">{product.itemNumber ?? '—'}</p>
                                         </div>
                                         {linkingProductId === product.id && (
                                             <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />

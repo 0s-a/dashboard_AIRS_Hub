@@ -32,10 +32,14 @@ export const columns: ColumnDef<PriceLabel>[] = [
     {
         accessorKey: "itemNumber",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const },
+        meta: {
+            filterType: "text" as const,
+            cellVariant: "code" as const,
+            align: "start" as const,
+        },
         header: "الرقم",
         cell: ({ row }) => (
-            <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+            <span className="truncate text-muted-foreground bg-muted/50 px-2 py-1 rounded">
                 {row.original.itemNumber}
             </span>
         ),
@@ -44,14 +48,20 @@ export const columns: ColumnDef<PriceLabel>[] = [
     {
         accessorKey: "name",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'اسم التسعيرة...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "اسم التسعيرة...",
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
         header: "اسم التسعيرة",
+        size: 200,
         cell: ({ row }) => {
             return (
-                <div className="flex items-center gap-2">
-                    <span className="font-medium">{row.original.name}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium truncate">{row.original.name}</span>
                     {row.original.isDefault && (
-                        <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/30 gap-1 text-[10px]">
+                        <Badge className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-500/30 gap-1 text-[10px] shrink-0">
                             <Star className="h-2.5 w-2.5 fill-current" />
                             افتراضية
                         </Badge>
@@ -63,12 +73,17 @@ export const columns: ColumnDef<PriceLabel>[] = [
     {
         accessorKey: "customerType",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const, filterPlaceholder: 'نوع العميل...' },
+        meta: {
+            filterType: "text" as const,
+            filterPlaceholder: "نوع العميل...",
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
         header: "نوع العميل",
         size: 160,
         cell: ({ row }) => {
-            const ct = (row.original as any).customerType
-            if (!ct) return <span className="text-muted-foreground text-xs text-center block">—</span>
+            const ct = (row.original as PriceLabel & { customerType?: string | null }).customerType
+            if (!ct) return <span className="text-muted-foreground text-xs">—</span>
             return (
                 <Badge className="bg-indigo-500/10 text-indigo-700 border-indigo-200 dark:border-indigo-500/30 text-[11px] font-medium">
                     {ct}
@@ -79,14 +94,15 @@ export const columns: ColumnDef<PriceLabel>[] = [
     {
         id: "customersCount",
         enableColumnFilter: false,
+        meta: { cellVariant: "number" as const, align: "end" as const },
         header: "العملاء",
         size: 90,
         cell: ({ row }) => {
-            const count = (row.original as any)._count?.customers ?? 0
+            const count = (row.original as PriceLabel & { _count?: { customers?: number } })._count?.customers ?? 0
             return (
-                <div className="flex items-center justify-center gap-1.5 text-sm font-mono">
+                <div className="flex items-center justify-end gap-1.5 text-sm">
                     <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className={count > 0 ? "text-foreground font-semibold" : "text-muted-foreground"}>{count}</span>
+                    <span className={count > 0 ? "text-foreground font-semibold tabular-nums" : "text-muted-foreground"}>{count}</span>
                 </div>
             )
         },
@@ -94,7 +110,9 @@ export const columns: ColumnDef<PriceLabel>[] = [
     {
         accessorKey: "isDefault",
         enableColumnFilter: false,
+        meta: { align: "start" as const },
         header: "الافتراضية",
+        size: 140,
         cell: ({ row }) => {
             const label = row.original
             if (label.isDefault) {
@@ -120,17 +138,22 @@ export const columns: ColumnDef<PriceLabel>[] = [
                     تعيين افتراضية
                 </Button>
             )
-        }
+        },
     },
     {
         accessorKey: "notes",
         enableColumnFilter: true,
-        meta: { filterType: 'text' as const },
+        meta: {
+            filterType: "text" as const,
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
         header: "ملاحظات",
+        size: 220,
         cell: ({ row }) => {
             const notes = row.original.notes
             return (
-                <div className="max-w-[400px] truncate text-sm text-muted-foreground">
+                <div className="truncate text-sm text-muted-foreground">
                     {notes || "—"}
                 </div>
             )
@@ -139,19 +162,14 @@ export const columns: ColumnDef<PriceLabel>[] = [
     {
         accessorKey: "createdAt",
         enableColumnFilter: true,
-        meta: { filterType: 'date-range' as const },
-        filterFn: (row: any, _columnId: string, filterValue: any) => {
-            const date = new Date(row.original.createdAt)
-            const d = date.toISOString().split('T')[0]
-            if (filterValue.from && d < filterValue.from) return false
-            if (filterValue.to && d > filterValue.to) return false
-            return true
-        },
+        meta: { filterType: "date-range" as const, align: "start" as const },
+        filterFn: "dateRange",
         header: "تاريخ الإنشاء",
+        size: 140,
         cell: ({ row }) => {
             return (
                 <div className="text-sm text-muted-foreground">
-                    {new Date(row.original.createdAt).toLocaleDateString('ar-SA')}
+                    {new Date(row.original.createdAt).toLocaleDateString("ar-SA")}
                 </div>
             )
         },
@@ -159,6 +177,10 @@ export const columns: ColumnDef<PriceLabel>[] = [
     {
         id: "actions",
         enableColumnFilter: false,
+        enableSorting: false,
+        meta: { cellVariant: "actions" as const, sticky: "actions" as const, align: "end" as const },
+        header: "الإجراءات",
+        size: 90,
         cell: function ActionsCell({ row }) {
             const router = useRouter()
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)

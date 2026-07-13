@@ -2,20 +2,19 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
 
-// ── Types ─────────────────────────────────────────────
-
 interface ProductSearchRow {
     id: string
-    name: string
-    productNumber: string | null
-    brand: string | null
     itemNumber: string | null
-    description: string | null
+    name: string
+    brand: string | null
     isAvailable: boolean
+    description: string | null
     tags: unknown[]
     alternativeNames: unknown[]
     rank: number
-    category: { id: string; name: string; icon: string | null } | null
+    category: { id: string; name: string } | null
+    attributes: Array<{ code: string; name: string; value: string }>
+    primaryImage: string | null
     prices: Array<{
         id: string
         value: number
@@ -26,21 +25,6 @@ interface ProductSearchRow {
         currencySymbol: string
         currencyName: string
     }>
-    skcs: Array<{
-        id: string
-        colorCode: string
-        colorName: string
-        hexCode: string
-        isDefault: boolean
-        isAvailable: boolean
-        skus: Array<{
-            id: string
-            skuCode: string
-            sizeLabel: string | null
-            isDefault: boolean
-            isAvailable: boolean
-        }>
-    }>
     images: Array<{
         url: string
         alt: string | null
@@ -48,44 +32,35 @@ interface ProductSearchRow {
     }>
 }
 
-// ── Subqueries extracted as constants for DRY ────────
-
 const CATEGORY_SUBQUERY = `
     (
-        SELECT jsonb_build_object('id', cat.id, 'name', cat.name, 'icon', cat.icon)
+        SELECT jsonb_build_object('id', cat.id, 'name', cat.name)
         FROM "Category" cat WHERE cat.id = p."categoryId"
     ) AS category
 `
 
-const SKCS_SUBQUERY = `
+const ATTRIBUTES_SUBQUERY = `
     (
         SELECT COALESCE(jsonb_agg(
             jsonb_build_object(
-                'id', skc.id,
-                'itemNumber', skc."itemNumber",
-                'colorCode', c.code,
-                'colorName', c.name,
-                'hexCode', c."hexCode",
-                'isDefault', skc."isDefault",
-                'isAvailable', skc."isAvailable",
-                'skus', (
-                    SELECT COALESCE(jsonb_agg(
-                        jsonb_build_object(
-                            'id', sku.id,
-                            'skuCode', sku."skuCode",
-                            'sizeLabel', sku."sizeLabel",
-                            'isDefault', sku."isDefault",
-                            'isAvailable', sku."isAvailable"
-                        ) ORDER BY sku."order" ASC
-                    ), '[]'::jsonb)
-                    FROM "SKU" sku WHERE sku."skcId" = skc.id
-                )
-            ) ORDER BY skc."order" ASC
+                'code', pa.code,
+                'name', pa.name,
+                'value', pav.value
+            ) ORDER BY pa.name ASC
         ), '[]'::jsonb)
-        FROM "SKC" skc
-        JOIN "Color" c ON c.id = skc."colorId"
-        WHERE skc."productId" = p.id
-    ) AS skcs
+        FROM "ProductAttributeValue" pav
+        JOIN "ProductAttribute" pa ON pa.id = pav."attributeId"
+        WHERE pav."productId" = p.id
+    ) AS attributes
+`
+
+const PRIMARY_IMAGE_SUBQUERY = `
+    (
+        SELECT pi.url FROM "ProductImage" pi
+        WHERE pi."productId" = p.id
+        ORDER BY pi."isPrimary" DESC, pi."order" ASC
+        LIMIT 1
+    ) AS "primaryImage"
 `
 
 const IMAGES_SUBQUERY = `
@@ -95,47 +70,55 @@ const IMAGES_SUBQUERY = `
                 'url', pi.url,
                 'alt', pi.alt,
                 'isPrimary', pi."isPrimary"
-            ) ORDER BY pi."order" ASC
+            ) ORDER BY pi."isPrimary" DESC, pi."order" ASC
         ), '[]'::jsonb)
         FROM "ProductImage" pi
-        WHERE pi."skcId" IN (SELECT id FROM "SKC" WHERE "productId" = p.id)
+        WHERE pi."productId" = p.id
     ) AS images
 `
 
-const SKU_IDS_FOR_PRODUCT = `
-    SELECT sku.id FROM "SKU" sku
-    JOIN "SKC" skc ON skc.id = sku."skcId"
-    WHERE skc."productId" = p.id
-`
-
 const getPriceSubquery = (customerId: string | null, paramIdx: number) => {
+    // Catalog prices are stored in default currency only; convert via Currency.exchangeRate
+    const convertedValue = `
+        CASE
+            WHEN c."isDefault" = true OR c."exchangeRate" IS NULL THEN pp.value
+            ELSE ROUND(pp.value / c."exchangeRate", 2)
+        END
+    `
+
     if (customerId) {
         return `
             (
                 SELECT COALESCE(jsonb_agg(
                     jsonb_build_object(
                         'id', pp.id,
-                        'value', pp.value,
+                        'value', ${convertedValue},
                         'unitName', u.name,
                         'priceLabelId', pl.id,
                         'priceLabelName', pl.name,
                         'currencyCode', c.code,
                         'currencySymbol', c.symbol,
                         'currencyName', c.name
-                    ) ORDER BY pp."createdAt" ASC
+                    ) ORDER BY pp."createdAt" ASC, c."isDefault" DESC, c.name ASC
                 ), '[]'::jsonb)
                 FROM "ProductPrice" pp
                 JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
-                JOIN "Currency" c ON c.id = pp."currencyId"
                 LEFT JOIN "Unit" u ON u.id = pp."unitId"
-                WHERE pp."skuId" IN (${SKU_IDS_FOR_PRODUCT})
+                CROSS JOIN "Currency" c
+                WHERE pp."productId" = p.id
                   AND (
-                      pp."priceLabelId" IN (SELECT "priceLabelId" FROM "CustomerPriceLabel" WHERE "customerId" = $${paramIdx})
-                      OR (NOT EXISTS (SELECT 1 FROM "CustomerPriceLabel" WHERE "customerId" = $${paramIdx}) AND pl."isDefault" = true)
+                      pp."priceLabelId" = (SELECT "priceLabelId" FROM "Customer" WHERE id = $${paramIdx})
+                      OR (
+                          (SELECT "priceLabelId" FROM "Customer" WHERE id = $${paramIdx}) IS NULL
+                          AND pl."isDefault" = true
+                      )
                   )
                   AND (
-                      pp."currencyId" IN (SELECT "currencyId" FROM "CustomerCurrency" WHERE "customerId" = $${paramIdx})
-                      OR (NOT EXISTS (SELECT 1 FROM "CustomerCurrency" WHERE "customerId" = $${paramIdx}) AND c."isDefault" = true)
+                      c.id IN (SELECT "currencyId" FROM "CustomerCurrency" WHERE "customerId" = $${paramIdx})
+                      OR (
+                          NOT EXISTS (SELECT 1 FROM "CustomerCurrency" WHERE "customerId" = $${paramIdx})
+                          AND c."isDefault" = true
+                      )
                   )
             ) AS prices
         `
@@ -156,9 +139,9 @@ const getPriceSubquery = (customerId: string | null, paramIdx: number) => {
             ), '[]'::jsonb)
             FROM "ProductPrice" pp
             JOIN "PriceLabel" pl ON pl.id = pp."priceLabelId"
-            JOIN "Currency" c ON c.id = pp."currencyId"
             LEFT JOIN "Unit" u ON u.id = pp."unitId"
-            WHERE pp."skuId" IN (${SKU_IDS_FOR_PRODUCT})
+            CROSS JOIN "Currency" c
+            WHERE pp."productId" = p.id
               AND pl."isDefault" = true
               AND c."isDefault" = true
         ) AS prices
@@ -173,26 +156,23 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url)
         const query = (searchParams.get('q') || searchParams.get('search') || '').trim()
-        const customerId = searchParams.get('customerId') || searchParams.get('customer_id') // backward compat
+        const customerId = searchParams.get('customerId') || searchParams.get('customer_id')
         const available = searchParams.get('available')
         const categoryId = searchParams.get('category')
         const brand = searchParams.get('brand')
-        const productNumber = searchParams.get('productNumber') || searchParams.get('productCode')
-        const tags = searchParams.getAll('tag').filter(Boolean)   // ?tag=new&tag=sale → ['new','sale']
-        const colorFilter   = searchParams.get('color')    // ?color=أحمر  → filter by SKC colorName
-        const hexFilter     = searchParams.get('hex')      // ?hex=ef4444   → filter by hex (with or without #)
-        const variantSuffix = searchParams.get('variant') || searchParams.get('suffix')  // ?variant=BLK or ?suffix=BLK
+        const itemNumber = searchParams.get('itemNumber') || searchParams.get('productNumber') || searchParams.get('productCode')
+        const tags = searchParams.getAll('tag').filter(Boolean)
+        const attrValue = searchParams.get('attr') || searchParams.get('color') || searchParams.get('colorCode') || searchParams.get('variant') || searchParams.get('suffix')
         const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
         const limit = Math.max(1, Math.min(50, parseInt(searchParams.get('limit') || '20')))
         const offset = (page - 1) * limit
 
-        // ── Build WHERE clauses ──────────────────────
         const conditions: string[] = []
         const params: unknown[] = []
         let paramIndex = 1
 
-        let selectRank = "0::float AS rank"
-        let orderBy = "ORDER BY p.\"createdAt\" DESC, p.name ASC"
+        let selectRank = '0::float AS rank'
+        let orderBy = 'ORDER BY p."createdAt" DESC, p.name ASC'
 
         if (query) {
             const ftsParamIndex = paramIndex
@@ -206,28 +186,26 @@ export async function GET(req: NextRequest) {
             conditions.push(`(
                 p.search_vector @@ websearch_to_tsquery('arabic', $${ftsParamIndex}) OR
                 p.name ILIKE $${likeParamIndex} OR
-                p."productNumber" ILIKE $${likeParamIndex} OR
+                p."itemNumber" ILIKE $${likeParamIndex} OR
                 p.description ILIKE $${likeParamIndex} OR
                 p."alternativeNames"::text ILIKE $${likeParamIndex} OR
                 b.name ILIKE $${likeParamIndex} OR
                 (SELECT name FROM "Category" WHERE id = p."categoryId") ILIKE $${likeParamIndex} OR
                 EXISTS (
-                    SELECT 1 FROM "SKC" skc_q
-                    WHERE skc_q."productId" = p.id AND skc_q."itemNumber" ILIKE $${likeParamIndex}
+                    SELECT 1 FROM "ProductAttributeValue" pav
+                    JOIN "ProductAttribute" pa ON pa.id = pav."attributeId"
+                    WHERE pav."productId" = p.id
+                      AND (pav.value ILIKE $${likeParamIndex} OR pa.name ILIKE $${likeParamIndex} OR pa.code ILIKE $${likeParamIndex})
                 )
             )`)
 
             selectRank = `ts_rank(p.search_vector, websearch_to_tsquery('arabic', $${ftsParamIndex})) AS rank`
-            orderBy = "ORDER BY rank DESC, p.name ASC"
+            orderBy = 'ORDER BY rank DESC, p.name ASC'
         }
 
         if (available === 'true' || available === 'false') {
-            const avail = available === 'true'
-            conditions.push(`EXISTS (
-                SELECT 1 FROM "SKC" skc_av
-                WHERE skc_av."productId" = p.id AND skc_av."isAvailable" = $${paramIndex}
-            )`)
-            params.push(avail)
+            conditions.push(`p."isAvailable" = $${paramIndex}`)
+            params.push(available === 'true')
             paramIndex++
         }
         if (categoryId) {
@@ -240,9 +218,9 @@ export async function GET(req: NextRequest) {
             params.push(`%${brand}%`)
             paramIndex++
         }
-        if (productNumber) {
-            conditions.push(`p."productNumber" ILIKE $${paramIndex}`)
-            params.push(`%${productNumber}%`)
+        if (itemNumber) {
+            conditions.push(`p."itemNumber" ILIKE $${paramIndex}`)
+            params.push(`%${itemNumber}%`)
             paramIndex++
         }
         if (tags.length > 0) {
@@ -251,34 +229,12 @@ export async function GET(req: NextRequest) {
             paramIndex++
         }
 
-        if (colorFilter) {
+        if (attrValue) {
             conditions.push(`EXISTS (
-                SELECT 1 FROM "SKC" vc
-                JOIN "Color" c ON c.id = vc."colorId"
-                WHERE vc."productId" = p.id AND (c.code ILIKE $${paramIndex} OR c.name ILIKE $${paramIndex})
+                SELECT 1 FROM "ProductAttributeValue" pav
+                WHERE pav."productId" = p.id AND pav.value ILIKE $${paramIndex}
             )`)
-            params.push(`%${colorFilter}%`)
-            paramIndex++
-        }
-
-        if (hexFilter) {
-            const normalizedHex = hexFilter.startsWith('#') ? hexFilter : `#${hexFilter}`
-            conditions.push(`EXISTS (
-                SELECT 1 FROM "SKC" vh
-                JOIN "Color" c ON c.id = vh."colorId"
-                WHERE vh."productId" = p.id AND c."hexCode" ILIKE $${paramIndex}
-            )`)
-            params.push(`%${normalizedHex}%`)
-            paramIndex++
-        }
-
-        if (variantSuffix) {
-            conditions.push(`EXISTS (
-                SELECT 1 FROM "SKC" vs
-                JOIN "Color" c ON c.id = vs."colorId"
-                WHERE vs."productId" = p.id AND c.code ILIKE $${paramIndex}
-            )`)
-            params.push(variantSuffix)
+            params.push(`%${attrValue}%`)
             paramIndex++
         }
 
@@ -287,7 +243,7 @@ export async function GET(req: NextRequest) {
         const whereParams = [...params]
         const mainParams = [...params]
 
-        let priceSubquery = ""
+        let priceSubquery = ''
         if (customerId) {
             mainParams.push(customerId)
             priceSubquery = getPriceSubquery(customerId, mainParams.length)
@@ -300,26 +256,18 @@ export async function GET(req: NextRequest) {
         const mainSQL = `
             SELECT
                 p.id,
+                p."itemNumber",
                 p.name,
-                p."productNumber",
                 b.name AS brand,
-                (
-                    SELECT skc."itemNumber" FROM "SKC" skc
-                    WHERE skc."productId" = p.id AND skc."itemNumber" IS NOT NULL
-                    ORDER BY skc."isDefault" DESC, skc."order" ASC
-                    LIMIT 1
-                ) AS "itemNumber",
                 p.description,
-                EXISTS (
-                    SELECT 1 FROM "SKC" skc_av
-                    WHERE skc_av."productId" = p.id AND skc_av."isAvailable" = true
-                ) AS "isAvailable",
+                p."isAvailable",
                 p.tags,
                 p."alternativeNames",
                 ${selectRank},
                 ${CATEGORY_SUBQUERY},
+                ${ATTRIBUTES_SUBQUERY},
+                ${PRIMARY_IMAGE_SUBQUERY},
                 ${priceSubquery},
-                ${SKCS_SUBQUERY},
                 ${IMAGES_SUBQUERY}
             FROM "Product" p
             LEFT JOIN "Brand" b ON b.id = p."brandId"
@@ -345,18 +293,15 @@ export async function GET(req: NextRequest) {
             count: results.length,
             searchMode: query ? 'hybrid' : 'browse',
             filters: {
-                ...(tags.length > 0         && { tags }),
-                ...(categoryId              && { categoryId }),
-                ...(brand                   && { brand }),
-                ...(productNumber            && { productNumber }),
-                ...(available !== null      && { available }),
-                ...(colorFilter             && { color: colorFilter }),
-                ...(hexFilter               && { hex: hexFilter }),
-                ...(variantSuffix           && { colorCode: variantSuffix }),
+                ...(tags.length > 0 && { tags }),
+                ...(categoryId && { categoryId }),
+                ...(brand && { brand }),
+                ...(itemNumber && { itemNumber }),
+                ...(available !== null && { available }),
+                ...(attrValue && { attr: attrValue }),
             },
             pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
         })
-
     } catch (error) {
         console.error('API Error [GET /products/search]:', error)
         return apiError('Internal Server Error', 500, { code: 'INTERNAL_ERROR' })

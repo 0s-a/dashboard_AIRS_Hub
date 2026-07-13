@@ -18,6 +18,8 @@ interface ServerPaginationProps {
     onLimitChange?: (limit: number) => void
     limitOptions?: number[]
     className?: string
+    /** Arabic noun for the item count label (e.g. منتج، طلب) */
+    itemLabel?: string
 }
 
 export function ServerPagination({
@@ -26,6 +28,7 @@ export function ServerPagination({
     onLimitChange,
     limitOptions = [10, 25, 50, 100, 200],
     className,
+    itemLabel = "عنصر",
 }: ServerPaginationProps) {
     const { page, limit, total, pages, hasPrev, hasNext } = pagination
 
@@ -77,7 +80,7 @@ export function ServerPagination({
                     <span className="font-bold text-foreground tabular-nums">{start}–{end}</span>
                     {" "}من{" "}
                     <span className="font-bold text-foreground">{total.toLocaleString("ar-EG")}</span>
-                    {" "}منتج
+                    {" "}{itemLabel}
                 </span>
 
                 {onLimitChange && (

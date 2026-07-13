@@ -1,44 +1,33 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Plus, SlidersHorizontal } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Plus, Tags } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AttributeSheet } from "@/components/product-attributes/attribute-sheet"
 import { AttributeTable } from "@/components/product-attributes/attribute-table"
 import { getProductAttributes } from "@/lib/actions/product-attributes"
-import { ProductAttribute } from "@prisma/client"
+import type { SerializedProductAttributeCatalog } from "@/lib/types/product-attribute"
 
 export default function ProductAttributesPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
-    const [selectedAttribute, setSelectedAttribute] = useState<ProductAttribute | undefined>()
-    const [attributes, setAttributes] = useState<ProductAttribute[]>([])
+    const [selected, setSelected] = useState<SerializedProductAttributeCatalog | undefined>()
+    const [attributes, setAttributes] = useState<SerializedProductAttributeCatalog[]>([])
 
-    const loadAttributes = async () => {
+    const loadAttributes = useCallback(async () => {
         const res = await getProductAttributes()
         if (res.success && res.data) {
             setAttributes(res.data)
         }
-    }
+    }, [])
 
     useEffect(() => {
-        void getProductAttributes().then((res) => {
-            if (res.success && res.data) {
-                setAttributes(res.data)
-            }
-        })
-        const handleEdit = (e: Event) => {
-            const customEvent = e as CustomEvent<ProductAttribute>
-            setSelectedAttribute(customEvent.detail)
-            setIsSheetOpen(true)
-        }
-        window.addEventListener("edit-product-attribute", handleEdit)
-        return () => window.removeEventListener("edit-product-attribute", handleEdit)
-    }, [])
+        void loadAttributes()
+    }, [loadAttributes])
 
     const handleSheetClose = () => {
         setIsSheetOpen(false)
-        setSelectedAttribute(undefined)
-        loadAttributes()
+        setSelected(undefined)
+        void loadAttributes()
     }
 
     return (
@@ -46,15 +35,15 @@ export default function ProductAttributesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight bg-linear-to-l from-primary to-indigo-400 bg-clip-text text-transparent">
-                        خصائص المنتجات
+                        صفات المنتج
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        كتالوج مرجعي لأسماء صفات المنتجات
+                        كتالوج الصفات الرئيسية — لون، مقاس، سعة… مع أمثلة قيم للتعبئة السريعة
                     </p>
                 </div>
                 <Button
                     onClick={() => {
-                        setSelectedAttribute(undefined)
+                        setSelected(undefined)
                         setIsSheetOpen(true)
                     }}
                     className="gap-2"
@@ -71,21 +60,29 @@ export default function ProductAttributesPage() {
                         <h3 className="text-3xl font-bold mt-2">{attributes.length}</h3>
                     </div>
                     <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <SlidersHorizontal className="size-6 text-primary" />
+                        <Tags className="size-6 text-primary" />
                     </div>
                 </div>
             </div>
 
             <div className="glass-panel rounded-xl border border-border/50 p-6">
-                <AttributeTable data={attributes} onRefresh={loadAttributes} />
+                <AttributeTable
+                    data={attributes}
+                    onEdit={(attr) => {
+                        setSelected(attr)
+                        setIsSheetOpen(true)
+                    }}
+                    onRefresh={loadAttributes}
+                />
             </div>
 
             <AttributeSheet
                 open={isSheetOpen}
                 onOpenChange={(open) => {
                     if (!open) handleSheetClose()
+                    else setIsSheetOpen(true)
                 }}
-                attribute={selectedAttribute}
+                attribute={selected}
             />
         </div>
     )

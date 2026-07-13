@@ -9,21 +9,19 @@ const BATCH_SIZE = 500
 
 export interface MeiliProductDocument {
     id:               string
-    productNumber:    string
-    itemNumbers:      string[]
+    itemNumber:       string | null
     name:             string
     description:      string | null
     brand:            string | null
     brandId:          string | null
     category:         string | null
     categoryId:       string | null
+    attributeText:    string[]
     tags:             string[]
     alternativeNames: string[]
     isAvailable:      boolean
     primaryImage:     string | null
     minPrice:         number | null
-    skuCount:         number
-    variantCount:     number
     createdAt:        string
 }
 
@@ -55,53 +53,45 @@ export interface MeiliSearchResult {
 const MEILI_PRODUCT_INCLUDE = {
     brandRef: { select: { name: true } },
     category: { select: { name: true } },
-    skcs: {
-        orderBy: { order: 'asc' as const },
-        include: {
-            images: { select: { url: true, isPrimary: true }, orderBy: { order: 'asc' as const } },
-            skus: { select: { id: true, productPrices: { select: { value: true } } } },
-        },
+    productAttributes: {
+        include: { attribute: { select: { name: true, code: true } } },
     },
+    productImages: { select: { url: true, isPrimary: true }, orderBy: { order: 'asc' as const } },
+    productPrices: { select: { value: true } },
 } as const
 
 function toMeiliDocument(product: any): MeiliProductDocument {
-    const defaultSkc = (product.skcs || []).find((s: any) => s.isDefault) || product.skcs?.[0]
-    const primaryImage = defaultSkc?.images?.find((i: any) => i.isPrimary)?.url
-        ?? defaultSkc?.images?.[0]?.url
+    const primaryImage = product.productImages?.find((i: any) => i.isPrimary)?.url
+        ?? product.productImages?.[0]?.url
         ?? null
 
-    const prices = (product.skcs || []).flatMap((skc: any) =>
-        (skc.skus || []).flatMap((sku: any) =>
-            (sku.productPrices || []).map((p: any) => Number(p.value))
-        )
-    )
+    const prices = (product.productPrices || []).map((p: any) => Number(p.value))
     const minPrice = prices.length > 0 ? Math.min(...prices) : null
-    const skuCount = (product.skcs || []).reduce((n: number, skc: any) => n + (skc.skus?.length ?? 0), 0)
 
-    const itemNumbers = (product.skcs || [])
-        .map((skc: any) => skc.itemNumber)
-        .filter((n: string | null | undefined): n is string => !!n)
+    const attributeText = (product.productAttributes || []).map((row: any) => {
+        const name = row.attribute?.name ?? row.attribute?.code ?? ''
+        const value = row.value ?? ''
+        return name && value ? `${name}: ${value}` : value
+    }).filter(Boolean)
 
     return {
-        id:               product.id,
-        productNumber:    product.productNumber,
-        itemNumbers,
-        name:             product.name,
-        description:      product.description ?? null,
-        brand:            product.brandRef?.name ?? null,
-        brandId:          product.brandId ?? null,
-        category:         product.category?.name ?? null,
-        categoryId:       product.categoryId ?? null,
-        tags:             Array.isArray(product.tags) ? product.tags : [],
+        id: product.id,
+        itemNumber: product.itemNumber ?? null,
+        name: product.name,
+        description: product.description ?? null,
+        brand: product.brandRef?.name ?? null,
+        brandId: product.brandId ?? null,
+        category: product.category?.name ?? null,
+        categoryId: product.categoryId ?? null,
+        attributeText,
+        tags: Array.isArray(product.tags) ? product.tags : [],
         alternativeNames: Array.isArray(product.alternativeNames) ? product.alternativeNames : [],
-        isAvailable:      (product.skcs || []).some((s: { isAvailable?: boolean }) => s.isAvailable),
+        isAvailable: product.isAvailable ?? true,
         primaryImage,
         minPrice,
-        skuCount,
-        variantCount:     skuCount,
-        createdAt:        product.createdAt instanceof Date
-                              ? product.createdAt.toISOString()
-                              : String(product.createdAt),
+        createdAt: product.createdAt instanceof Date
+            ? product.createdAt.toISOString()
+            : String(product.createdAt),
     }
 }
 
@@ -115,7 +105,7 @@ export async function syncAllProductsToMeilisearch(): Promise<SyncResult> {
     }
 
     const client = getMeilisearchClient()
-    const index  = client.index(MEILI_INDEX)
+    const index = client.index(MEILI_INDEX)
     const totalCount = await prisma.product.count()
 
     let offset = 0, synced = 0, errors = 0
@@ -145,8 +135,8 @@ export async function getMeilisearchStats(): Promise<MeiliStats> {
     const host = process.env.MEILISEARCH_HOST || 'http://localhost:7700'
     try {
         const client = getMeilisearchClient()
-        const index  = client.index(MEILI_INDEX)
-        const stats  = await index.getStats()
+        const index = client.index(MEILI_INDEX)
+        const stats = await index.getStats()
         return { connected: true, documentCount: stats.numberOfDocuments, isIndexing: stats.isIndexing, indexName: MEILI_INDEX, lastUpdated: null, host }
     } catch {
         return { connected: false, documentCount: 0, isIndexing: false, indexName: MEILI_INDEX, lastUpdated: null, host }
@@ -156,7 +146,7 @@ export async function getMeilisearchStats(): Promise<MeiliStats> {
 export async function upsertProductToMeilisearch(productId: string): Promise<void> {
     try {
         const client = getMeilisearchClient()
-        const index  = client.index(MEILI_INDEX)
+        const index = client.index(MEILI_INDEX)
         const product = await prisma.product.findUnique({
             where: { id: productId },
             include: MEILI_PRODUCT_INCLUDE,
@@ -183,7 +173,7 @@ export async function testMeilisearchSearch(
 ): Promise<MeiliSearchResult> {
     try {
         const client = getMeilisearchClient()
-        const index  = client.index(MEILI_INDEX)
+        const index = client.index(MEILI_INDEX)
         const filter: string[] = []
         if (options.isAvailable !== undefined) filter.push(`isAvailable = ${options.isAvailable}`)
         const result = await index.search(query, {

@@ -64,7 +64,6 @@ async function buildItemCreateData(
             const snapshot = await resolveItemSnapshot({
                 customerId,
                 productId: item.productId,
-                skuId: item.skuId,
                 unitId: item.unitId,
                 unitPrice: item.unitPrice,
                 currencyId: item.currencyId,
@@ -73,7 +72,6 @@ async function buildItemCreateData(
 
             return {
                 productId: item.productId,
-                skuId: item.skuId ?? null,
                 unitId: item.unitId ?? null,
                 quantity: item.quantity ?? 1,
                 notes: item.notes ?? null,
@@ -301,7 +299,6 @@ export async function addOrderItem(orderId: string, input: OrderItemInput) {
         where: {
             orderId,
             productId: input.productId,
-            skuId: input.skuId ?? null,
             unitId: input.unitId ?? null,
         },
     })
@@ -328,7 +325,6 @@ export async function addOrderItem(orderId: string, input: OrderItemInput) {
         data: {
             orderId,
             productId: input.productId,
-            skuId: input.skuId ?? null,
             unitId: input.unitId ?? null,
             quantity: input.quantity ?? 1,
             notes: input.notes ?? null,
@@ -346,7 +342,6 @@ export async function updateOrderItem(
     itemId: string,
     input: {
         quantity?: number
-        skuId?: string | null
         unitId?: string | null
         notes?: string | null
     }
@@ -369,7 +364,6 @@ export async function updateOrderItem(
         where: { id: itemId },
         data: {
             ...(input.quantity !== undefined && { quantity: input.quantity }),
-            ...(input.skuId !== undefined && { skuId: input.skuId }),
             ...(input.unitId !== undefined && { unitId: input.unitId }),
             ...(input.notes !== undefined && { notes: input.notes }),
         },

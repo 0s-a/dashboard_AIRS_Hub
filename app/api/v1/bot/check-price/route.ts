@@ -2,11 +2,11 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { validateApiKey, apiError, apiSuccess, normalizePhonePatterns } from '@/lib/api-utils'
+import { convertFromDefault } from '@/lib/currency-utils'
 
 const CheckPriceSchema = z.object({
     phoneNumber: z.string().min(1, 'phoneNumber is required'),
     productId: z.string().min(1, 'productId is required'),
-    skuId: z.string().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -23,67 +23,94 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        const { phoneNumber, productId, skuId } = parsed.data
+        const { phoneNumber, productId } = parsed.data
 
         const product = await prisma.product.findUnique({
             where: { id: productId },
-            select: { id: true, name: true },
-        })
-        if (!product) return apiError('Product not found', 404, { code: 'NOT_FOUND' })
-
-        let resolvedSkuId = skuId
-        if (!resolvedSkuId) {
-            const sku = await prisma.sKU.findFirst({
-                where: { skc: { productId } },
-                orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
-                select: { id: true },
-            })
-            resolvedSkuId = sku?.id
-        }
-
-        if (!resolvedSkuId) {
-            return apiSuccess({ productId: product.id, productName: product.name, customerName: null, prices: [] })
-        }
-
-        const sku = await prisma.sKU.findUnique({
-            where: { id: resolvedSkuId },
-            include: {
+            select: {
+                id: true,
+                name: true,
                 productPrices: {
                     include: {
                         priceLabel: true,
-                        currency: true,
                         unit: { select: { name: true } },
                     },
                     orderBy: { createdAt: 'asc' },
                 },
             },
         })
+        if (!product) return apiError('Product not found', 404, { code: 'NOT_FOUND' })
 
         const patterns = normalizePhonePatterns(phoneNumber)
         const customer = await prisma.customer.findFirst({
             where: { contacts: { some: { value: { in: patterns } } } },
-            select: { id: true, name: true, priceLabelId: true },
+            select: {
+                id: true,
+                name: true,
+                priceLabelId: true,
+                customerCurrencies: {
+                    include: {
+                        currency: {
+                            select: {
+                                id: true,
+                                code: true,
+                                symbol: true,
+                                name: true,
+                                isDefault: true,
+                                exchangeRate: true,
+                            },
+                        },
+                    },
+                },
+            },
         })
 
-        let filteredPrices = sku?.productPrices ?? []
+        let filteredPrices = product.productPrices
         if (customer?.priceLabelId) {
             filteredPrices = filteredPrices.filter(pp => pp.priceLabelId === customer.priceLabelId)
+        } else {
+            const defaultOnly = filteredPrices.filter(pp => pp.priceLabel.isDefault)
+            if (defaultOnly.length > 0) filteredPrices = defaultOnly
         }
 
-        const prices = filteredPrices.map(pp => ({
-            label: pp.priceLabel.name,
-            value: pp.value,
-            currency: {
-                code: pp.currency.code,
-                symbol: pp.currency.symbol,
-                name: pp.currency.name,
+        const defaultCurrency = await prisma.currency.findFirst({
+            where: { isDefault: true },
+            select: {
+                id: true,
+                code: true,
+                symbol: true,
+                name: true,
+                isDefault: true,
+                exchangeRate: true,
             },
-            unit: pp.unit?.name ?? null,
-        }))
+        })
+
+        const customerCurrencies = (customer?.customerCurrencies || [])
+            .map(cc => cc.currency)
+            .filter(Boolean)
+
+        const targetCurrencies =
+            customerCurrencies.length > 0
+                ? customerCurrencies
+                : defaultCurrency
+                    ? [defaultCurrency]
+                    : []
+
+        const prices = filteredPrices.flatMap(pp =>
+            targetCurrencies.map(c => ({
+                label: pp.priceLabel.name,
+                value: convertFromDefault(Number(pp.value), c),
+                currency: {
+                    code: c.code,
+                    symbol: c.symbol,
+                    name: c.name,
+                },
+                unit: pp.unit?.name ?? null,
+            }))
+        )
 
         return apiSuccess({
             productId: product.id,
-            skuId: resolvedSkuId,
             productName: product.name,
             customerName: customer?.name || null,
             prices,

@@ -92,11 +92,11 @@ export default async function InvoicePage({ params }: Props) {
                                             {lineTotal.toLocaleString("ar-YE")} {sym}
                                         </span>
                                     </div>
-                                    {(item.sku || item.unit || priceLabelName) && (
+                                    {(item.product?.productAttributes?.length || item.unit || priceLabelName) && (
                                         <div className="text-[9px] text-gray-500 flex gap-1">
-                                            {item.sku && (
+                                            {item.product?.productAttributes?.length > 0 && (
                                                 <span>
-                                                    ({[item.sku.skc?.color?.name, item.sku.sizeLabel].filter(Boolean).join(' / ') || item.sku.skuCode})
+                                                    ({item.product.productAttributes.map((a: { value: string }) => a.value).filter(Boolean).join(' / ')})
                                                 </span>
                                             )}
                                             {item.unit && <span>[{item.unit.name}]</span>}

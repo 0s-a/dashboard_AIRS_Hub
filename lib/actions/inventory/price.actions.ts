@@ -4,31 +4,20 @@ import {
     prisma,
     serializeProduct,
     requireProduct,
-    revalidateProduct,
-    revalidateSkc,
-    revalidateSku,
-    getProductIdFromSkuId,
-    SKU_INCLUDE,
-    serializeSKU,
+    revalidateProductPricing,
     serializeProductUnits,
+    PRODUCT_PRICE_INCLUDE,
 } from './_shared'
 import { upsertProductToMeilisearch } from '@/lib/utils/meilisearch-sync'
 import { requireAuth } from '@/lib/auth-utils'
 
-async function revalidateSkuPrice(skuId: string) {
-    const productId = await getProductIdFromSkuId(skuId)
-    if (!productId) return
-    const sku = await prisma.sKU.findUnique({ where: { id: skuId }, select: { skcId: true } })
-    if (sku) revalidateSkc(sku.skcId, productId)
-    revalidateSku(skuId, productId)
-    revalidateProduct(productId)
+async function afterPriceChange(productId: string) {
+    revalidateProductPricing(productId)
     upsertProductToMeilisearch(productId).catch(console.warn)
 }
 
-/** Add a single price entry to a SKU */
-export async function addProductPrice(skuId: string, data: {
+export async function addProductPrice(productId: string, data: {
     priceLabelId: string
-    currencyId: string
     unitId: string
     value: number
     isAutoCalculated?: boolean
@@ -37,33 +26,27 @@ export async function addProductPrice(skuId: string, data: {
         await requireAuth()
         if (isNaN(data.value) || data.value < 0) return { success: false, error: 'القيمة غير صحيحة' }
         if (!data.priceLabelId) return { success: false, error: 'مسمى التسعيرة مطلوب' }
-        if (!data.currencyId)   return { success: false, error: 'العملة مطلوبة' }
-        if (!data.unitId)       return { success: false, error: 'الوحدة مطلوبة' }
+        if (!data.unitId) return { success: false, error: 'الوحدة مطلوبة' }
 
-        const sku = await prisma.sKU.findUnique({ where: { id: skuId }, select: { id: true } })
-        if (!sku) return { success: false, error: 'المقاس غير موجود' }
+        const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } })
+        if (!product) return { success: false, error: 'المنتج غير موجود' }
 
         await prisma.productPrice.create({
             data: {
-                skuId,
+                productId,
                 priceLabelId: data.priceLabelId,
-                currencyId:   data.currencyId,
-                unitId:       data.unitId,
-                value:        data.value,
+                unitId: data.unitId,
+                value: data.value,
                 isAutoCalculated: data.isAutoCalculated ?? false,
             },
         })
 
-        await revalidateSkuPrice(skuId)
-        const productId = await getProductIdFromSkuId(skuId)
-        if (productId) {
-            const product = await requireProduct(productId)
-            return { success: true, data: serializeProduct(product) }
-        }
-        return { success: true }
+        await afterPriceChange(productId)
+        const updated = await requireProduct(productId)
+        return { success: true, data: serializeProduct(updated) }
     } catch (error: any) {
         console.error('Failed to add product price:', error)
-        if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + العملة + الوحدة) موجود بالفعل' }
+        if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + الوحدة) موجود بالفعل' }
         return { success: false, error: error?.message ?? 'فشل إضافة السعر' }
     }
 }
@@ -72,7 +55,6 @@ export async function updateProductPrice(priceId: string, data: {
     value?: number
     isAutoCalculated?: boolean
     priceLabelId?: string
-    currencyId?: string
     unitId?: string
 }) {
     try {
@@ -87,24 +69,19 @@ export async function updateProductPrice(priceId: string, data: {
         await prisma.productPrice.update({
             where: { id: priceId },
             data: {
-                value:           data.value,
+                value: data.value,
                 isAutoCalculated: data.isAutoCalculated,
-                priceLabelId:    data.priceLabelId,
-                currencyId:      data.currencyId,
-                unitId:          data.unitId,
+                priceLabelId: data.priceLabelId,
+                unitId: data.unitId,
             },
         })
 
-        await revalidateSkuPrice(existing.skuId)
-        const productId = await getProductIdFromSkuId(existing.skuId)
-        if (productId) {
-            const product = await requireProduct(productId)
-            return { success: true, data: serializeProduct(product) }
-        }
-        return { success: true }
+        await afterPriceChange(existing.productId)
+        const product = await requireProduct(existing.productId)
+        return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to update product price:', error)
-        if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + العملة + الوحدة) موجود بالفعل' }
+        if (error?.code === 'P2002') return { success: false, error: 'هذا التسعير (المسمى + الوحدة) موجود بالفعل' }
         return { success: false, error: error?.message ?? 'فشل تحديث السعر' }
     }
 }
@@ -112,28 +89,23 @@ export async function updateProductPrice(priceId: string, data: {
 export async function deleteProductPrice(priceId: string) {
     try {
         await requireAuth()
-        const existing = await prisma.productPrice.findUnique({
-            where: { id: priceId },
-            include: { sku: { select: { skc: { select: { productId: true } } } } },
-        })
+        const existing = await prisma.productPrice.findUnique({ where: { id: priceId } })
         if (!existing) return { success: false, error: 'السعر غير موجود' }
 
-        const productId = existing.sku.skc.productId
+        const productId = existing.productId
         await prisma.productPrice.delete({ where: { id: priceId } })
 
-        const remainingPricesCount = await prisma.productPrice.count({
-            where: { sku: { skc: { productId } } },
-        })
+        const remainingPricesCount = await prisma.productPrice.count({ where: { productId } })
         const remainingUnitsCount = await prisma.productUnit.count({ where: { productId } })
 
         if (remainingPricesCount === 0 || remainingUnitsCount === 0) {
-            await prisma.sKC.updateMany({
-                where: { productId },
+            await prisma.product.update({
+                where: { id: productId },
                 data: { isAvailable: false },
             })
         }
 
-        await revalidateSkuPrice(existing.skuId)
+        await afterPriceChange(productId)
         const product = await requireProduct(productId)
         return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
@@ -142,29 +114,22 @@ export async function deleteProductPrice(priceId: string) {
     }
 }
 
-export async function addProductPricesForAllUnits(skuId: string, data: {
+export async function addProductPricesForAllUnits(productId: string, data: {
     priceLabelId: string
-    currencies: Array<{ currencyId: string; basePriceValue: number }>
+    basePriceValue: number
 }) {
     try {
         await requireAuth()
         if (!data.priceLabelId) return { success: false, error: 'مسمى التسعيرة مطلوب' }
-        if (!data.currencies.length) return { success: false, error: 'حدد عملة واحدة على الأقل' }
-
-        for (const cur of data.currencies) {
-            if (isNaN(cur.basePriceValue) || cur.basePriceValue < 0) {
-                return { success: false, error: 'أحد الأسعار الأساسية غير صحيح' }
-            }
+        if (isNaN(data.basePriceValue) || data.basePriceValue < 0) {
+            return { success: false, error: 'السعر الأساسي غير صحيح' }
         }
 
-        const sku = await prisma.sKU.findUnique({
-            where: { id: skuId },
-            include: { skc: { select: { productId: true } } },
-        })
-        if (!sku) return { success: false, error: 'المقاس غير موجود' }
+        const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } })
+        if (!product) return { success: false, error: 'المنتج غير موجود' }
 
         const productUnits = await prisma.productUnit.findMany({
-            where: { productId: sku.skc.productId },
+            where: { productId },
             include: { unit: true },
             orderBy: { order: 'asc' },
         })
@@ -173,40 +138,36 @@ export async function addProductPricesForAllUnits(skuId: string, data: {
             return { success: false, error: 'أضف وحدات المنتج أولاً' }
         }
 
-        for (const cur of data.currencies) {
-            for (const pu of productUnits) {
-                const value = pu.isBase
-                    ? cur.basePriceValue
-                    : cur.basePriceValue * (pu.conversionFactor || 1)
+        for (const pu of productUnits) {
+            const value = pu.isBase
+                ? data.basePriceValue
+                : data.basePriceValue * (pu.conversionFactor || 1)
 
-                await prisma.productPrice.upsert({
-                    where: {
-                        skuId_priceLabelId_currencyId_unitId: {
-                            skuId,
-                            priceLabelId: data.priceLabelId,
-                            currencyId:   cur.currencyId,
-                            unitId:       pu.unitId,
-                        },
+            await prisma.productPrice.upsert({
+                where: {
+                    productId_priceLabelId_unitId: {
+                        productId,
+                        priceLabelId: data.priceLabelId,
+                        unitId: pu.unitId,
                     },
-                    create: {
-                        skuId,
-                        priceLabelId:     data.priceLabelId,
-                        currencyId:       cur.currencyId,
-                        unitId:           pu.unitId,
-                        value,
-                        isAutoCalculated: !pu.isBase,
-                    },
-                    update: {
-                        value,
-                        isAutoCalculated: !pu.isBase,
-                    },
-                })
-            }
+                },
+                create: {
+                    productId,
+                    priceLabelId: data.priceLabelId,
+                    unitId: pu.unitId,
+                    value,
+                    isAutoCalculated: !pu.isBase,
+                },
+                update: {
+                    value,
+                    isAutoCalculated: !pu.isBase,
+                },
+            })
         }
 
-        await revalidateSkuPrice(skuId)
-        const product = await requireProduct(sku.skc.productId)
-        return { success: true, data: serializeProduct(product) }
+        await afterPriceChange(productId)
+        const updated = await requireProduct(productId)
+        return { success: true, data: serializeProduct(updated) }
     } catch (error: any) {
         console.error('Failed to add prices for all units:', error)
         if (error?.code === 'P2002') return { success: false, error: 'بعض الأسعار موجودة بالفعل' }
@@ -215,7 +176,7 @@ export async function addProductPricesForAllUnits(skuId: string, data: {
 }
 
 export async function copyPriceLabelPrices(
-    skuId: string,
+    productId: string,
     fromLabelId: string,
     toLabelId: string,
     adjustmentPercent: number = 0
@@ -227,7 +188,7 @@ export async function copyPriceLabelPrices(
         }
 
         const sourcePrices = await prisma.productPrice.findMany({
-            where: { skuId, priceLabelId: fromLabelId },
+            where: { productId, priceLabelId: fromLabelId },
         })
 
         if (sourcePrices.length === 0) {
@@ -241,58 +202,54 @@ export async function copyPriceLabelPrices(
 
             await prisma.productPrice.upsert({
                 where: {
-                    skuId_priceLabelId_currencyId_unitId: {
-                        skuId,
+                    productId_priceLabelId_unitId: {
+                        productId,
                         priceLabelId: toLabelId,
-                        currencyId:   sp.currencyId,
-                        unitId:       sp.unitId,
+                        unitId: sp.unitId,
                     },
                 },
                 create: {
-                    skuId,
-                    priceLabelId:     toLabelId,
-                    currencyId:       sp.currencyId,
-                    unitId:           sp.unitId,
-                    value:            newValue,
+                    productId,
+                    priceLabelId: toLabelId,
+                    unitId: sp.unitId,
+                    value: newValue,
                     isAutoCalculated: true,
                 },
                 update: {
-                    value:            newValue,
+                    value: newValue,
                     isAutoCalculated: true,
                 },
             })
         }
 
-        await revalidateSkuPrice(skuId)
-        const productId = await getProductIdFromSkuId(skuId)
-        if (productId) {
-            const product = await requireProduct(productId)
-            return { success: true, data: serializeProduct(product) }
-        }
-        return { success: true }
+        await afterPriceChange(productId)
+        const product = await requireProduct(productId)
+        return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to copy price label prices:', error)
         return { success: false, error: error?.message ?? 'فشل نسخ الأسعار' }
     }
 }
 
-export async function getSkuPrices(skuId: string) {
+export async function getProductPrices(productId: string) {
     try {
         await requireAuth()
-        const sku = await prisma.sKU.findUnique({
-            where: { id: skuId },
+        const product = await prisma.product.findUnique({
+            where: { id: productId },
             include: {
-                ...SKU_INCLUDE.include,
-                skc: {
-                    include: {
-                        product: { include: { productUnits: { include: { unit: true } } } },
-                    },
-                },
+                productPrices: { include: PRODUCT_PRICE_INCLUDE, orderBy: { createdAt: 'asc' } },
+                productUnits: { include: { unit: true }, orderBy: { order: 'asc' } },
             },
         })
-        if (!sku) return { success: false, error: 'المقاس غير موجود' }
-        const units = serializeProductUnits(sku.skc.product.productUnits)
-        return { success: true, data: serializeSKU(sku, units) }
+        if (!product) return { success: false, error: 'المنتج غير موجود' }
+        return {
+            success: true,
+            data: {
+                productId,
+                productPrices: product.productPrices,
+                productUnits: serializeProductUnits(product.productUnits),
+            },
+        }
     } catch (error) {
         return { success: false, error: 'فشل جلب الأسعار' }
     }

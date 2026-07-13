@@ -3,7 +3,6 @@ import type { OrderStatusValue } from '@/lib/order-constants'
 export interface OrderItemInput {
     productId: string
     quantity?: number
-    skuId?: string | null
     unitId?: string | null
     notes?: string | null
     unitPrice?: number | null

@@ -17,9 +17,10 @@ import type { SerializedProduct } from "@/lib/actions/inventory"
 interface ProductSheetProps {
     product?: SerializedProduct
     trigger?: React.ReactNode
+    onSuccess?: () => void
 }
 
-export function ProductSheet({ product, trigger }: ProductSheetProps) {
+export function ProductSheet({ product, trigger, onSuccess }: ProductSheetProps) {
     const [open, setOpen] = useState(false)
 
     return (
@@ -33,18 +34,24 @@ export function ProductSheet({ product, trigger }: ProductSheetProps) {
             </SheetTrigger>
             <SheetContent
                 side="left"
-                className={`overflow-y-auto ${product ? "sm:max-w-2xl" : "sm:max-w-lg"}`}
+                className={`overflow-y-auto ${product ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
             >
                 <SheetHeader>
                     <SheetTitle>{product ? "تعديل المنتج" : "إضافة منتج جديد"}</SheetTitle>
                     <SheetDescription>
                         {product
                             ? "قم بإجراء التعديلات اللازمة على تفاصيل المنتج هنا."
-                            : "أدخل بيانات المنتج واختر نوع المواصفة والألوان — الأصناف تُضاف من صفحة الأصناف."}
+                            : "أدخل بيانات المنتج — اللون والمواصفة والتصنيف."}
                     </SheetDescription>
                 </SheetHeader>
                 <div className="py-4">
-                    <ProductForm product={product} onSuccess={() => setOpen(false)} />
+                    <ProductForm
+                        product={product}
+                        onSuccess={() => {
+                            setOpen(false)
+                            onSuccess?.()
+                        }}
+                    />
                 </div>
             </SheetContent>
         </Sheet>

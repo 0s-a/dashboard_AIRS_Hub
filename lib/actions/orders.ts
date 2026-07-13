@@ -10,6 +10,7 @@ import {
 import { validateOrderStatus, VALID_ORDER_STATUSES } from '@/lib/order-constants'
 import { ORDER_INCLUDE } from '@/lib/prisma-includes'
 import { requireAuth } from '@/lib/auth-utils'
+import { resolveItemSnapshot } from '@/lib/orders/snapshot'
 
 // ============================================================
 // Types
@@ -17,7 +18,6 @@ import { requireAuth } from '@/lib/auth-utils'
 
 export interface OrderItemInput {
     productId: string
-    skuId?: string | null
     quantity: number
     notes?: string | null
     unitId?: string | null
@@ -151,6 +151,28 @@ export async function createOrder(data: CreateOrderData) {
     return safeActionWithRevalidation(
         async () => {
             await requireAuth()
+            const itemCreates = await Promise.all(
+                data.items.map(async (it) => {
+                    const snapshot = await resolveItemSnapshot({
+                        customerId: data.customerId,
+                        productId: it.productId,
+                        unitId: it.unitId,
+                        unitPrice: it.unitPrice,
+                        currencyId: it.currencyId,
+                        priceLabelId: it.priceLabelId,
+                    })
+                    return {
+                        productId: it.productId,
+                        unitId: it.unitId ?? null,
+                        quantity: it.quantity,
+                        notes: it.notes ?? null,
+                        unitPrice: snapshot.unitPrice,
+                        currencyId: snapshot.currencyId,
+                        priceLabelId: snapshot.priceLabelId,
+                    }
+                })
+            )
+
             return prisma.$transaction(async (tx) => {
                 const orderNumber = await generateItemNumber('order')
                 return tx.order.create({
@@ -159,19 +181,7 @@ export async function createOrder(data: CreateOrderData) {
                         customerId: data.customerId ?? null,
                         notes: data.notes ?? null,
                         deliveryInfo: data.deliveryInfo ?? null,
-                        items: {
-                            create: data.items.map(it => ({
-                                productId:    it.productId,
-                                skuId:        it.skuId ?? null,
-                                unitId:       it.unitId ?? null,
-                                quantity:     it.quantity,
-                                notes:        it.notes ?? null,
-                                // Snapshot — السعر المُثبَّت وقت الإنشاء
-                                unitPrice:    it.unitPrice ?? null,
-                                currencyId:   it.currencyId ?? null,
-                                priceLabelId: it.priceLabelId ?? null,
-                            }))
-                        },
+                        items: { create: itemCreates },
                     },
                 })
             })
@@ -202,19 +212,43 @@ export async function updateOrder(id: string, data: UpdateOrderData) {
                     throw new Error('لا يمكن حفظ طلب بدون منتجات — أضف منتجاً واحداً على الأقل')
                 }
 
+                const customerId =
+                    data.customerId !== undefined ? data.customerId : undefined
+                const existing =
+                    customerId === undefined
+                        ? await prisma.order.findUnique({
+                              where: { id },
+                              select: { customerId: true },
+                          })
+                        : null
+                const snapshotCustomerId =
+                    customerId !== undefined ? customerId : existing?.customerId
+
+                const createItems = await Promise.all(
+                    data.items.map(async (it) => {
+                        const snapshot = await resolveItemSnapshot({
+                            customerId: snapshotCustomerId,
+                            productId: it.productId,
+                            unitId: it.unitId,
+                            unitPrice: it.unitPrice,
+                            currencyId: it.currencyId,
+                            priceLabelId: it.priceLabelId,
+                        })
+                        return {
+                            productId: it.productId,
+                            unitId: it.unitId ?? null,
+                            quantity: it.quantity,
+                            notes: it.notes ?? null,
+                            unitPrice: snapshot.unitPrice,
+                            currencyId: snapshot.currencyId,
+                            priceLabelId: snapshot.priceLabelId,
+                        }
+                    })
+                )
+
                 itemsPayload = {
                     deleteMany: {},
-                    create: data.items.map(it => ({
-                        productId:    it.productId,
-                        skuId:        it.skuId ?? null,
-                        unitId:       it.unitId ?? null,
-                        quantity:     it.quantity,
-                        notes:        it.notes ?? null,
-                        // Snapshot
-                        unitPrice:    it.unitPrice ?? null,
-                        currencyId:   it.currencyId ?? null,
-                        priceLabelId: it.priceLabelId ?? null,
-                    }))
+                    create: createItems,
                 }
             }
 
@@ -273,107 +307,22 @@ export async function deleteOrder(id: string) {
 }
 
 // ============================================================
-// Helpers: Product price labels & variants (for order form)
+// Helpers: Product price labels (for order form)
 // ============================================================
 
-export async function getProductPriceLabels(productId: string, skuId?: string | null) {
+export async function getProductPriceLabels(productId: string) {
     return safeAction(
         async () => {
             await requireAuth()
-            let resolvedSkuId = skuId
-            if (!resolvedSkuId) {
-                const sku = await prisma.sKU.findFirst({
-                    where: { skc: { productId } },
-                    orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
-                    select: { id: true },
-                })
-                resolvedSkuId = sku?.id
-            }
-            if (!resolvedSkuId) return []
 
-            const defaultPrices = await prisma.productPrice.findMany({
-                where: { skuId: resolvedSkuId, currency: { isDefault: true } },
-                include: { priceLabel: true, currency: true },
+            const data = await prisma.productPrice.findMany({
+                where: { productId },
+                include: { priceLabel: true },
                 orderBy: { priceLabel: { name: 'asc' } },
             })
-
-            const data = defaultPrices.length > 0
-                ? defaultPrices
-                : await prisma.productPrice.findMany({
-                    where: { skuId: resolvedSkuId },
-                    include: { priceLabel: true, currency: true },
-                    orderBy: { priceLabel: { name: 'asc' } },
-                })
 
             return JSON.parse(JSON.stringify(data))
         },
         'تعذّر جلب التسعيرات'
     )
-}
-
-export async function getProductSkcs(productId: string) {
-    return safeAction(
-        async () => {
-            await requireAuth()
-            return prisma.sKC.findMany({
-                where: { productId },
-                orderBy: { order: 'asc' },
-                select: {
-                    id: true,
-                    colorId: true,
-                    color: { select: { id: true, code: true, name: true, hexCode: true } },
-                    isDefault: true,
-                    isAvailable: true,
-                },
-            })
-        },
-        'تعذّر جلب الأصناف'
-    )
-}
-
-export async function getProductSkus(productId: string, skcId?: string) {
-    return safeAction(
-        async () => {
-            await requireAuth()
-            return prisma.sKU.findMany({
-                where: {
-                    skc: {
-                        productId,
-                        ...(skcId ? { id: skcId } : {}),
-                    },
-                },
-                orderBy: [{ skc: { order: 'asc' } }, { order: 'asc' }],
-                select: {
-                    id: true,
-                    skuCode: true,
-                    sizeLabel: true,
-                    isDefault: true,
-                    isAvailable: true,
-                    skcId: true,
-                    skc: { select: { color: { select: { name: true, hexCode: true, code: true } } } },
-                },
-            })
-        },
-        'تعذّر جلب المقاسات'
-    )
-}
-
-/** @deprecated use getProductSkcs */
-export async function getProductVariants(productId: string) {
-    const res = await getProductSkcs(productId)
-    if (!res.success || !res.data) return res
-    return {
-        ...res,
-        data: res.data.map(s => ({
-            id: s.id,
-            name: s.color.name,
-            type: 'color',
-            hex: s.color.hexCode,
-            suffix: s.color.code,
-            colorName: s.color.name,
-            hexCode: s.color.hexCode,
-            colorCode: s.color.code,
-            isDefault: s.isDefault,
-        })),
-    }
 }

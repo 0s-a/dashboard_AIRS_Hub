@@ -1010,7 +1010,7 @@
           "Pricing"
         ],
         "summary": "فحص سعر منتج",
-        "description": "فحص سعر منتج معين بناءً على رقم هاتف العميل. يبحث عن العميل بالهاتف ويُرجع الأسعار المسموحة حسب تصنيف السعر المرتبط بالعميل.\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X POST \"http://localhost:3000/api/v1/bot/check-price\" \\\n  -H \"x-api-key: YOUR_API_KEY\"\n```\n",
+        "description": "فحص سعر منتج معين بناءً على رقم هاتف العميل. يبحث عن العميل بالهاتف، يفلتر الأسعار حسب مسمى التسعير المرتبط به، ويحوّل القيمة من العملة الافتراضية إلى عملات العميل (CustomerCurrency) عبر exchangeRate.\n\n### 🚀 مثال على شكل الطلب (cURL)\n```bash\ncurl -X POST \"http://localhost:3000/api/v1/bot/check-price\" \\\n  -H \"x-api-key: YOUR_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"phoneNumber\": \"+967700000000\", \"productId\": \"uuid\"}'\n```\n",
         "operationId": "checkPrice",
         "requestBody": {
           "required": true,
@@ -1995,10 +1995,9 @@
             "type": "string",
             "example": "إلكترونيات"
           },
-          "icon": {
+          "code": {
             "type": "string",
-            "nullable": true,
-            "example": "Laptop"
+            "example": "ELC"
           }
         }
       },
@@ -2045,32 +2044,6 @@
           },
           "currency": {
             "$ref": "#/components/schemas/CurrencyFull"
-          }
-        }
-      },
-      "SKU": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "skuCode": { "type": "string", "example": "ELC-AP-0001-RED-30ML" },
-          "sizeLabel": { "type": "string", "nullable": true, "example": "30ml" },
-          "isDefault": { "type": "boolean" },
-          "isAvailable": { "type": "boolean" },
-          "order": { "type": "integer" }
-        }
-      },
-      "SKC": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "colorCode": { "type": "string", "example": "RD" },
-          "colorName": { "type": "string", "example": "أحمر" },
-          "hexCode": { "type": "string", "example": "#EF4444" },
-          "isDefault": { "type": "boolean" },
-          "isAvailable": { "type": "boolean" },
-          "skus": {
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/SKU" }
           }
         }
       },
@@ -2167,11 +2140,20 @@
               "$ref": "#/components/schemas/ProductPrice"
             }
           },
-          "skcs": {
+          "attributes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/SKC"
+              "type": "object",
+              "properties": {
+                "code": { "type": "string", "example": "color" },
+                "name": { "type": "string", "example": "اللون" },
+                "value": { "type": "string", "example": "أحمر" }
+              }
             }
+          },
+          "primaryImage": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -2181,7 +2163,6 @@
         "description": "بند في الطلب — snapshot السعر يُحسب تلقائياً إن لم يُمرَّر unitPrice.",
         "properties": {
           "productId": { "type": "string", "format": "uuid" },
-          "skuId": { "type": "string", "format": "uuid", "nullable": true },
           "unitId": { "type": "string", "format": "uuid", "nullable": true },
           "quantity": { "type": "integer", "minimum": 1, "default": 1 },
           "notes": { "type": "string", "nullable": true },
@@ -2229,7 +2210,6 @@
         "type": "object",
         "properties": {
           "quantity": { "type": "integer", "minimum": 1 },
-          "skuId": { "type": "string", "format": "uuid", "nullable": true },
           "unitId": { "type": "string", "format": "uuid", "nullable": true },
           "notes": { "type": "string", "nullable": true }
         }
@@ -2487,11 +2467,20 @@
               }
             }
           },
-          "skcs": {
+          "attributes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/SKC"
+              "type": "object",
+              "properties": {
+                "code": { "type": "string", "example": "color" },
+                "name": { "type": "string", "example": "اللون" },
+                "value": { "type": "string", "example": "أحمر" }
+              }
             }
+          },
+          "primaryImage": {
+            "type": "string",
+            "nullable": true
           },
           "images": {
             "type": "array",

@@ -20,37 +20,28 @@ const getDashboardData = unstable_cache(
             activeCustomerCount,
             unavailableProductCount,
             recentProducts,
+            defaultCurrency,
             recentCustomers
         ] = await Promise.all([
             prisma.product.count(),
             prisma.customer.count(),
             prisma.customer.count({ where: { isActive: true } }),
-            prisma.product.count({
-                where: { NOT: { skcs: { some: { isAvailable: true } } } },
-            }),
-            // Get recent products (last 5)
+            prisma.product.count({ where: { isAvailable: false } }),
             prisma.product.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    skcs: {
-                        include: {
-                            images: { orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }], take: 1 },
-                            skus: {
-                                include: {
-                                    productPrices: {
-                                        include: { priceLabel: true, currency: true },
-                                        orderBy: { createdAt: 'asc' },
-                                        take: 1,
-                                    },
-                                },
-                                take: 1,
-                            },
-                        },
-                        orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
+                    productImages: { orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }], take: 1 },
+                    productPrices: {
+                        include: { priceLabel: true },
+                        orderBy: { createdAt: 'asc' },
                         take: 1,
                     },
                 },
+            }),
+            prisma.currency.findFirst({
+                where: { isDefault: true },
+                select: { symbol: true },
             }),
             // Get recent customers (last 5) - with customerType and contacts
             prisma.customer.findMany({
@@ -68,6 +59,7 @@ const getDashboardData = unstable_cache(
 
         // Generate activity data for last 7 days (optimized with parallel execution)
         const activityData = await generateActivityData()
+        const defaultSymbol = defaultCurrency?.symbol ?? ''
 
         return {
             stats: {
@@ -76,23 +68,19 @@ const getDashboardData = unstable_cache(
                 activeCustomerCount,
                 unavailableProductCount
             },
-            recentProducts: recentProducts.map((p: any) => {
-                const primarySkc = (p.skcs || []).find((s: any) => s.isDefault) || p.skcs?.[0]
-                return {
+            recentProducts: recentProducts.map((p: any) => ({
                 ...p,
-                isAvailable: (p.skcs || []).some((skc: { isAvailable?: boolean }) => skc.isAvailable),
-                mediaImages: (primarySkc?.images || []).map((pi: any) => ({
+                isAvailable: p.isAvailable,
+                mediaImages: (p.productImages || []).map((pi: any) => ({
                     url: toDisplayUrl(pi.url),
                     isPrimary: pi.isPrimary,
                 })),
-                productPrices: (primarySkc?.skus || []).flatMap((sku: any) =>
-                    (sku.productPrices || []).map((pp: any) => ({
-                        priceLabelName: pp.priceLabel.name,
-                        value: Number(pp.value),
-                        currencySymbol: pp.currency.symbol,
-                    }))
-                ).slice(0, 1),
-            }}),
+                productPrices: (p.productPrices || []).map((pp: any) => ({
+                    priceLabelName: pp.priceLabel.name,
+                    value: Number(pp.value),
+                    currencySymbol: defaultSymbol,
+                })).slice(0, 1),
+            })),
             recentCustomers,
             activityData
         }

@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
     Plus, Trash2, ShoppingCart, Loader2, PackagePlus, Hash,
-    User, StickyNote, Palette, Check, ChevronsUpDown, Search as SearchIcon, Truck
+    User, StickyNote, Check, ChevronsUpDown, Search as SearchIcon, Truck
 } from "lucide-react"
 import {
     Command,
@@ -32,31 +32,15 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { createOrder, updateOrder, getProductPriceLabels, getProductSkcs, getProductSkus } from "@/lib/actions/orders"
+import { createOrder, updateOrder, getProductPriceLabels } from "@/lib/actions/orders"
 import { ORDER_STATUSES } from "./order-columns"
 
 // ──────────────────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────────────────
 
-interface SkcOption {
-    id: string
-    colorName: string
-    hexCode: string
-    colorCode: string
-    isDefault: boolean
-}
-
-interface SkuOption {
-    id: string
-    skuCode: string
-    sizeLabel: string | null
-    isDefault: boolean
-    skcId: string
-}
-
 interface PriceLabelOption {
-    productPriceId: string  // معرّف السعر الفعلي (ProductPrice.id) — يضمن اختيار العملة الصحيحة
+    productPriceId: string
     priceLabelId: string
     priceLabelName: string
     value: number
@@ -66,21 +50,16 @@ interface PriceLabelOption {
 
 interface OrderItemRow {
     productId: string
-    productPriceId: string  // التسعيرة المختارة من قائمة العرض
-    skcId: string
-    skuId: string
-    unitId: string          // الوحدة المختارة
+    productPriceId: string
+    unitId: string
     quantity: number
     notes: string
     previewPrice?: number
     previewSymbol?: string
     previewLabelName?: string
     availablePriceLabels: PriceLabelOption[]
-    availableSkcs: SkcOption[]
-    availableSkus: SkuOption[]
     availableUnits: UnitOption[]
     loadingPrices: boolean
-    loadingSkus: boolean
 }
 
 interface Props {
@@ -112,36 +91,36 @@ function buildEditItem(it: any): OrderItemRow {
     return {
         productId: it.productId ?? "",
         productPriceId: "",
-        skcId: it.sku?.skcId ?? it.sku?.skc?.id ?? "",
-        skuId: it.skuId ?? "",
         unitId: it.unitId ?? "",
         quantity: it.quantity ?? 1,
         notes: it.notes ?? "",
         availablePriceLabels: [],
-        availableSkcs: [],
-        availableSkus: [],
         availableUnits: [],
         loadingPrices: false,
-        loadingSkus: false,
     }
 }
 
 function emptyItem(): OrderItemRow {
     return {
-        productId: "", productPriceId: "", skcId: "", skuId: "", unitId: "", quantity: 1, notes: "",
-        availablePriceLabels: [], availableSkcs: [], availableSkus: [], availableUnits: [],
-        loadingPrices: false, loadingSkus: false,
+        productId: "",
+        productPriceId: "",
+        unitId: "",
+        quantity: 1,
+        notes: "",
+        availablePriceLabels: [],
+        availableUnits: [],
+        loadingPrices: false,
     }
 }
 
-function mapPriceLabels(data: any[]): PriceLabelOption[] {
+function mapPriceLabels(data: any[], defaultCurrency?: { id: string; symbol: string } | null): PriceLabelOption[] {
     return data.map((pp: any) => ({
         productPriceId: pp.id,
         priceLabelId: pp.priceLabelId,
         priceLabelName: pp.priceLabel?.name ?? "—",
-        value: pp.value,
-        currencySymbol: pp.currency?.symbol ?? "",
-        currencyId: pp.currencyId ?? pp.currency?.id ?? "",
+        value: Number(pp.value),
+        currencySymbol: defaultCurrency?.symbol ?? "",
+        currencyId: defaultCurrency?.id ?? "",
     }))
 }
 
@@ -207,9 +186,9 @@ function ProductCombobox({ products, value, onChange, disabled }: {
                         <div className="flex items-center gap-2 truncate">
                             <PackagePlus className="size-4 text-primary/70" />
                             <span className="truncate font-medium">{selectedProduct.name}</span>
-                            {selectedProduct.productNumber && (
+                            {selectedProduct.itemNumber && (
                                 <span className="text-[10px] font-mono text-muted-foreground bg-background border px-1.5 py-0.5 rounded shrink-0">
-                                    #{selectedProduct.productNumber}
+                                    #{selectedProduct.itemNumber}
                                 </span>
                             )}
                         </div>
@@ -231,7 +210,7 @@ function ProductCombobox({ products, value, onChange, disabled }: {
                             {products.map((p) => (
                                 <CommandItem
                                     key={p.id}
-                                    value={`${p.name} ${p.productNumber || ""}`}
+                                    value={`${p.name} ${p.itemNumber || ""}`}
                                     onSelect={() => {
                                         onChange(p.id)
                                         setOpen(false)
@@ -240,9 +219,9 @@ function ProductCombobox({ products, value, onChange, disabled }: {
                                 >
                                     <div className="flex flex-col gap-0.5">
                                         <span className="font-medium">{p.name}</span>
-                                        {p.productNumber && (
+                                        {p.itemNumber && (
                                             <span className="text-[10px] text-muted-foreground font-mono">
-                                                #{p.productNumber}
+                                                #{p.itemNumber}
                                             </span>
                                         )}
                                     </div>
@@ -352,59 +331,25 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
     }
 
-    // When product changes → load SKCs/SKUs + prices for default SKU
+    // When product changes → load prices and units
     const onProductChange = useCallback(async (idx: number, productId: string) => {
-        const exists = items.find((it, i) => i !== idx && it.productId === productId && !it.skuId)
+        const exists = items.find((it, i) => i !== idx && it.productId === productId)
         if (exists) toast.info("هذا المنتج موجود بالفعل في الطلب")
 
         updateItem(idx, {
             productId,
             productPriceId: "",
-            skcId: "",
-            skuId: "",
             previewPrice: undefined,
             previewSymbol: "",
             previewLabelName: "",
             loadingPrices: true,
-            loadingSkus: true,
             availablePriceLabels: [],
-            availableSkcs: [],
-            availableSkus: [],
         })
 
-        const [skcsRes, skusRes] = await Promise.all([
-            getProductSkcs(productId),
-            getProductSkus(productId),
-        ])
-
-        const skcs: SkcOption[] = skcsRes.success && skcsRes.data
-            ? skcsRes.data.map((s: { id: string; color: { name: string; hexCode: string; code: string }; isDefault: boolean }) => ({
-                id: s.id,
-                colorName: s.color.name,
-                hexCode: s.color.hexCode,
-                colorCode: s.color.code,
-                isDefault: s.isDefault,
-            }))
+        const pricesRes = await getProductPriceLabels(productId)
+        const labels = pricesRes.success && pricesRes.data
+            ? mapPriceLabels(pricesRes.data, { id: "", symbol: defaultSymbol })
             : []
-
-        const allSkus: SkuOption[] = skusRes.success && skusRes.data
-            ? skusRes.data.map((s: any) => ({
-                id: s.id,
-                skuCode: s.skuCode,
-                sizeLabel: s.sizeLabel,
-                isDefault: s.isDefault,
-                skcId: s.skcId,
-            }))
-            : []
-
-        const defaultSkc = skcs.find(s => s.isDefault) ?? skcs[0]
-        const skusForSkc = defaultSkc
-            ? allSkus.filter(s => s.skcId === defaultSkc.id)
-            : allSkus
-        const defaultSku = skusForSkc.find(s => s.isDefault) ?? skusForSkc[0]
-
-        const pricesRes = await getProductPriceLabels(productId, defaultSku?.id ?? null)
-        const labels = pricesRes.success && pricesRes.data ? mapPriceLabels(pricesRes.data) : []
         const auto = pickAutoPrice(labels, customerId, customers)
 
         const selectedProduct = products.find((p: any) => p.id === productId)
@@ -421,112 +366,27 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         const defaultUnit = units.find(u => u.isBase) ?? units[0] ?? null
 
         updateItem(idx, {
-            skcId: defaultSkc?.id ?? "",
-            skuId: defaultSku?.id ?? "",
             productPriceId: auto.productPriceId,
             previewPrice: auto.previewPrice,
             previewSymbol: auto.previewSymbol,
             previewLabelName: auto.previewLabelName,
             availablePriceLabels: labels,
-            availableSkcs: skcs,
-            availableSkus: allSkus,
             availableUnits: units,
             unitId: defaultUnit?.id ?? "",
             loadingPrices: false,
-            loadingSkus: false,
         })
     }, [customerId, customers, items, products])
 
-    const onSkcChange = useCallback(async (idx: number, skcId: string) => {
+    const hydrateEditItem = useCallback(async (idx: number) => {
         const item = items[idx]
         if (!item?.productId) return
 
-        const isSelected = item.skcId === skcId
-        const newSkcId = isSelected ? "" : skcId
+        updateItem(idx, { loadingPrices: true })
 
-        updateItem(idx, { skcId: newSkcId, skuId: "", loadingPrices: true })
-
-        const skusRes = await getProductSkus(item.productId, newSkcId || undefined)
-        const skusForSkc: SkuOption[] = skusRes.success && skusRes.data
-            ? skusRes.data.map((s: any) => ({
-                id: s.id,
-                skuCode: s.skuCode,
-                sizeLabel: s.sizeLabel,
-                isDefault: s.isDefault,
-                skcId: s.skcId,
-            }))
+        const pricesRes = await getProductPriceLabels(item.productId)
+        const labels = pricesRes.success && pricesRes.data
+            ? mapPriceLabels(pricesRes.data, { id: "", symbol: defaultSymbol })
             : []
-
-        const defaultSku = skusForSkc.find(s => s.isDefault) ?? skusForSkc[0]
-        const pricesRes = await getProductPriceLabels(item.productId, defaultSku?.id ?? null)
-        const labels = pricesRes.success && pricesRes.data ? mapPriceLabels(pricesRes.data) : []
-        const auto = pickAutoPrice(labels, customerId, customers)
-
-        updateItem(idx, {
-            skuId: defaultSku?.id ?? "",
-            productPriceId: auto.productPriceId,
-            previewPrice: auto.previewPrice,
-            previewSymbol: auto.previewSymbol,
-            previewLabelName: auto.previewLabelName,
-            availablePriceLabels: labels,
-            loadingPrices: false,
-        })
-    }, [customerId, customers, items])
-
-    const onSkuChange = useCallback(async (idx: number, skuId: string) => {
-        const item = items[idx]
-        if (!item?.productId) return
-
-        const isSelected = item.skuId === skuId
-        const newSkuId = isSelected ? "" : skuId
-
-        updateItem(idx, { skuId: newSkuId, loadingPrices: true })
-
-        const pricesRes = await getProductPriceLabels(item.productId, newSkuId || null)
-        const labels = pricesRes.success && pricesRes.data ? mapPriceLabels(pricesRes.data) : []
-        const auto = pickAutoPrice(labels, customerId, customers)
-
-        updateItem(idx, {
-            productPriceId: auto.productPriceId,
-            previewPrice: auto.previewPrice,
-            previewSymbol: auto.previewSymbol,
-            previewLabelName: auto.previewLabelName,
-            availablePriceLabels: labels,
-            loadingPrices: false,
-        })
-    }, [customerId, customers, items])
-
-    const hydrateEditItem = useCallback(async (idx: number, preserved: { skcId?: string; skuId?: string }) => {
-        const item = items[idx]
-        if (!item?.productId) return
-
-        updateItem(idx, { loadingSkus: true, loadingPrices: true })
-
-        const [skcsRes, skusRes] = await Promise.all([
-            getProductSkcs(item.productId),
-            getProductSkus(item.productId),
-        ])
-
-        const skcs: SkcOption[] = skcsRes.success && skcsRes.data
-            ? skcsRes.data.map((s: { id: string; color: { name: string; hexCode: string; code: string }; isDefault: boolean }) => ({
-                id: s.id, colorName: s.color.name, hexCode: s.color.hexCode,
-                colorCode: s.color.code, isDefault: s.isDefault,
-            }))
-            : []
-
-        const allSkus: SkuOption[] = skusRes.success && skusRes.data
-            ? skusRes.data.map((s: any) => ({
-                id: s.id, skuCode: s.skuCode, sizeLabel: s.sizeLabel,
-                isDefault: s.isDefault, skcId: s.skcId,
-            }))
-            : []
-
-        const skcId = preserved.skcId || skcs.find(s => s.isDefault)?.id || skcs[0]?.id || ""
-        const skusForSkc = skcId ? allSkus.filter(s => s.skcId === skcId) : allSkus
-        const skuId = preserved.skuId || skusForSkc.find(s => s.isDefault)?.id || skusForSkc[0]?.id || ""
-
-        const pricesRes = await getProductPriceLabels(item.productId, skuId || null)
-        const labels = pricesRes.success && pricesRes.data ? mapPriceLabels(pricesRes.data) : []
         const auto = pickAutoPrice(labels, customerId, customers)
 
         const selectedProduct = products.find((p: any) => p.id === item.productId)
@@ -541,27 +401,22 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
             : []
 
         updateItem(idx, {
-            skcId,
-            skuId,
             productPriceId: auto.productPriceId,
             previewPrice: auto.previewPrice,
             previewSymbol: auto.previewSymbol,
             previewLabelName: auto.previewLabelName,
             availablePriceLabels: labels,
-            availableSkcs: skcs,
-            availableSkus: allSkus,
             availableUnits: units,
             unitId: item.unitId || units.find(u => u.isBase)?.id || units[0]?.id || "",
             loadingPrices: false,
-            loadingSkus: false,
         })
     }, [customerId, customers, items, products])
 
     useEffect(() => {
         if (!open || !isEdit) return
         items.forEach((item, idx) => {
-            if (item.productId && item.availableSkcs.length === 0 && !item.loadingSkus) {
-                hydrateEditItem(idx, { skcId: item.skcId, skuId: item.skuId })
+            if (item.productId && item.availablePriceLabels.length === 0 && !item.loadingPrices) {
+                hydrateEditItem(idx)
             }
         })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -573,7 +428,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         return sum
     }, 0)
 
-    // ── Submit ── يُرسل productId + skuId + quantity + notes
+    // ── Submit ── يُرسل productId + quantity + notes
     async function handleSubmit(keepOpen = false) {
         const validItems = items.filter(it => it.productId && it.quantity > 0)
         if (validItems.length === 0) {
@@ -586,17 +441,15 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
             notes: notes || null,
             deliveryInfo: deliveryInfo || null,
             items: validItems.map(it => {
-                // البحث عن التسعيرة المختارة لاستخراج currencyId وpriceLabelId
                 const selectedLabel = it.availablePriceLabels.find(l => l.productPriceId === it.productPriceId)
                 return {
-                    productId:    it.productId,
-                    skuId:        it.skuId || null,
-                    unitId:       it.unitId || null,
-                    quantity:     it.quantity,
-                    notes:        it.notes || null,
-                    // Snapshot — السعر المعروض وقت إنشاء/تعديل الطلب
-                    unitPrice:    it.previewPrice ?? null,
-                    currencyId:   selectedLabel?.currencyId ?? null,
+                    productId: it.productId,
+                    unitId: it.unitId || null,
+                    quantity: it.quantity,
+                    notes: it.notes || null,
+                    // دع الخادم يثبّت السعر ويحوّل للعملة المناسبة
+                    unitPrice: null,
+                    currencyId: null,
                     priceLabelId: selectedLabel?.priceLabelId ?? null,
                 }
             }),
@@ -862,78 +715,6 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                                     </div>
                                                 )}
                                             </div>
-
-                                            {/* SKC Row (colors) */}
-                                            {item.productId && !item.loadingSkus && item.availableSkcs.length > 1 && (
-                                                <div className="space-y-1">
-                                                    <Label className="text-[10px] font-bold text-muted-foreground/70 flex items-center gap-1">
-                                                        <Palette className="size-3" />
-                                                        اللون / المادة
-                                                    </Label>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {item.availableSkcs.map(skc => {
-                                                            const isSelected = item.skcId === skc.id
-                                                            return (
-                                                                <button
-                                                                    key={skc.id}
-                                                                    type="button"
-                                                                    onClick={() => onSkcChange(idx, skc.id)}
-                                                                    className={cn(
-                                                                        "flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-semibold transition-all",
-                                                                        isSelected
-                                                                            ? "border-primary bg-primary text-white"
-                                                                            : "border-border bg-muted/20 hover:bg-muted text-muted-foreground"
-                                                                    )}
-                                                                >
-                                                                    {skc.hexCode && (
-                                                                        <span
-                                                                            className="size-2.5 rounded-full border border-white/20"
-                                                                            style={{ backgroundColor: skc.hexCode }}
-                                                                        />
-                                                                    )}
-                                                                    <span>{skc.colorName}</span>
-                                                                </button>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* SKU Row (sizes) */}
-                                            {item.productId && !item.loadingSkus && (() => {
-                                                const skus = item.skcId
-                                                    ? item.availableSkus.filter(s => s.skcId === item.skcId)
-                                                    : item.availableSkus
-                                                if (skus.length <= 1) return null
-                                                return (
-                                                <div className="space-y-1">
-                                                    <Label className="text-[10px] font-bold text-muted-foreground/70">
-                                                        المقاس / الوحدة
-                                                    </Label>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {skus.map(sku => {
-                                                            const isSelected = item.skuId === sku.id
-                                                            const label = sku.sizeLabel || sku.skuCode
-                                                            return (
-                                                                <button
-                                                                    key={sku.id}
-                                                                    type="button"
-                                                                    onClick={() => onSkuChange(idx, sku.id)}
-                                                                    className={cn(
-                                                                        "px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all",
-                                                                        isSelected
-                                                                            ? "border-primary bg-primary text-white"
-                                                                            : "border-border bg-muted/20 hover:bg-muted text-muted-foreground"
-                                                                    )}
-                                                                >
-                                                                    {label}
-                                                                </button>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                </div>
-                                                )
-                                            })()}
 
                                             {/* Unit Row (if product has units) */}
                                             {item.productId && item.availableUnits.length > 1 && (

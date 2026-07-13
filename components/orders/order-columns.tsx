@@ -126,10 +126,11 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
             size: 120,
             minSize: 100,
             maxSize: 140,
+            meta: { cellVariant: "code" as const, align: "start" as const },
             cell: ({ row }) => (
                 <Link
                     href={`/orders/${row.original.id}`}
-                    className="font-mono font-bold text-primary text-sm hover:underline underline-offset-2 transition-colors"
+                    className="font-bold text-primary text-sm hover:underline underline-offset-2 transition-colors truncate"
                     onClick={(e) => e.stopPropagation()}
                 >
                     #{row.original.orderNumber}
@@ -142,13 +143,14 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
             size: 170,
             minSize: 130,
             maxSize: 220,
+            meta: { cellVariant: "text" as const, align: "start" as const },
             cell: ({ row }) => {
                 const customer = row.original.customer
                 if (!customer) return <span className="text-muted-foreground text-sm">—</span>
                 return (
                     <Link
                         href={`/customers/${customer.id}`}
-                        className="text-sm font-medium hover:text-primary hover:underline underline-offset-2 transition-colors"
+                        className="text-sm font-medium hover:text-primary hover:underline underline-offset-2 transition-colors truncate block"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {customer.name}
@@ -163,26 +165,26 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
             minSize: 200,
             maxSize: 340,
             enableSorting: false,
+            meta: { cellVariant: "text" as const, align: "start" as const },
             cell: ({ row }) => {
                 const items = row.original.items ?? []
                 if (items.length === 0) return <span className="text-muted-foreground text-sm">—</span>
                 const visibleItems = items.slice(0, 2)
                 const extraCount = items.length - visibleItems.length
                 return (
-                    <div className="flex flex-col gap-0.5 py-0.5">
-                        {visibleItems.map((item: any, i: number) => (
-                            <div key={i} className="flex items-center gap-1.5 text-xs">
-                                {item.sku?.skc?.color?.hexCode && (
-                                    <span
-                                        className="size-2.5 rounded-full border border-black/10 shrink-0"
-                                        style={{ backgroundColor: item.sku.skc.color.hexCode }}
-                                    />
-                                )}
-                                <span className="text-foreground/80 truncate max-w-[140px]">
+                    <div className="flex flex-col gap-0.5 py-0.5 min-w-0">
+                        {visibleItems.map((item: any, i: number) => {
+                            const attrText = (item.product?.productAttributes ?? [])
+                                .map((a: { value?: string }) => a.value)
+                                .filter(Boolean)
+                                .join(' / ')
+                            return (
+                            <div key={i} className="flex items-center gap-1.5 text-xs min-w-0">
+                                <span className="text-foreground/80 truncate min-w-0">
                                     {item.product?.name ?? '—'}
-                                    {(item.sku?.skc?.color?.name || item.sku?.sizeLabel) && (
+                                    {attrText && (
                                         <span className="text-muted-foreground/60">
-                                            {' '}({[item.sku?.skc?.color?.name, item.sku?.sizeLabel].filter(Boolean).join(' / ')})
+                                            {' '}({attrText})
                                         </span>
                                     )}
                                 </span>
@@ -195,7 +197,8 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
                                     )}
                                 </span>
                             </div>
-                        ))}
+                            )
+                        })}
                         {extraCount > 0 && (
                             <span className="text-primary font-semibold text-[10px]">+{extraCount} منتجات أخرى</span>
                         )}
@@ -209,6 +212,7 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
             size: 130,
             minSize: 100,
             maxSize: 160,
+            meta: { cellVariant: "number" as const, align: "end" as const },
             cell: ({ row }) => {
                 const order = row.original
                 const total = calcOrderTotal(
@@ -216,7 +220,7 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
                     order.customer?.priceLabelId
                 )
                 return (
-                    <span className="font-mono font-semibold text-sm">
+                    <span className="font-semibold text-sm">
                         {total.toLocaleString("ar-YE")} {defaultSymbol}
                     </span>
                 )
@@ -228,10 +232,9 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
             meta: {
                 filterType: 'select' as const,
                 filterOptions: ORDER_STATUSES.map(s => ({ label: s.label, value: s.value })),
+                align: "start" as const,
             },
-            filterFn: (row: any, _columnId: string, filterValue: string) => {
-                return row.original.status === filterValue
-            },
+            filterFn: "select",
             header: "الحالة",
             size: 140,
             minSize: 120,
@@ -244,6 +247,7 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
             size: 120,
             minSize: 100,
             maxSize: 150,
+            meta: { align: "start" as const },
             cell: ({ row }) => {
                 const d = new Date(row.original.createdAt)
                 return (
@@ -256,7 +260,9 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
         {
             id: "actions",
             enableColumnFilter: false,
-            header: "",
+            enableSorting: false,
+            meta: { cellVariant: "actions" as const, sticky: "actions" as const, align: "end" as const },
+            header: "الإجراءات",
             size: 100,
             cell: ({ row }) => (
                 <ActionsCell row={row} customers={customers} products={products} />

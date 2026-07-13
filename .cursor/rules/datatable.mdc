@@ -1,0 +1,79 @@
+---
+description: اتفاقية DataTable — أعمدة، فلاتر، client/server
+globs: "**/{*table*,*columns*}*.tsx,components/ui/data-table/**/*.tsx"
+alwaysApply: false
+---
+
+# DataTable
+
+مصدر الحقيقة للجدول الكتالوجي: `components/ui/data-table`.
+
+## متى DataTable؟
+
+| الحالة | النمط |
+|--------|--------|
+| كتالوج CRUD صغير | `mode="client"` (افتراضي) — بحث + فلاتر محلية + pagination مدمج |
+| قائمة كبيرة / سابقة | `mode="server"` + `ServerPagination` في `footerContent` + debounce بحث ~350ms |
+
+## ممنوع للقوائم الكتالوجية
+
+- جداول HTML مخصّصة
+- إخفاء صف فلاتر الأعمدة
+- إعادة كتابة `filterFns` المدمجة (`select` | `boolean` | `dateRange` | `numberRange`)
+- `CustomEvent` لتعديل/تحديث — استخدم `createColumns({ onEdit })` أو `table.options.meta.onRefresh`
+
+## استثناءات (ليست DataTable)
+
+- `components/inventory/import/import-table.tsx` — محرر استيراد
+- `components/inventory/pricing/comparison-table.tsx` — مصفوفة أسعار
+- `app/(dashboard)/inventory/new-tags/new-tags-table.tsx` — UI checkbox مخصّص
+
+## غلاف الصفحة
+
+```tsx
+// *-table.tsx — رفيع؛ لا منطق أعمال
+<DataTable columns={columns} data={data} onRefresh={onRefresh} searchPlaceholder="ابحث..." />
+```
+
+Server:
+
+```tsx
+<DataTable
+  mode="server"
+  columns={columns}
+  data={rows}
+  searchValue={search}
+  onSearchChange={handleSearch}
+  onColumnFiltersChange={handleFilters}
+  isLoading={isPending}
+  totalCount={pagination.total}
+  footerContent={<ServerPagination pagination={pagination} onPageChange={…} itemLabel="منتج" />}
+/>
+```
+
+## أعمدة (`columns.tsx`)
+
+- رأس بسيط: `header: "العنوان"` — المحاذاة من `meta` عبر DataTable
+- فلترة: `enableColumnFilter: true` + `meta.filterType` (+ `filterPlaceholder` / `filterOptions`)
+- `filterFn: "select" | "boolean" | "dateRange" | "numberRange"` — دالة مخصّصة فقط لمنطق غير قياسي
+- لكل عمود بيانات: `meta.cellVariant` (`text` | `number` | `code` | `actions`) و`align` عند الحاجة
+- إجراءات:
+
+```ts
+{
+  id: "actions",
+  enableColumnFilter: false,
+  enableSorting: false,
+  meta: { cellVariant: "actions", sticky: "actions", align: "end" },
+  header: "الإجراءات",
+  size: 90,
+}
+```
+
+- حذف: `AlertDialog` عربي قبل `deleteX()`
+- بعد mutation: `onRefresh` / `router.refresh()` — لا `CustomEvent`
+
+## نماذج مرجعية
+
+- Client: `components/categories/`
+- Server: `app/(dashboard)/products/products-table.tsx`

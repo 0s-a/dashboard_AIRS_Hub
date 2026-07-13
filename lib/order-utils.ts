@@ -3,8 +3,9 @@
 // السعر يُحسب بالأولوية:
 // 1. unitPrice (snapshot) — المُثبَّت وقت إنشاء الطلب ← الأولوية
 // 2. تسعيرة العميل من ProductPrice (للطلبات القديمة بدون snapshot)
-// 3. التسعيرة الافتراضية للنظام (isDefault=true) بالعملة الافتراضية
-// 4. أي سعر متاح بالعملة الافتراضية
+// 3. التسعيرة الافتراضية للنظام (isDefault=true)
+// 4. أي سعر متاح
+// ملاحظة: ProductPrice يُخزَّن بالعملة الافتراضية فقط؛ التحويل عند الإنشاء عبر resolveItemSnapshot
 // ============================================================
 
 export interface ResolvedPrice {
@@ -48,7 +49,7 @@ export function resolveItemPrice(
     }
 
     // ── Fallback الديناميكي للطلبات القديمة ──
-    const prices = (item as any).sku?.productPrices ?? item.product?.productPrices ?? []
+    const prices = item.product?.productPrices ?? []
 
     if (prices.length === 0) {
         return { price: 0, symbol: '', priceLabelName: '—', isSnapshot: false }
@@ -68,7 +69,7 @@ export function resolveItemPrice(
     }
 
     // 3. التسعيرة الافتراضية للنظام
-    const defaultLabel = prices.find((p: { priceLabel?: { isDefault?: boolean } }) => p.priceLabel?.isDefault)
+    const defaultLabel = prices.find(p => p.priceLabel?.isDefault === true)
     if (defaultLabel) {
         return {
             price: Number(defaultLabel.value),

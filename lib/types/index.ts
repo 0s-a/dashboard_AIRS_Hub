@@ -96,9 +96,6 @@ export interface ProductPriceFull {
     id: string
     priceLabelId: string
     priceLabelName: string
-    currencyId: string
-    currencySymbol: string
-    currencyName: string
     value: number
     unitId: string
     unitName: string
@@ -110,11 +107,16 @@ export interface ProductPriceFull {
 
 export interface OrderItemFull {
     id: string
-    productId: string | null
+    productId: string
     product: {
         id: string
         name: string
-        productNumber: string
+        itemNumber: string | null
+        productAttributes?: Array<{
+            id: string
+            value: string
+            attribute?: { id: string; code: string; name: string } | null
+        }>
         productPrices?: Array<{
             priceLabelId: string
             value: number
@@ -122,23 +124,15 @@ export interface OrderItemFull {
             currency?: { id: string; symbol: string; code: string } | null
         }>
     } | null
-    skuId: string | null
-    sku: {
-        id: string
-        skuCode: string
-        sizeLabel: string | null
-        skc?: { id: string; color: { id: string; code: string; name: string; hexCode: string } } | null
-    } | null
     unitId: string | null
     unit: { id: string; name: string; pluralName: string | null } | null
     quantity: number
     notes: string | null
-    // Snapshot — السعر المُثبَّت وقت إنشاء الطلب
-    unitPrice:    number | null
-    currencyId:   string | null
-    currency:     { id: string; symbol: string; code: string } | null
+    unitPrice: number | null
+    currencyId: string | null
+    currency: { id: string; symbol: string; code: string } | null
     priceLabelId: string | null
-    priceLabel:   { id: string; name: string } | null
+    priceLabel: { id: string; name: string } | null
 }
 
 export interface OrderFull {

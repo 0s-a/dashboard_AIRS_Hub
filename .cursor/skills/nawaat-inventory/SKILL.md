@@ -1,77 +1,75 @@
 ---
 name: nawaat-inventory
-description: مخزون Nawaat — منتجات، variants، أكواد، استيراد CSV. استخدم عند العمل على inventory actions، product codes، variants، أو import.
+description: مخزون Nawaat — منتجات مسطّحة، صفات منتج، استيراد CSV. استخدم عند العمل على inventory actions، products، أو import.
 ---
 
 # Nawaat Inventory
+
+## نموذج المنتج (مسطّح)
+
+كل صف في `Product` = منتج قابل للبيع واحد:
+
+| الحقل | الوصف |
+|-------|--------|
+| `itemNumber` | رقم الصنف — يدخله المستخدم (فريد) |
+| `name` | اسم المنتج |
+| `brandId` | البراند |
+| `categoryId` | التصنيف |
+| `isAvailable` | التوفر |
+
+**لا يوجد:** Color، SKC، SKU، `sizeLabel`، `specKind`، `productNumber`
+
+## صفات المنتج
+
+| الجدول | الدور |
+|--------|--------|
+| `ProductAttribute` | كتالوج: `code`, `name`, `examples` (JSON string[]) |
+| `ProductAttributeValue` | وسيط: `productId` + `attributeId` + `value`، `@@unique([productId, attributeId])` |
+
+- المنتج قد يكون بلا صفات أو بعدة صفات
+- كل صفة مرة واحدة فقط لكل منتج
+- بذرة أساسية: `color`, `size`, `capacity`, `volume`, `weight`
+- UI كتالوج: `app/(dashboard)/product-attributes/`
+- Actions: `lib/actions/product-attributes.ts`
 
 ## هيكل الملفات
 
 ```
 lib/actions/inventory/
-├── product.actions.ts    # CRUD منتجات
+├── product.actions.ts    # CRUD منتجات + استبدال صفات الوسيط
 ├── product.queries.ts    # قراءة وبحث
-├── price.actions.ts      # تسعير
+├── price.actions.ts      # تسعير (productId)
 ├── unit.actions.ts       # وحدات المنتج
 ├── metadata.actions.ts   # tags, availability
 ├── new-tags.queries.ts   # منتجات جديدة
-└── _shared.ts            # helpers (بدون 'use server')
-lib/actions/colors.ts     # CRUD كتalog الألوان
+└── _shared.ts            # helpers + serialize
+lib/actions/product-attributes.ts  # كتالوج الصفات
+lib/actions/product-images.ts
+lib/actions/import.ts
+lib/utils/product-attributes.ts    # formatProductAttributes
 ```
 
-## Product numbers
+## التسعير والوحدات
 
-- **3 خانات** يدخلها المستخدم: `[A-Z0-9]{3}` — مثال: `001`, `A12`
-- Config والتحقق: `lib/config/product-number.config.ts` + `validateProductNumber()` في `_shared.ts`
-- فريد عالمياً على `Product.productNumber`
-- رقم الصنف اليدوي (`itemNumber`) على `SKC` وليس `Product`
-
-## Color catalog
-
-- Model: `Color` — `code` (2–4 chars), `name`, `hexCode`, `order`, `isActive`
-- Config: `lib/config/color.config.ts`
-- Actions: `lib/actions/colors.ts`
-- UI: `app/(dashboard)/colors/`
-- SKC يرتبط إلزامياً بـ `colorId` — `@@unique([productId, colorId])`
-- لون افتراضي: `ST` / "قياسي" (`DEFAULT_COLOR_CODE`)
-
-## SKU codes
-
-- صيغة: `{productNumber}-{color.code}[-{sizeLabel}]` — مثال: `001-RD`, `001-ST`, `001-RD-M`
-- `buildSkuCode()` في `lib/actions/inventory/_shared.ts`
-
-## Size presets
-
-- `lib/config/variant-presets.ts` — SIZE/MATERIAL presets فقط (الألوان من جدول Color)
-
-## Product attributes (كتalog + قيم SKC)
-
-- Model: `ProductAttribute` — `code`, `name`, `description` (كتalog الأسماء)
-- Actions: `lib/actions/product-attributes.ts`
-- UI: `app/(dashboard)/product-attributes/`
-- **قيم الصفات على SKC:** `SKC.attributes` (`Json` / `@db.JsonB`) — `{ [ProductAttribute.code]: string }`
-- التحقق: `normalizeSkcAttributes()` في `lib/utils/skc-attributes.ts` — مفاتيح صارمة من الكتalog
-- UI: `components/items/skc-attributes-form.tsx` في `SkcSheet` و `SkcEditSheet`
+- `ProductPrice`: `(productId, priceLabelId, unitId)` → `value` (بالعملة الافتراضية؛ التحويل عبر exchangeRate)
+- `ProductUnit`: وحدات البيع لكل منتج
+- بعد أي تعديل: `upsertProductToMeilisearch(id).catch(console.warn)`
 
 ## Constraints
 
-- `(name, brandId)` unique على Product
-- `productNumber` unique
-- `Color.code` و `Color.name` فريدان عالمياً
-- بعد أي تعديل: `upsertProductToMeilisearch(id).catch(console.warn)`
+- `itemNumber` unique (إلزامي)
+- `ProductAttribute.code` و `name` فريدان
+- `ProductAttributeValue`: unique `(productId, attributeId)`
 
-## Import
+## Import CSV
 
-- `lib/actions/import.ts` — CSV عبر papaparse
-- `validateImportData()` ثم `importProductsBatch()`
-- SKC افتراضي يربط `Color(ST)`
+أعمدة إلزامية: `name`, `itemNumber`, `categoryCode`, `brandCode`  
+أعمدة صفات اختيارية: `color`, `size`, `capacity`, `volume`, `weight`
 
 ## Gallery & images
 
-- `lib/actions/product-images.ts`
-- `lib/actions/gallery.ts`
-- `lib/actions/upload.ts`
-- مسارات: `lib/utils/image-paths.ts`, `lib/config/image-storage.config.ts`
+- `ProductImage.productId` — معرض لكل منتج
+- مجلد التخزين: `itemNumber` أو `product.id`
 
 ## Auth
 

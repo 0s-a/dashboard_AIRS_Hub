@@ -11,16 +11,17 @@ export const PRODUCT_NUMBER_CONFIG = {
     },
 } as const
 
-/** Category code used in catalog (2 chars) — unrelated to product number */
+/** Category code used in catalog (1–3 chars) — unrelated to product number */
 export const CATEGORY_CODE_CONFIG = {
-    length: 2,
-    pattern: /^[A-Z0-9]{2}$/,
+    minLength: 1,
+    maxLength: 3,
+    pattern: /^[A-Z0-9]{1,3}$/,
 } as const
 
-/** Brand code used in catalog (1 char) — unrelated to product number */
+/** Brand code used in catalog (2 chars) — unrelated to product number */
 export const BRAND_CODE_CONFIG = {
-    length: 1,
-    pattern: /^[A-Z0-9]{1}$/,
+    length: 2,
+    pattern: /^[A-Z0-9]{2}$/,
 } as const
 
 /** @deprecated Use PRODUCT_NUMBER_CONFIG / CATEGORY_CODE_CONFIG / BRAND_CODE_CONFIG */

@@ -7,7 +7,7 @@ import { toDisplayUrl } from '@/lib/utils/image-paths'
 import { IMAGE_STORAGE_CONFIG } from '@/lib/config/image-storage.config'
 import { requireAuth } from '@/lib/auth-utils'
 import { upsertProductToMeilisearch } from '@/lib/utils/meilisearch-sync'
-import { revalidateAllSkusForSkc } from '@/lib/actions/inventory/_shared'
+import { revalidateProduct } from '@/lib/actions/inventory/_shared'
 
 export type ProductImageRecord = {
     id: string
@@ -19,14 +19,12 @@ export type ProductImageRecord = {
     width: number | null
     height: number | null
     sizeBytes: number | null
-    skcId: string
+    productId: string
 }
 
-async function revalidateSkcImages(skcId: string, productId: string) {
-    revalidatePath('/products')
-    revalidatePath('/inventory')
+async function revalidateProductImages(productId: string) {
+    revalidateProduct(productId)
     revalidatePath('/gallery')
-    await revalidateAllSkusForSkc(skcId, productId)
     upsertProductToMeilisearch(productId).catch(console.warn)
 }
 
@@ -40,7 +38,7 @@ function mapRecord(pi: {
     width: number | null
     height: number | null
     sizeBytes: number | null
-    skcId: string
+    productId: string
 }): ProductImageRecord {
     return {
         id: pi.id,
@@ -52,49 +50,53 @@ function mapRecord(pi: {
         width: pi.width,
         height: pi.height,
         sizeBytes: pi.sizeBytes,
-        skcId: pi.skcId,
+        productId: pi.productId,
     }
 }
 
-export async function getSkcImages(skcId: string): Promise<{ success: boolean; data: ProductImageRecord[]; error?: string }> {
+export async function getProductImages(productId: string): Promise<{ success: boolean; data: ProductImageRecord[]; error?: string }> {
     try {
         await requireAuth()
         const pis = await prisma.productImage.findMany({
-            where: { skcId },
+            where: { productId },
             orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { createdAt: 'asc' }],
         })
         return { success: true, data: pis.map(mapRecord) }
     } catch (error) {
-        console.error('Failed to get skc images:', error)
+        console.error('Failed to get product images:', error)
         return { success: false, data: [], error: 'فشل جلب الصور' }
     }
 }
 
-export async function addSkcImage(
-    skcId: string,
+/** @deprecated use getProductImages */
+export const getSkcImages = getProductImages
+
+export async function addProductImage(
+    productId: string,
     file: File
 ): Promise<{ success: boolean; data?: ProductImageRecord; error?: string }> {
     try {
         await requireAuth()
-        const skc = await prisma.sKC.findUnique({
-            where: { id: skcId },
-            include: { product: { select: { id: true, productNumber: true } } },
+        const product = await prisma.product.findUnique({
+            where: { id: productId },
+            select: { id: true, itemNumber: true },
         })
-        if (!skc) return { success: false, error: 'الصنف غير موجود' }
+        if (!product) return { success: false, error: 'المنتج غير موجود' }
 
-        const existingCount = await prisma.productImage.count({ where: { skcId } })
+        const folderKey = product.itemNumber || product.id
+        const existingCount = await prisma.productImage.count({ where: { productId } })
         if (existingCount >= IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct) {
-            return { success: false, error: `الحد الأقصى ${IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct} صور للصنف` }
+            return { success: false, error: `الحد الأقصى ${IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct} صور للمنتج` }
         }
 
-        const result = await uploadProductImage(file, skc.product.productNumber, existingCount)
+        const result = await uploadProductImage(file, folderKey, existingCount)
         if (!result.success || !result.url) {
             return { success: false, error: result.error || 'فشل رفع الصورة' }
         }
 
         const pi = await prisma.productImage.create({
             data: {
-                skcId,
+                productId,
                 url: result.url,
                 filename: result.filename!,
                 sizeBytes: result.sizeBytes ?? null,
@@ -105,31 +107,33 @@ export async function addSkcImage(
             },
         })
 
-        await revalidateSkcImages(skcId, skc.product.id)
+        await revalidateProductImages(productId)
         return { success: true, data: mapRecord(pi) }
     } catch (error) {
-        console.error('Failed to add skc image:', error)
+        console.error('Failed to add product image:', error)
         return { success: false, error: 'فشل إضافة الصورة' }
     }
 }
+
+/** @deprecated use addProductImage */
+export const addSkcImage = addProductImage
 
 export async function removeProductImage(productImageId: string) {
     try {
         await requireAuth()
         const pi = await prisma.productImage.findUnique({
             where: { id: productImageId },
-            include: { skc: { select: { id: true, productId: true } } },
+            select: { id: true, productId: true, url: true, isPrimary: true },
         })
         if (!pi) return { success: false, error: 'الصورة غير موجودة' }
 
-        const { skcId, isPrimary: wasPrimary } = pi
-        const productId = pi.skc.productId
+        const { productId, isPrimary: wasPrimary } = pi
         await deleteImageFile(pi.url)
         await prisma.productImage.delete({ where: { id: productImageId } })
 
         if (wasPrimary) {
             const first = await prisma.productImage.findFirst({
-                where: { skcId },
+                where: { productId },
                 orderBy: { order: 'asc' },
             })
             if (first) {
@@ -137,7 +141,7 @@ export async function removeProductImage(productImageId: string) {
             }
         }
 
-        await revalidateSkcImages(skcId, productId)
+        await revalidateProductImages(productId)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'فشل حذف الصورة' }
@@ -149,12 +153,12 @@ export async function setPrimaryProductImage(productImageId: string) {
         await requireAuth()
         const pi = await prisma.productImage.findUnique({
             where: { id: productImageId },
-            include: { skc: { select: { id: true, productId: true } } },
+            select: { id: true, productId: true },
         })
         if (!pi) return { success: false, error: 'الصورة غير موجودة' }
 
         await prisma.productImage.updateMany({
-            where: { skcId: pi.skcId },
+            where: { productId: pi.productId },
             data: { isPrimary: false },
         })
         await prisma.productImage.update({
@@ -162,7 +166,7 @@ export async function setPrimaryProductImage(productImageId: string) {
             data: { isPrimary: true },
         })
 
-        await revalidateSkcImages(pi.skcId, pi.skc.productId)
+        await revalidateProductImages(pi.productId)
         return { success: true }
     } catch (error) {
         return { success: false, error: 'فشل تحديث الصورة الرئيسية' }
@@ -180,9 +184,9 @@ export async function reorderProductImages(productImageIds: string[]) {
         if (productImageIds.length > 0) {
             const first = await prisma.productImage.findUnique({
                 where: { id: productImageIds[0] },
-                include: { skc: { select: { id: true, productId: true } } },
+                select: { productId: true },
             })
-            if (first) await revalidateSkcImages(first.skcId, first.skc.productId)
+            if (first) await revalidateProductImages(first.productId)
         }
         return { success: true }
     } catch (error) {

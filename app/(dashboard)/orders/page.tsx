@@ -17,7 +17,7 @@ export default async function OrdersPage() {
             select: {
                 id: true,
                 name: true,
-                productNumber: true,
+                itemNumber: true,
                 productUnits: {
                     include: { unit: { select: { id: true, name: true, pluralName: true } } },
                     orderBy: { order: 'asc' },

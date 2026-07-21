@@ -51,6 +51,7 @@ export default async function ProductsPage() {
                 initialPagination={result.pagination}
                 filterCategories={filterOpts.categories}
                 filterBrands={filterOpts.brands}
+                filterFamilies={filterOpts.families}
             />
         </div>
     )

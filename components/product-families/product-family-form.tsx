@@ -3,9 +3,9 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Loader2, Tag, Package, AlignLeft } from "lucide-react"
+import { Loader2, Tag, Package, AlignLeft, Layers } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,11 @@ import {
     Form, FormControl, FormDescription,
     FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form"
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import { createProductFamily, updateProductFamily } from "@/lib/actions/product-families"
+import { getCategories } from "@/lib/actions/categories"
 import type { ProductFamilyFormData } from "@/lib/types/product-family"
 
 const familySchema = z.object({
@@ -25,6 +29,7 @@ const familySchema = z.object({
         .min(1, "الكود مطلوب")
         .max(32, "الكود بحد أقصى 32 خانة")
         .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "حروف/أرقام إنجليزية، ويمكن شرطة أو شرطة سفلية"),
+    categoryId: z.string().min(1, "التصنيف مطلوب"),
     description: z.string().nullable().optional(),
 })
 
@@ -38,6 +43,8 @@ interface ProductFamilyFormProps {
 export function ProductFamilyForm({ family, onSuccess }: ProductFamilyFormProps) {
     const isEditing = !!family
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [categories, setCategories] = useState<{ id: string; name: string; code: string }[]>([])
+    const [loadingCats, setLoadingCats] = useState(true)
 
     const form = useForm<FamilyFormValues>({
         resolver: zodResolver(familySchema),
@@ -45,9 +52,17 @@ export function ProductFamilyForm({ family, onSuccess }: ProductFamilyFormProps)
         defaultValues: {
             name: family?.name ?? "",
             code: family?.code ?? "",
+            categoryId: family?.categoryId ?? "",
             description: family?.description ?? "",
         },
     })
+
+    useEffect(() => {
+        void getCategories().then(res => {
+            if (res.success && res.data) setCategories(res.data as typeof categories)
+            setLoadingCats(false)
+        })
+    }, [])
 
     async function onSubmit(values: FamilyFormValues) {
         setIsSubmitting(true)
@@ -55,6 +70,7 @@ export function ProductFamilyForm({ family, onSuccess }: ProductFamilyFormProps)
             const payload = {
                 name: values.name,
                 code: values.code.toUpperCase(),
+                categoryId: values.categoryId,
                 description: values.description || null,
             }
 
@@ -85,7 +101,7 @@ export function ProductFamilyForm({ family, onSuccess }: ProductFamilyFormProps)
                             <CardTitle className="text-lg">بيانات المنتج الرئيسي</CardTitle>
                         </div>
                         <CardDescription>
-                            طبقة تجميع فقط — لا أسعار ولا طلبات على هذا المستوى
+                            طبقة تجميع فقط — التصنيف هنا، والأسعار والطلبات على المنتج
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6 pt-6">
@@ -128,6 +144,32 @@ export function ProductFamilyForm({ family, onSuccess }: ProductFamilyFormProps)
                                     <FormDescription className="text-[11px]">
                                         فريد — لربط الأصناف تحت نفس المنتج الرئيسي
                                     </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="categoryId"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5">
+                                        <Layers className="h-3.5 w-3.5" />
+                                        التصنيف <span className="text-destructive">*</span>
+                                    </FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                                        <FormControl>
+                                            <SelectTrigger className="w-full focus:ring-primary/20">
+                                                <SelectValue placeholder={loadingCats ? "جاري التحميل..." : "اختر التصنيف"} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {categories.map(cat => (
+                                                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}

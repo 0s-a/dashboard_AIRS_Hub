@@ -52,9 +52,16 @@ export const CUSTOMER_INCLUDE = {
 export const BOT_CUSTOMER_WHERE = { type: 'customer' as const }
 
 export const PRODUCT_INCLUDE = {
-    category: { select: { id: true, name: true, code: true } },
     brandRef: { select: { id: true, name: true, code: true } },
-    family: { select: { id: true, code: true, name: true } },
+    family: {
+        select: {
+            id: true,
+            code: true,
+            name: true,
+            categoryId: true,
+            category: { select: { id: true, name: true, code: true } },
+        },
+    },
     productAttributes: {
         include: {
             attribute: { select: { id: true, code: true, name: true, examples: true } },

@@ -25,6 +25,7 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
         const {
             search,
             categoryId,
+            familyId,
             brandId,
             hasPrices,
             isAvailable,
@@ -47,7 +48,8 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
                 { itemNumber: { contains: q, mode: 'insensitive' } },
                 { description: { contains: q, mode: 'insensitive' } },
                 { brandRef: { name: { contains: q, mode: 'insensitive' } } },
-                { category: { name: { contains: q, mode: 'insensitive' } } },
+                { family: { name: { contains: q, mode: 'insensitive' } } },
+                { family: { category: { name: { contains: q, mode: 'insensitive' } } } },
                 {
                     productAttributes: {
                         some: {
@@ -62,7 +64,12 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
             ]
         }
 
-        if (categoryId && categoryId !== 'all') where.categoryId = categoryId
+        const familyWhere: Prisma.ProductFamilyWhereInput = {}
+        if (categoryId && categoryId !== 'all') familyWhere.categoryId = categoryId
+        if (familyId && familyId !== 'all') familyWhere.id = familyId
+        if (Object.keys(familyWhere).length > 0) {
+            where.family = familyWhere
+        }
         if (brandId && brandId !== 'all') where.brandId = brandId
         if (isAvailable === true) where.isAvailable = true
         if (isAvailable === false) where.isAvailable = false
@@ -108,7 +115,7 @@ export async function getProductsPaginated(filters: ProductsFilters = {}) {
 export async function getProductFilterOptions() {
     try {
         await requireAuth()
-        const [brands, categories] = await Promise.all([
+        const [brands, categories, families] = await Promise.all([
             prisma.brand.findMany({
                 select: { id: true, name: true, code: true },
                 orderBy: { name: 'asc' },
@@ -117,12 +124,16 @@ export async function getProductFilterOptions() {
                 select: { id: true, name: true, code: true },
                 orderBy: { name: 'asc' },
             }),
+            prisma.productFamily.findMany({
+                select: { id: true, name: true, code: true },
+                orderBy: { name: 'asc' },
+            }),
         ])
 
-        return { success: true, brands, categories }
+        return { success: true, brands, categories, families }
     } catch (error) {
         console.error('Failed to fetch filter options:', error)
-        return { success: false, brands: [], categories: [] }
+        return { success: false, brands: [], categories: [], families: [] }
     }
 }
 

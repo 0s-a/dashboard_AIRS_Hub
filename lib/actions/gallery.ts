@@ -51,7 +51,11 @@ export async function getGalleryImages(cursor?: string): Promise<{
                         id: true,
                         name: true,
                         itemNumber: true,
-                        category: { select: { name: true } },
+                        family: {
+                            select: {
+                                category: { select: { name: true } },
+                            },
+                        },
                     },
                 },
             },
@@ -71,7 +75,7 @@ export async function getGalleryImages(cursor?: string): Promise<{
             productId: pi.product.id,
             productName: pi.product.name,
             itemNumber: pi.product.itemNumber,
-            categoryName: pi.product.category?.name ?? null,
+            categoryName: pi.product.family?.category?.name ?? null,
         }))
 
         return {

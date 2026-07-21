@@ -56,7 +56,7 @@ apiError(message, status, { code?, details? })
 | Method | Path | ملاحظات |
 |--------|------|---------|
 | GET | `/api/v1/bot/brands` | قائمة البراندات — `{ name, code }` فقط، مرتبة أبجدياً |
-| GET | `/api/v1/bot/products/search` | `q` مطلوب · Meili-first · يعيد `name` + `displayName` + `family`/`familyId` + `siblings` · فلاتر `brand`/`attr`/`available` · `meta.engine` + `meta.parsed` |
+| GET | `/api/v1/bot/products/search` | `q` مطلوب · نتائج **عائلات** (`family` + `products[]` مطابق فقط) · `page`/`limit` بعدد العائلات · `familyCode` · `hasMore`/`skuMatch` · تفكيك `parse` · فلاتر `brand`/`attr`/`available` · `meta.engine` + `meta.parsed` |
 | GET | `/api/v1/bot/products/price` | `productId` أو `itemNumber` · `customerId`/`currency` اختياريان |
 | GET | `/api/v1/bot/products/image` | `productId` أو `itemNumber` · الصورة الرئيسية فقط |
 

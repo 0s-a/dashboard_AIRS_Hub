@@ -41,7 +41,7 @@ export function ProductSheet({ product, trigger, onSuccess }: ProductSheetProps)
                     <SheetDescription>
                         {product
                             ? "قم بإجراء التعديلات اللازمة على تفاصيل المنتج هنا."
-                            : "أدخل بيانات المنتج — اللون والمواصفة والتصنيف."}
+                            : "أدخل بيانات المنتج — منتج رئيسي، اسم مستقل، وصفات اختيارية."}
                     </SheetDescription>
                 </SheetHeader>
                 <div className="py-4">

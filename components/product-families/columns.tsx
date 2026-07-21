@@ -156,6 +156,16 @@ export function buildColumns(onRefresh: () => void): ColumnDef<ProductFamilyRow>
             ),
         },
         {
+            id: "category",
+            header: "التصنيف",
+            enableColumnFilter: false,
+            meta: { cellVariant: 'text' as const, align: 'start' as const },
+            size: 140,
+            cell: ({ row }) => (
+                <span className="text-xs truncate">{row.original.category?.name ?? "—"}</span>
+            ),
+        },
+        {
             id: "products",
             enableColumnFilter: false,
             meta: { cellVariant: 'number' as const, align: 'end' as const },

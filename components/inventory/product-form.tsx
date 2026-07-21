@@ -17,6 +17,7 @@ import {
     Tag,
 } from "lucide-react"
 import { toast } from "sonner"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,7 +43,6 @@ import {
 } from "@/components/ui/select"
 
 import { createProduct, updateProduct } from "@/lib/actions/inventory"
-import { getCategories } from "@/lib/actions/categories"
 import { getBrands } from "@/lib/actions/brands"
 import { getProductFamilies } from "@/lib/actions/product-families"
 import { getUnits } from "@/lib/actions/units"
@@ -57,46 +57,30 @@ import {
     type CatalogAttribute,
 } from "@/components/inventory/product-attributes-field"
 import { ImageGalleryUpload } from "@/components/ui/image-gallery-upload"
-import { Switch } from "@/components/ui/switch"
 import { useProductPricing } from "@/hooks/use-product-pricing"
 import type { SerializedProduct } from "@/lib/actions/inventory"
 import type { ProductUnitEntry } from "@/lib/types/product"
 import { INVENTORY_LABELS } from "@/lib/config/inventory-labels"
 
 const formSchema = z.object({
-    name: z.string().optional().default(""),
+    name: z.string().min(2, { message: "الاسم يجب أن يكون حرفين على الأقل" }),
     brandId: z.string().min(1, { message: "البراند مطلوب" }),
-    categoryId: z.string().min(1, { message: "التصنيف مطلوب" }),
     itemNumber: z.string().trim().min(1, { message: "رقم الصنف مطلوب" }),
     description: z.string().optional().nullable(),
     tags: z.array(z.string().min(1, "التاغ لا يمكن أن يكون فارغاً")).optional(),
-    familyId: z.string().optional().nullable(),
-    inheritsFamilyName: z.boolean().default(false),
-}).superRefine((values, ctx) => {
-    const inherits = values.inheritsFamilyName && Boolean(values.familyId)
-    if (!inherits && (!values.name || values.name.trim().length < 2)) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "الاسم يجب أن يكون حرفين على الأقل",
-            path: ["name"],
-        })
-    }
-    if (values.inheritsFamilyName && !values.familyId) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "اختر منتجاً رئيسياً لوراثة الاسم",
-            path: ["inheritsFamilyName"],
-        })
-    }
+    familyId: z.string().min(1, { message: "المنتج الرئيسي مطلوب" }),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
-type CategoryOption = { id: string; name: string; code: string }
 type BrandOption = { id: string; name: string; code: string }
-type FamilyOption = { id: string; name: string; code: string }
-
-const NONE_FAMILY = "__none__"
+type FamilyOption = {
+    id: string
+    name: string
+    code: string
+    categoryId: string
+    categoryName: string
+}
 
 interface ProductFormProps {
     product?: SerializedProduct
@@ -116,7 +100,6 @@ function toAttributeDrafts(
 export function ProductForm({ product, onSuccess }: ProductFormProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
-    const [categories, setCategories] = useState<CategoryOption[]>([])
     const [brands, setBrands] = useState<BrandOption[]>([])
     const [families, setFamilies] = useState<FamilyOption[]>([])
     const [attributeCatalog, setAttributeCatalog] = useState<CatalogAttribute[]>([])
@@ -139,21 +122,27 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
 
     useEffect(() => {
         async function loadOptions() {
-            const [catRes, brandRes, familyRes, attrsRes, unitsRes] = await Promise.all([
-                getCategories(),
+            const [brandRes, familyRes, attrsRes, unitsRes] = await Promise.all([
                 getBrands(),
                 getProductFamilies(),
                 getProductAttributes(),
                 product ? getUnits() : Promise.resolve({ success: true, data: [] }),
             ])
-            if (catRes.success && catRes.data) setCategories(catRes.data as CategoryOption[])
             if (brandRes.success && brandRes.data) setBrands(brandRes.data as BrandOption[])
             if (familyRes.success && familyRes.data) {
                 setFamilies(
-                    familyRes.data.map((f: { id: string; name: string; code: string }) => ({
+                    familyRes.data.map((f: {
+                        id: string
+                        name: string
+                        code: string
+                        categoryId: string
+                        category?: { name: string }
+                    }) => ({
                         id: f.id,
                         name: f.name,
                         code: f.code,
+                        categoryId: f.categoryId,
+                        categoryName: f.category?.name ?? '',
                     }))
                 )
             }
@@ -197,19 +186,15 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         defaultValues: {
             name: product?.name ?? "",
             brandId: product?.brandId ?? "",
-            categoryId: product?.categoryId ?? "",
             itemNumber: product?.itemNumber ?? "",
             description: product?.description ?? "",
             tags: (product?.tags as string[]) ?? [],
-            familyId: product?.familyId ?? null,
-            inheritsFamilyName: product?.inheritsFamilyName ?? false,
+            familyId: product?.familyId ?? "",
         },
     })
 
     const watchedFamilyId = form.watch("familyId")
-    const inheritsFamilyName = form.watch("inheritsFamilyName")
     const selectedFamily = families.find(f => f.id === watchedFamilyId)
-    const nameLocked = Boolean(inheritsFamilyName && watchedFamilyId)
 
     async function onSubmit(values: FormValues) {
         const incomplete = attributeDrafts.some(d => d.attributeId && !d.value.trim())
@@ -223,24 +208,17 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
             .map(d => ({ attributeId: d.attributeId, value: d.value.trim() }))
 
         const selectedFamilyName = families.find(f => f.id === values.familyId)?.name
-        const inherits = Boolean(values.inheritsFamilyName && values.familyId)
-        const resolvedName = inherits
-            ? (selectedFamilyName || values.name.trim())
-            : values.name.trim()
-
         const payload = {
-            name: resolvedName,
+            name: values.name.trim(),
             brandId: values.brandId.trim(),
-            categoryId: values.categoryId.trim(),
             itemNumber: values.itemNumber.trim(),
             description: values.description?.trim() || null,
             tags: values.tags,
             productAttributes,
-            familyId: values.familyId || null,
-            inheritsFamilyName: inherits,
+            familyId: values.familyId,
         }
 
-        const toastName = inherits ? (selectedFamilyName || resolvedName) : resolvedName
+        const toastName = values.name.trim()
 
         startTransition(async () => {
             try {
@@ -265,7 +243,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                 }
 
                 toast.success("تم إنشاء المنتج", {
-                    description: `تم إنشاء "${toastName}" — يمكنك إضافة الصور والتسعير`,
+                    description: `تم إنشاء "${toastName}"${selectedFamilyName ? ` تحت «${selectedFamilyName}»` : ""} — يمكنك إضافة الصور والتسعير`,
                 })
                 onSuccess?.()
                 router.push(`/products/${res.data.id}`)
@@ -291,29 +269,42 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
         router.refresh()
     }
 
+    const noFamilies = !isLoadingOptions && families.length === 0
+
     const basicFields = (
         <div className="space-y-5">
+            {noFamilies ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 space-y-2">
+                    <p className="text-sm font-medium text-destructive">لا يوجد منتجات رئيسية</p>
+                    <p className="text-xs text-muted-foreground">
+                        يجب إنشاء منتج رئيسي أولاً قبل إضافة أصناف — التصنيف يُربَط عبر المنتج الرئيسي.
+                    </p>
+                    <Link
+                        href="/product-families"
+                        className="inline-flex text-xs font-semibold text-primary hover:underline"
+                    >
+                        الذهاب إلى المنتجات الرئيسية
+                    </Link>
+                </div>
+            ) : null}
+
             <FormField
                 control={form.control}
                 name="familyId"
                 render={({ field }) => (
                     <FormItem>
-                        <FormLabel>المنتج الرئيسي</FormLabel>
+                        <FormLabel>المنتج الرئيسي <span className="text-destructive">*</span></FormLabel>
                         <Select
-                            onValueChange={(v) => {
-                                const next = v === NONE_FAMILY ? null : v
-                                field.onChange(next)
-                                if (!next) form.setValue("inheritsFamilyName", false)
-                            }}
-                            value={field.value || NONE_FAMILY}
+                            onValueChange={field.onChange}
+                            value={field.value || undefined}
+                            disabled={noFamilies}
                         >
                             <FormControl>
                                 <SelectTrigger className="w-full focus:ring-primary/20">
-                                    <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "بدون منتج رئيسي"} />
+                                    <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : noFamilies ? "لا توجد منتجات رئيسية" : "اختر المنتج الرئيسي"} />
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                <SelectItem value={NONE_FAMILY}>بدون منتج رئيسي</SelectItem>
                                 {families.map(f => (
                                     <SelectItem key={f.id} value={f.id}>
                                         {f.name}
@@ -324,50 +315,17 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <FormDescription className="text-xs">اختياري — لتجميع الأصناف المرتبطة</FormDescription>
+                        <FormDescription className="text-xs">إلزامي — التصنيف يُؤخذ من المنتج الرئيسي</FormDescription>
                         <FormMessage />
                     </FormItem>
                 )}
             />
 
-            {watchedFamilyId && selectedFamily ? (
+            {selectedFamily ? (
                 <div className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 space-y-1">
-                    <p className="text-xs text-muted-foreground">اسم المنتج الرئيسي</p>
-                    <p className="text-sm font-medium">
-                        {selectedFamily.name}
-                        <span className="text-muted-foreground font-mono text-xs mr-2" dir="ltr">
-                            ({selectedFamily.code})
-                        </span>
-                    </p>
+                    <p className="text-xs text-muted-foreground">تصنيف المنتج الرئيسي</p>
+                    <p className="text-sm font-medium">{selectedFamily.categoryName || "—"}</p>
                 </div>
-            ) : null}
-
-            {watchedFamilyId ? (
-                <FormField
-                    control={form.control}
-                    name="inheritsFamilyName"
-                    render={({ field }) => (
-                        <FormItem className="flex items-center justify-between gap-4 rounded-xl border border-border/50 px-4 py-3">
-                            <div className="space-y-0.5">
-                                <FormLabel className="text-sm">وراثة اسم المنتج من الرئيسي</FormLabel>
-                                <FormDescription className="text-xs">
-                                    يؤثّر على «اسم المنتج» فقط — اسم المنتج الرئيسي يبقى كما في الكتالوج
-                                </FormDescription>
-                            </div>
-                            <FormControl>
-                                <Switch
-                                    checked={field.value}
-                                    onCheckedChange={(checked) => {
-                                        field.onChange(checked)
-                                        if (checked && selectedFamily) {
-                                            form.setValue("name", selectedFamily.name)
-                                        }
-                                    }}
-                                />
-                            </FormControl>
-                        </FormItem>
-                    )}
-                />
             ) : null}
 
             <FormField
@@ -376,81 +334,48 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                 render={({ field }) => (
                     <FormItem>
                         <FormLabel>
-                            اسم المنتج {!nameLocked && <span className="text-destructive">*</span>}
+                            اسم المنتج <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
                             <Input
                                 placeholder="مثال: آيفون 15..."
                                 className="focus-visible:ring-primary/20"
                                 {...field}
-                                value={nameLocked ? (selectedFamily?.name ?? field.value) : field.value}
-                                disabled={nameLocked}
-                                readOnly={nameLocked}
                             />
                         </FormControl>
-                        {nameLocked ? (
-                            <FormDescription className="text-xs">
-                                اسم المنتج (موروث من المنتج الرئيسي)
-                            </FormDescription>
-                        ) : (
-                            <FormDescription className="text-xs">
-                                اسم هذا الصنف — مستقل عن اسم المنتج الرئيسي ما لم تُفعَّل الوراثة
-                            </FormDescription>
-                        )}
+                        <FormDescription className="text-xs">
+                            اسم هذا الصنف — مستقل عن اسم المنتج الرئيسي
+                        </FormDescription>
                         <FormMessage />
                     </FormItem>
                 )}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                    control={form.control}
-                    name="categoryId"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>التصنيف <span className="text-destructive">*</span></FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || undefined}>
-                                <FormControl>
-                                    <SelectTrigger className="w-full focus:ring-primary/20">
-                                        <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر التصنيف"} />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {categories.map(cat => (
-                                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="brandId"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>البراند <span className="text-destructive">*</span></FormLabel>
-                            <Select
-                                onValueChange={field.onChange}
-                                value={field.value || undefined}
-                            >
-                                <FormControl>
-                                    <SelectTrigger className="w-full focus:ring-primary/20">
-                                        <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر البراند"} />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {brands.map(b => (
-                                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </div>
+            <FormField
+                control={form.control}
+                name="brandId"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>البراند <span className="text-destructive">*</span></FormLabel>
+                        <Select
+                            onValueChange={field.onChange}
+                            value={field.value || undefined}
+                        >
+                            <FormControl>
+                                <SelectTrigger className="w-full focus:ring-primary/20">
+                                    <SelectValue placeholder={isLoadingOptions ? "جاري التحميل..." : "اختر البراند"} />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {brands.map(b => (
+                                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
 
             <FormField
                 control={form.control}
@@ -523,7 +448,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                     </Button>
                     <Button
                         type="submit"
-                        disabled={isPending}
+                        disabled={isPending || noFamilies}
                         className={product ? "flex-1 sm:flex-none bg-linear-to-l from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground shadow-md" : "flex-1"}
                     >
                         {isPending && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
@@ -568,7 +493,7 @@ export function ProductForm({ product, onSuccess }: ProductFormProps) {
                                         <Package className="w-5 h-5 text-primary" />
                                         <CardTitle className="text-lg">البيانات الأساسية</CardTitle>
                                     </div>
-                                    <CardDescription>اسم المنتج، اللون، المواصفة، والتصنيف</CardDescription>
+                                    <CardDescription>اسم المنتج، البراند، والمنتج الرئيسي</CardDescription>
                                 </CardHeader>
                                 <CardContent className="pt-6">{basicFields}</CardContent>
                             </Card>

@@ -36,7 +36,7 @@ export default async function SearchEnginePage() {
             {/* ── Page header ─────────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-4">
-                    <Link href="/inventory">
+                    <Link href="/products">
                         <Button variant="ghost" size="icon" className="rounded-full">
                             <ArrowRight className="w-5 h-5" />
                         </Button>

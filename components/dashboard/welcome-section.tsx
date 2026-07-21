@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Package, Users, TrendingUp, CalendarDays } from "lucide-react"
+import { Package, Users, CalendarDays } from "lucide-react"
 import Link from "next/link"
 
 export function WelcomeSection({ userName }: { userName: string }) {
@@ -15,7 +15,7 @@ export function WelcomeSection({ userName }: { userName: string }) {
     }
 
     const today = new Date()
-    const formattedDate = today.toLocaleDateString('ar-EG', {
+    const formattedDate = today.toLocaleDateString('ar-YE', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -44,7 +44,7 @@ export function WelcomeSection({ userName }: { userName: string }) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
-                    <Link href="/inventory">
+                    <Link href="/products">
                         <Button size="sm" className="rounded-lg font-semibold gap-1.5 shadow-sm transition-all hover:-translate-y-0.5">
                             <Package className="size-4" />
                             إضافة منتج
@@ -56,10 +56,6 @@ export function WelcomeSection({ userName }: { userName: string }) {
                             إضافة عميل
                         </Button>
                     </Link>
-                    <Button variant="ghost" size="sm" className="rounded-lg font-semibold gap-1.5 text-muted-foreground hover:bg-muted/50 transition-colors">
-                        <TrendingUp className="size-4" />
-                        التقارير
-                    </Button>
                 </div>
             </div>
         </div>

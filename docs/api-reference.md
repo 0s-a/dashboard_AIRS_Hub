@@ -223,22 +223,23 @@ GET /api/v1/bot/customers/{uuid}/pricing
 
 ## Products API
 
-### `GET /products/search` — بحث بالاسم أو رقم الصنف
+### `GET /products/search` — بحث مجمّع حسب المنتج الرئيسي
 
-بحث Meilisearch-first (fuzzy + full-text + typo + تطبيع عربي بما فيه `ى→ي` وحقل `searchText`) مع hydrate من Prisma. تفكيك حذر لـ `q` إلى `brand`/`attr` (افتراضي؛ `parse=false` للتعطيل) مع أولوية للفلاتر الصريحة وإعادة محاولة بدون الفلاتر المستخرجة عند الصفر (`meta.parsed.relaxed`). رقم صنف وحيد يُرجع فوراً بدون Meili. عند تعطّل Meili يُستخدم Prisma بفلاتر exact وILIKE على النص (`engine` في الـ meta).
+بحث Meilisearch-first ثم hydrate من Prisma. **`data[]` دائماً عائلات**: كل عنصر = منتج رئيسي + `products[]` للأصناف **المطابقة فقط**. `page`/`limit` بعدد العائلات (مع over-fetch داخلي). تفكيك حذر لـ `q` (`parse` افتراضي true). رقم صنف وحيد → عائلة واحدة مع `skuMatch: true`. عند تعطّل Meili: Prisma fallback.
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `q` | string | **مطلوب** — اسم أو رقم أو اسم بديل أو براند أو صفة |
-| `brand` | string | اختياري صريح — تطابق كامل لاسم العلامة بعد التطبيع (يتفوّق على المستخرج) |
-| `attr` | string (متكرر) | اختياري — تطابق كامل لقيمة صفة بعد التطبيع؛ عدة `attr` = AND |
+| `brand` | string | اختياري صريح — تطابق كامل لاسم العلامة بعد التطبيع |
+| `attr` | string (متكرر) | اختياري — تطابق كامل لقيمة صفة؛ عدة `attr` = AND |
 | `available` | boolean | اختياري — `true` للمتاح فقط / `false` لغير المتاح |
 | `parse` | boolean | اختياري — افتراضي `true`؛ `false` يعطّل تفكيك `q` |
-| `page` / `limit` | number | pagination (حد أقصى 50) |
+| `familyCode` | string | اختياري — كود المنتج الرئيسي؛ غير موجود → نتائج فارغة |
+| `page` / `limit` | number | صفحات **العائلات** (حد أقصى 50) |
 
-**الاستجابة:** معلومات أساسية فقط (`id`, `itemNumber`, `name`, `isAvailable`, `brand`, `category`, `attributes`) — بدون أسعار أو صور. الـ meta يتضمن `engine: "meili" | "prisma"` و`parsed?: { brand?, attr[], residualQ, relaxed? }`.
+**الاستجابة:** عناصر من شكل `{ family, category, brand, matchCount, products[] }` بدون أسعار/صور. الـ meta: `engine`, `hasMore`, `skuMatch?`, `parsed?`, و`pagination.total` تقديري للعائلات.
 
-**بعد الشحن:** من لوحة search-engine نفّذ مزامنة كاملة مرة واحدة لفهرسة `searchText` والتطبيع الجديد.
+**بعد الشحن:** إن لزم، مزامنة Meili من لوحة search-engine لتفعيل فلتر `familyId`.
 
 ---
 

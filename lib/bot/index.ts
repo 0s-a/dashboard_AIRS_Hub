@@ -19,7 +19,8 @@ export {
 export type {
     ProductSearchQuery,
     ProductSearchResult,
-    ProductSearchSibling,
+    ProductSearchFamilyGroup,
+    ProductSearchProduct,
     ProductSearchMeta,
     ProductSearchParsedMeta,
     SearchEngine,

@@ -8,16 +8,15 @@ import {
     normalizeItemNumberForSearch,
     normalizeSearchQuery,
 } from '@/lib/bot/normalize-search-query'
-import { resolveProductDisplayName } from '@/lib/utils/product-display-name'
 
 const BATCH_SIZE = 500
 
 export interface MeiliProductDocument {
     id:               string
     itemNumber:       string | null
-    /** Indexed display name (family name when inheriting) */
+    /** Indexed name (= Product.name; displayName synonym) */
     name:             string
-    /** Stored product.name — searchable via searchText when different from display */
+    /** Same as name — kept for document shape / searchText compat */
     productName:      string
     familyId:         string | null
     brand:            string | null
@@ -45,6 +44,8 @@ export interface SearchProductIdsOptions {
     brand?: string
     attributeValues?: string[]
     isAvailable?: boolean
+    /** Restrict to a ProductFamily id */
+    familyId?: string
     /** Exclude a document id (e.g. exact SKU already pinned on page 1) */
     excludeId?: string
 }
@@ -76,8 +77,13 @@ export interface MeiliSearchResult {
 
 const MEILI_PRODUCT_INCLUDE = {
     brandRef: { select: { name: true } },
-    category: { select: { name: true } },
-    family: { select: { id: true, name: true } },
+    family: {
+        select: {
+            id: true,
+            name: true,
+            category: { select: { name: true } },
+        },
+    },
     productAttributes: {
         include: { attribute: { select: { name: true, code: true } } },
     },
@@ -114,28 +120,22 @@ function toMeiliDocument(product: any): MeiliProductDocument {
             : null
 
     const productNameRaw = product.name ?? ''
-    const displayRaw = resolveProductDisplayName({
-        name: productNameRaw,
-        inheritsFamilyName: product.inheritsFamilyName,
-        family: product.family,
-    })
-    const name = normalizeSearchQuery(displayRaw)
-    const productName = normalizeSearchQuery(productNameRaw)
+    const name = normalizeSearchQuery(productNameRaw)
+    const productName = name
     const familyName = product.family?.name
         ? normalizeSearchQuery(product.family.name)
         : null
     const brand = product.brandRef?.name
         ? normalizeSearchQuery(product.brandRef.name)
         : null
-    const category = product.category?.name
-        ? normalizeSearchQuery(product.category.name)
+    const category = product.family?.category?.name
+        ? normalizeSearchQuery(product.family.category.name)
         : null
     const tags = normalizeTextList(product.tags)
     const alternativeNames = normalizeTextList(product.alternativeNames)
 
     const searchText = [
         name,
-        productName !== name ? productName : null,
         familyName && familyName !== name ? familyName : null,
         ...alternativeNames,
         brand,
@@ -180,6 +180,9 @@ function buildProductSearchFilter(options: SearchProductIdsOptions): string | un
     }
     if (options.isAvailable !== undefined) {
         parts.push(`isAvailable = ${options.isAvailable}`)
+    }
+    if (options.familyId) {
+        parts.push(`familyId = "${escapeMeiliFilterValue(options.familyId)}"`)
     }
     if (options.excludeId) {
         parts.push(`id != "${escapeMeiliFilterValue(options.excludeId)}"`)

@@ -7,7 +7,7 @@ import type { BrandPayload } from '@/lib/types/brand'
 import { BRAND_CODE_CONFIG } from '@/lib/config/product-number.config'
 
 // Paths to revalidate after any write operation
-const REVALIDATE_PATHS = ['/brands', '/inventory']
+const REVALIDATE_PATHS = ['/brands', '/products']
 const BRAND_CODE_REGEX = BRAND_CODE_CONFIG.pattern
 
 // ─── READ ─────────────────────────────────────────────────────

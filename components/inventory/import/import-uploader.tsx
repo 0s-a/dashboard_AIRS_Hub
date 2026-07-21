@@ -32,7 +32,7 @@ export function ImportUploader({ onDataParsed }: ImportUploaderProps) {
                     _id: `row-${index}-${Date.now()}`,
                     name: row.name || '',
                     itemNumber: row.itemNumber || '',
-                    categoryCode: row.categoryCode || '',
+                    familyCode: row.familyCode || '',
                     brandCode: row.brandCode || '',
                     color: row.color || '',
                     size: row.size || row.sizeLabel || '',
@@ -107,21 +107,21 @@ export function ImportUploader({ onDataParsed }: ImportUploaderProps) {
                             <tr>
                                 <td className="px-4 py-2 text-muted-foreground">2</td>
                                 <td className="px-4 py-2 font-mono text-xs text-primary">itemNumber</td>
-                                <td className="px-4 py-2">رقم الصنف (الباركود)</td>
+                                <td className="px-4 py-2">رقم الصنف</td>
                                 <td className="px-4 py-2">نص/أرقام (String)</td>
                                 <td className="px-4 py-2"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-400">إلزامي (فريد)</span></td>
                             </tr>
                             <tr>
                                 <td className="px-4 py-2 text-muted-foreground">3</td>
-                                <td className="px-4 py-2 font-mono text-xs text-primary">categoryCode</td>
-                                <td className="px-4 py-2">كود التصنيف (1–3 خانات)</td>
-                                <td className="px-4 py-2 font-mono text-xs text-muted-foreground">نص قصير (Code)</td>
+                                <td className="px-4 py-2 font-mono text-xs text-primary">familyCode</td>
+                                <td className="px-4 py-2">كود المنتج الرئيسي (موجود مسبقاً)</td>
+                                <td className="px-4 py-2 font-mono text-xs text-muted-foreground">نص (Code)</td>
                                 <td className="px-4 py-2"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-400">إلزامي</span></td>
                             </tr>
                             <tr>
                                 <td className="px-4 py-2 text-muted-foreground">4</td>
                                 <td className="px-4 py-2 font-mono text-xs text-primary">brandCode</td>
-                                <td className="px-4 py-2">كود البرند (خانتان)</td>
+                                <td className="px-4 py-2">كود البراند (خانتان)</td>
                                 <td className="px-4 py-2 font-mono text-xs text-muted-foreground">نص قصير (Code)</td>
                                 <td className="px-4 py-2"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full dark:bg-red-900/30 dark:text-red-400">إلزامي</span></td>
                             </tr>

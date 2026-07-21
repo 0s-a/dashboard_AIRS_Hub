@@ -163,11 +163,6 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{product.name}</h1>
-                                {product.inheritsFamilyName && product.family && (
-                                    <Badge variant="secondary" className="text-[10px]">
-                                        موروث من الرئيسي
-                                    </Badge>
-                                )}
                                 <AvailabilityBadge available={available} />
                             </div>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">

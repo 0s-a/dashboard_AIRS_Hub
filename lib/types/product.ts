@@ -22,9 +22,7 @@ export interface ProductInput {
     slug?: string
     brandId: string
     description?: string | null
-    categoryId: string
-    familyId?: string | null
-    inheritsFamilyName?: boolean
+    familyId: string
     productAttributes?: ProductAttributeInput[]
     alternativeNames?: string[]
     tags?: string[]
@@ -85,6 +83,7 @@ export type PaginationMeta = {
 export type ProductsFilters = {
     search?: string
     categoryId?: string
+    familyId?: string
     brandId?: string
     hasPrices?: boolean
     isAvailable?: boolean
@@ -99,6 +98,7 @@ export type SerializedProduct = {
     itemNumber: string
     slug: string
     name: string
+    /** Alias of name — kept for Bot API compatibility */
     displayName: string
     brandId: string
     brandRef: {
@@ -112,9 +112,8 @@ export type SerializedProduct = {
     tags: string[]
     categoryId: string
     category: SerializedCategory
-    familyId: string | null
-    family: SerializedProductFamilyRef | null
-    inheritsFamilyName: boolean
+    familyId: string
+    family: SerializedProductFamilyRef
     productAttributes: SerializedProductAttribute[]
     isAvailable: boolean
     order: number

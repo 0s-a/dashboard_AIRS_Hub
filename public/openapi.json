@@ -518,8 +518,8 @@
         "tags": [
           "Products"
         ],
-        "summary": "بحث منتجات بالاسم أو رقم الصنف",
-        "description": "بحث Meilisearch-first (fuzzy + full-text + typo + تطبيع عربي بما فيه ى→ي وsearchText) ثم hydrate من Prisma. تفكيك حذر لـ q إلى brand/attr (افتراضي ON؛ parse=false للتعطيل) مع أولوية للفلاتر الصريحة وrelax عند الصفر. رقم صنف وحيد يُرجع فوراً. فلاتر brand و attr بتطابق كامل بعد التطبيع (AND). عند تعطّل Meili: fallback Prisma بفلاتر exact وILIKE على q مع meta.engine=prisma. meta.parsed يوضح ما طُبّق. يعيد معلومات أساسية فقط بدون أسعار أو صور. بعد تغيير الفهرس: مزامنة كاملة من لوحة search-engine.",
+        "summary": "بحث منتجات مجمّع حسب المنتج الرئيسي",
+        "description": "بحث Meilisearch-first ثم hydrate من Prisma. الاستجابة دائماً قائمة عائلات: كل عنصر = منتج رئيسي + products[] للأصناف المطابقة فقط. page/limit بعدد العائلات (مع over-fetch داخلي). تفكيك حذر لـ q (parse افتراضي true). رقم صنف وحيد → عائلة واحدة مع meta.skuMatch=true. فلتر familyCode اختياري. meta يتضمن engine و hasMore و total تقديري و parsed.",
         "operationId": "searchProducts",
         "parameters": [
           {
@@ -537,7 +537,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "فلتر اختياري صريح — تطابق كامل لاسم العلامة بعد التطبيع (يتفوّق على المستخرج من q)"
+            "description": "فلتر اختياري صريح — تطابق كامل لاسم العلامة بعد التطبيع"
           },
           {
             "name": "attr",
@@ -545,7 +545,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "فلتر اختياري قابل للتكرار — تطابق كامل لقيمة صفة بعد التطبيع. عدة قيم = AND (?attr=أحمر&attr=L)"
+            "description": "فلتر اختياري قابل للتكرار — تطابق كامل لقيمة صفة. عدة قيم = AND"
           },
           {
             "name": "available",
@@ -562,7 +562,15 @@
               "type": "boolean",
               "default": true
             },
-            "description": "عند true (افتراضي): استخراج brand/attr عالي الثقة من q. عند false: تعطيل التفكيك"
+            "description": "عند true (افتراضي): استخراج brand/attr من q. عند false: تعطيل التفكيك"
+          },
+          {
+            "name": "familyCode",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "فلتر اختياري — كود المنتج الرئيسي (ProductFamily.code). كود غير موجود → نتائج فارغة"
           },
           {
             "name": "page",
@@ -570,7 +578,8 @@
             "schema": {
               "type": "integer",
               "default": 1
-            }
+            },
+            "description": "رقم صفحة العائلات"
           },
           {
             "name": "limit",
@@ -579,12 +588,13 @@
               "type": "integer",
               "default": 20,
               "maximum": 50
-            }
+            },
+            "description": "أقصى عدد عائلات في الصفحة"
           }
         ],
         "responses": {
           "200": {
-            "description": "نتائج",
+            "description": "نتائج مجمّعة حسب المنتج الرئيسي",
             "content": {
               "application/json": {
                 "schema": {
@@ -599,58 +609,42 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "itemNumber": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string",
-                            "description": "اسم المنتج المخزّن (Product.name)"
-                          },
-                          "displayName": {
-                            "type": "string",
-                            "description": "اسم العرض (اسم العائلة عند الوراثة)"
-                          },
-                          "familyId": {
-                            "type": "string",
-                            "format": "uuid",
-                            "nullable": true
-                          },
                           "family": {
                             "type": "object",
-                            "nullable": true,
                             "properties": {
                               "id": { "type": "string", "format": "uuid" },
                               "code": { "type": "string" },
                               "name": { "type": "string" }
                             }
                           },
-                          "isAvailable": {
-                            "type": "boolean"
+                          "category": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string", "format": "uuid" },
+                              "name": { "type": "string" }
+                            }
                           },
                           "brand": {
                             "type": "object",
-                            "nullable": true
+                            "nullable": true,
+                            "description": "براند أول صنف مطابق في ترتيب الظهور"
                           },
-                          "category": {
-                            "type": "object"
+                          "matchCount": {
+                            "type": "integer"
                           },
-                          "attributes": {
-                            "type": "array"
-                          },
-                          "siblings": {
+                          "products": {
                             "type": "array",
-                            "description": "منتجات أخرى في نفس العائلة (بدون السعر الحالي)",
+                            "description": "الأصناف المطابقة لهذا الاستعلام فقط",
                             "items": {
                               "type": "object",
                               "properties": {
                                 "id": { "type": "string", "format": "uuid" },
                                 "itemNumber": { "type": "string" },
                                 "name": { "type": "string" },
-                                "displayName": { "type": "string" },
+                                "displayName": {
+                                  "type": "string",
+                                  "description": "مرادف لـ name"
+                                },
                                 "isAvailable": { "type": "boolean" },
                                 "attributes": { "type": "array" }
                               }
@@ -660,39 +654,38 @@
                       }
                     },
                     "count": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "عدد العائلات في هذه الصفحة"
                     },
                     "pagination": {
-                      "$ref": "#/components/schemas/PaginationMeta"
+                      "$ref": "#/components/schemas/PaginationMeta",
+                      "description": "total تقديري على مستوى العائلات"
+                    },
+                    "hasMore": {
+                      "type": "boolean",
+                      "description": "هل توجد عائلات إضافية بعد هذه الصفحة"
                     },
                     "engine": {
                       "type": "string",
                       "enum": [
                         "meili",
                         "prisma"
-                      ],
-                      "description": "محرك البحث المستخدم لهذه الاستجابة"
+                      ]
+                    },
+                    "skuMatch": {
+                      "type": "boolean",
+                      "description": "true عند مسار رقم الصنف السريع"
                     },
                     "parsed": {
                       "type": "object",
-                      "description": "نتيجة تفكيك q (إن وُجد)",
                       "properties": {
-                        "brand": {
-                          "type": "string"
-                        },
+                        "brand": { "type": "string" },
                         "attr": {
                           "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
+                          "items": { "type": "string" }
                         },
-                        "residualQ": {
-                          "type": "string"
-                        },
-                        "relaxed": {
-                          "type": "boolean",
-                          "description": "true إذا أُعيد البحث بدون فلاتر مستخرجة بعد صفر نتائج"
-                        }
+                        "residualQ": { "type": "string" },
+                        "relaxed": { "type": "boolean" }
                       }
                     }
                   }

@@ -81,20 +81,30 @@
       "id": "sku-single-token",
       "q": "NOTE: replace with a real itemNumber from your DB",
       "skip": true,
-      "expectMinResults": 1
+      "expectMinResults": 1,
+      "expectFamilyShape": true
     },
     {
       "id": "loose-phrase",
       "q": "قميص",
       "parse": true,
       "expectMinResults": 0,
-      "note": "Smoke — adjust expectMinResults after seeding"
+      "expectFamilyShape": true,
+      "note": "Smoke — results must be family groups when count > 0"
     },
     {
       "id": "parse-false",
       "q": "قميص",
       "parse": false,
-      "expectMinResults": 0
+      "expectMinResults": 0,
+      "expectFamilyShape": true
+    },
+    {
+      "id": "unknown-family-code",
+      "q": "قميص",
+      "familyCode": "__no_such_family__",
+      "expectMinResults": 0,
+      "expectFamilyShape": true
     }
   ]
 }

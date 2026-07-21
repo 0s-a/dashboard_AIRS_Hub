@@ -36,7 +36,9 @@ type GoldFile = {
         parse?: boolean
         brand?: string
         attr?: string[]
+        familyCode?: string
         expectMinResults?: number
+        expectFamilyShape?: boolean
         skip?: boolean
         note?: string
     }>
@@ -135,19 +137,43 @@ async function main() {
                 brand: c.brand,
                 attr: c.attr ?? [],
                 parse: c.parse ?? true,
+                familyCode: c.familyCode,
                 page: 1,
                 limit: 20,
             })
             const min = c.expectMinResults ?? 0
-            if (results.length >= min) {
-                console.log(
-                    `  PASS ${c.id} (count=${results.length}, engine=${meta.engine})`
+            let ok = results.length >= min
+            if (ok && c.expectFamilyShape && results.length > 0) {
+                const g = results[0] as {
+                    family?: { id?: string; code?: string; name?: string }
+                    products?: unknown[]
+                    matchCount?: number
+                }
+                ok = Boolean(
+                    g.family?.id &&
+                        g.family?.code &&
+                        Array.isArray(g.products) &&
+                        typeof g.matchCount === 'number'
                 )
-            } else {
+                if (!ok) {
+                    console.error(`  FAIL ${c.id} expected family group shape`, g)
+                }
+            }
+            if (ok && typeof meta.hasMore !== 'boolean') {
+                ok = false
+                console.error(`  FAIL ${c.id} meta.hasMore missing`)
+            }
+            if (ok) {
+                console.log(
+                    `  PASS ${c.id} (families=${results.length}, engine=${meta.engine}, hasMore=${meta.hasMore})`
+                )
+            } else if (results.length < min) {
                 failed++
                 console.error(
                     `  FAIL ${c.id} expected >= ${min}, got ${results.length}`
                 )
+            } else {
+                failed++
             }
         }
     } catch (err) {

@@ -24,9 +24,13 @@ function validateFamilyPayload(data: ProductFamilyPayload) {
         throw new Error('كود المنتج الرئيسي: حروف/أرقام إنجليزية، ويمكن شرطة أو شرطة سفلية (حتى 32 خانة)')
     }
 
+    const categoryId = data.categoryId?.trim()
+    if (!categoryId) throw new Error('التصنيف مطلوب')
+
     return {
         name,
         code,
+        categoryId,
         description: data.description?.trim() || null,
     }
 }
@@ -53,7 +57,10 @@ export async function getProductFamilies() {
             await requireAuth()
             return prisma.productFamily.findMany({
                 orderBy: { name: 'asc' },
-                include: { _count: { select: { products: true } } },
+                include: {
+                    category: { select: { id: true, name: true, code: true } },
+                    _count: { select: { products: true } },
+                },
             })
         },
         'تعذّر جلب المنتجات الرئيسية'
@@ -68,6 +75,11 @@ export async function createProductFamily(data: ProductFamilyPayload) {
         async () => {
             await requireAuth()
             const payload = validateFamilyPayload(data)
+            const category = await prisma.category.findUnique({
+                where: { id: payload.categoryId },
+                select: { id: true },
+            })
+            if (!category) throw new Error('التصنيف غير موجود')
             return prisma.productFamily.create({ data: payload })
         },
         REVALIDATE_PATHS,
@@ -81,13 +93,14 @@ export async function updateProductFamily(id: string, data: ProductFamilyPayload
         async () => {
             await requireAuth()
             const payload = validateFamilyPayload(data)
+            const category = await prisma.category.findUnique({
+                where: { id: payload.categoryId },
+                select: { id: true },
+            })
+            if (!category) throw new Error('التصنيف غير موجود')
             const updated = await prisma.productFamily.update({
                 where: { id },
                 data: payload,
-            })
-            await prisma.product.updateMany({
-                where: { familyId: id, inheritsFamilyName: true },
-                data: { name: payload.name },
             })
             reindexFamilyProducts(id)
             return updated

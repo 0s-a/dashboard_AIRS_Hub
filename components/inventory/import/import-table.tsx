@@ -7,18 +7,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CheckCircle2, XCircle, Trash2, Save } from 'lucide-react'
 
-import { SerializedCategory } from '@/lib/types/product'
+type FamilyOption = { id: string; code: string; name: string }
 
 interface ImportTableProps {
     rows: ValidatedRow[]
     onRowChange: (id: string, field: keyof ValidatedRow, value: string) => void
     onRemoveRow: (id: string) => void
     onImportRow?: (id: string) => void
-    categories?: SerializedCategory[]
-    brands?: any[]
+    families?: FamilyOption[]
+    brands?: { id: string; code: string; name: string }[]
 }
 
-export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categories = [], brands = [] }: ImportTableProps) {
+export function ImportTable({
+    rows,
+    onRowChange,
+    onRemoveRow,
+    onImportRow,
+    families = [],
+    brands = [],
+}: ImportTableProps) {
     const [animationParent] = useAutoAnimate()
 
     if (rows.length === 0) {
@@ -28,7 +35,7 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
     return (
         <div className="rounded-md border overflow-hidden">
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
+                <table className="w-full text-sm text-right">
                     <thead className="bg-muted/50 text-muted-foreground uppercase text-xs">
                         <tr>
                             <th className="px-4 py-3 font-medium text-right w-10">الحالة</th>
@@ -37,8 +44,10 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                             <th className="px-4 py-3 font-medium text-right min-w-[100px]">اللون (color)</th>
                             <th className="px-4 py-3 font-medium text-right min-w-[100px]">المقاس (size)</th>
                             <th className="px-4 py-3 font-medium text-right min-w-[100px]">السعة (capacity)</th>
-                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">كود التصنيف (categoryCode)</th>
-                            <th className="px-4 py-3 font-medium text-right min-w-[120px]">كود البرند (brandCode)</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[100px]">الحجم (volume)</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[100px]">الوزن (weight)</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[150px]">كود المنتج الرئيسي (familyCode)</th>
+                            <th className="px-4 py-3 font-medium text-right min-w-[120px]">كود البراند (brandCode)</th>
                             <th className="px-4 py-3 font-medium text-right w-16">إجراء</th>
                         </tr>
                     </thead>
@@ -95,10 +104,26 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                                 </td>
                                 <td className="px-4 py-2">
                                     <Input
-                                        list="categories-datalist"
-                                        value={row.categoryCode}
-                                        onChange={(e) => onRowChange(row._id, 'categoryCode', e.target.value)}
-                                        className={`h-8 font-mono text-xs ${!row.isValid && row.errors.some(e => e.includes('التصنيف')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                        value={row.volume ?? ''}
+                                        onChange={(e) => onRowChange(row._id, 'volume', e.target.value)}
+                                        className="h-8"
+                                        dir="ltr"
+                                    />
+                                </td>
+                                <td className="px-4 py-2">
+                                    <Input
+                                        value={row.weight ?? ''}
+                                        onChange={(e) => onRowChange(row._id, 'weight', e.target.value)}
+                                        className="h-8"
+                                        dir="ltr"
+                                    />
+                                </td>
+                                <td className="px-4 py-2">
+                                    <Input
+                                        list="families-datalist"
+                                        value={row.familyCode}
+                                        onChange={(e) => onRowChange(row._id, 'familyCode', e.target.value)}
+                                        className={`h-8 font-mono text-xs ${!row.isValid && row.errors.some(e => e.includes('المنتج الرئيسي')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                                         placeholder="أدخل الكود..."
                                     />
                                 </td>
@@ -107,7 +132,7 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                                         list="brands-datalist"
                                         value={row.brandCode}
                                         onChange={(e) => onRowChange(row._id, 'brandCode', e.target.value)}
-                                        className={`h-8 font-mono text-xs ${!row.isValid && row.errors.some(e => e.includes('البرند')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                        className={`h-8 font-mono text-xs ${!row.isValid && row.errors.some(e => e.includes('البراند')) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                                         placeholder="أدخل الكود..."
                                     />
                                 </td>
@@ -140,7 +165,7 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                     </tbody>
                 </table>
             </div>
-            
+
             {rows.some(r => !r.isValid) && (
                 <div className="bg-destructive/10 p-3 text-sm text-destructive border-t">
                     <p className="font-semibold mb-1">تفاصيل الأخطاء:</p>
@@ -152,10 +177,9 @@ export function ImportTable({ rows, onRowChange, onRemoveRow, onImportRow, categ
                 </div>
             )}
 
-            {/* Datalists for Combobox functionality */}
-            <datalist id="categories-datalist">
-                {categories.map(c => (
-                    <option key={c.id} value={c.code}>{c.name}</option>
+            <datalist id="families-datalist">
+                {families.map(f => (
+                    <option key={f.id} value={f.code}>{f.name}</option>
                 ))}
             </datalist>
             <datalist id="brands-datalist">

@@ -19,11 +19,18 @@ interface BrandOption {
     code: string | null
 }
 
+interface FamilyOption {
+    id: string
+    name: string
+    code: string
+}
+
 interface ProductsTableProps {
     initialProducts: SerializedProduct[]
     initialPagination: PaginationMeta
     filterCategories: FilterOption[]
     filterBrands: BrandOption[]
+    filterFamilies: FamilyOption[]
     onRefresh?: () => void | Promise<void>
 }
 
@@ -34,6 +41,7 @@ export function ProductsTable({
     initialPagination,
     filterCategories,
     filterBrands,
+    filterFamilies,
     onRefresh,
 }: ProductsTableProps) {
     const [isPending, startTransition] = useTransition()
@@ -44,6 +52,7 @@ export function ProductsTable({
     const [limit, setLimit] = useState(initialPagination.limit)
     const [categoryId, setCategoryId] = useState<string | undefined>()
     const [brandId, setBrandId] = useState<string | undefined>()
+    const [familyId, setFamilyId] = useState<string | undefined>()
 
     const tableColumns = useMemo(() => {
         return columns.map(col => {
@@ -65,16 +74,28 @@ export function ProductsTable({
                     },
                 }
             }
+            if (col.id === "family") {
+                return {
+                    ...col,
+                    meta: {
+                        ...col.meta,
+                        filterOptions: (filterFamilies || []).map(f => ({
+                            label: `${f.name} (${f.code})`,
+                            value: f.id,
+                        })),
+                    },
+                }
+            }
             return col
         })
-    }, [filterCategories, filterBrands])
+    }, [filterCategories, filterBrands, filterFamilies])
 
     const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const filtersRef = useRef({ search, page, limit, categoryId, brandId })
+    const filtersRef = useRef({ search, page, limit, categoryId, brandId, familyId })
 
     useEffect(() => {
-        filtersRef.current = { search, page, limit, categoryId, brandId }
-    }, [search, page, limit, categoryId, brandId])
+        filtersRef.current = { search, page, limit, categoryId, brandId, familyId }
+    }, [search, page, limit, categoryId, brandId, familyId])
 
     useEffect(() => {
         return () => {
@@ -86,6 +107,7 @@ export function ProductsTable({
         search?: string
         categoryId?: string
         brandId?: string
+        familyId?: string
         page?: number
         limit?: number
     }) => {
@@ -95,6 +117,7 @@ export function ProductsTable({
                     search: params.search,
                     categoryId: params.categoryId,
                     brandId: params.brandId,
+                    familyId: params.familyId,
                     page: params.page ?? 1,
                     limit: params.limit ?? limit,
                     sortBy: "createdAt",
@@ -116,6 +139,7 @@ export function ProductsTable({
             search: f.search || undefined,
             categoryId: f.categoryId,
             brandId: f.brandId,
+            familyId: f.familyId,
             limit: f.limit,
         }
     }, [])
@@ -132,13 +156,16 @@ export function ProductsTable({
     const handleColumnFiltersChange = (filters: ColumnFiltersState) => {
         const nextBrand = filters.find(f => f.id === "brand")?.value as string | undefined
         const nextCategory = filters.find(f => f.id === "category")?.value as string | undefined
+        const nextFamily = filters.find(f => f.id === "family")?.value as string | undefined
         setBrandId(nextBrand)
         setCategoryId(nextCategory)
+        setFamilyId(nextFamily)
         setPage(1)
         fetchProducts({
             ...currentFilters(),
             brandId: nextBrand,
             categoryId: nextCategory,
+            familyId: nextFamily,
             page: 1,
         })
     }
@@ -149,6 +176,7 @@ export function ProductsTable({
             search: f.search || undefined,
             categoryId: f.categoryId,
             brandId: f.brandId,
+            familyId: f.familyId,
             limit: f.limit,
             page: f.page,
         })

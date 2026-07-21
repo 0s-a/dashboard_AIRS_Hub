@@ -8,6 +8,8 @@ export type ProductFamilyRow = {
     name: string
     code: string
     description: string | null
+    categoryId: string
+    category: { id: string; name: string; code: string }
     createdAt: Date
     _count: { products: number }
 }
@@ -15,12 +17,13 @@ export type ProductFamilyRow = {
 /** Minimal family data needed by the edit form & sheet */
 export type ProductFamilyFormData = Pick<
     ProductFamilyRow,
-    'id' | 'name' | 'code' | 'description'
+    'id' | 'name' | 'code' | 'description' | 'categoryId'
 >
 
 /** Payload sent to createProductFamily / updateProductFamily */
 export type ProductFamilyPayload = {
     name: string
     code: string
+    categoryId: string
     description?: string | null
 }

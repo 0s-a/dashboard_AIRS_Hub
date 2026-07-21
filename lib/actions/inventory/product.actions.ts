@@ -21,15 +21,8 @@ function normalizeItemNumber(input: string | null | undefined): string | null {
 }
 
 function requireProductFields(data: Partial<ProductInput>, mode: 'create' | 'update') {
-    const inherits = Boolean(data.inheritsFamilyName)
-    const hasFamily = Boolean(data.familyId?.trim())
-
-    if (inherits && !hasFamily && (mode === 'create' || data.inheritsFamilyName !== undefined || data.familyId !== undefined)) {
-        // validated later with resolveFamilyFields; skip name if inheriting with family
-    }
-
     if (mode === 'create' || data.name !== undefined) {
-        if (!inherits && !data.name?.trim()) return 'اسم المنتج مطلوب'
+        if (!data.name?.trim()) return 'اسم المنتج مطلوب'
     }
     if (mode === 'create' || data.itemNumber !== undefined) {
         if (!normalizeItemNumber(data.itemNumber)) return 'رقم الصنف مطلوب'
@@ -37,63 +30,24 @@ function requireProductFields(data: Partial<ProductInput>, mode: 'create' | 'upd
     if (mode === 'create' || data.brandId !== undefined) {
         if (!data.brandId?.trim()) return 'البراند مطلوب'
     }
-    if (mode === 'create' || data.categoryId !== undefined) {
-        if (!data.categoryId?.trim()) return 'التصنيف مطلوب'
+    if (mode === 'create' || data.familyId !== undefined) {
+        if (!data.familyId?.trim()) return 'المنتج الرئيسي مطلوب'
     }
     return null
 }
 
-type ResolvedFamilyFields = {
-    familyId: string | null
-    inheritsFamilyName: boolean
-    name: string
-}
-
-async function resolveFamilyFields(
-    data: Partial<ProductInput>,
-    existing?: { name: string; familyId: string | null; inheritsFamilyName: boolean },
+async function requireFamilyId(
+    familyId: string | null | undefined,
     tx: Prisma.TransactionClient = prisma
-): Promise<ResolvedFamilyFields> {
-    const familyId =
-        data.familyId !== undefined
-            ? (data.familyId?.trim() || null)
-            : (existing?.familyId ?? null)
-
-    let inheritsFamilyName =
-        data.inheritsFamilyName !== undefined
-            ? Boolean(data.inheritsFamilyName)
-            : (existing?.inheritsFamilyName ?? false)
-
-    if (!familyId) {
-        inheritsFamilyName = false
-    }
-
-    if (inheritsFamilyName && !familyId) {
-        throw new Error('لا يمكن وراثة الاسم بدون منتج رئيسي')
-    }
-
-    let familyName: string | null = null
-    if (familyId) {
-        const family = await tx.productFamily.findUnique({
-            where: { id: familyId },
-            select: { name: true },
-        })
-        if (!family) throw new Error('المنتج الرئيسي غير موجود')
-        familyName = family.name
-    }
-
-    let name =
-        data.name !== undefined
-            ? (data.name?.trim() || '')
-            : (existing?.name ?? '')
-
-    if (inheritsFamilyName && familyName) {
-        name = familyName
-    } else if (!name) {
-        throw new Error('اسم المنتج مطلوب')
-    }
-
-    return { familyId, inheritsFamilyName, name }
+): Promise<string> {
+    const id = familyId?.trim()
+    if (!id) throw new Error('المنتج الرئيسي مطلوب')
+    const family = await tx.productFamily.findUnique({
+        where: { id },
+        select: { id: true },
+    })
+    if (!family) throw new Error('المنتج الرئيسي غير موجود')
+    return id
 }
 
 async function replaceProductAttributes(
@@ -121,23 +75,22 @@ export async function createProduct(data: ProductInput) {
         const { alternativeNames, tags, slug: inputSlug, itemNumber, productAttributes } = data
         const normalizedItemNumber = normalizeItemNumber(itemNumber)!
         const attrs = normalizeAttributeInputs(productAttributes)
+        const name = data.name.trim()
 
         const product = await prisma.$transaction(async (tx) => {
-            const familyFields = await resolveFamilyFields(data, undefined, tx)
+            const familyId = await requireFamilyId(data.familyId, tx)
 
             const slug = inputSlug?.trim()
                 ? await uniqueProductSlug(inputSlug)
-                : await uniqueProductSlug(familyFields.name)
+                : await uniqueProductSlug(name)
 
             const created = await tx.product.create({
                 data: {
                     brandId: data.brandId.trim(),
-                    categoryId: data.categoryId.trim(),
                     description: data.description,
                     isAvailable: data.isAvailable,
-                    name: familyFields.name,
-                    familyId: familyFields.familyId,
-                    inheritsFamilyName: familyFields.inheritsFamilyName,
+                    name,
+                    familyId,
                     itemNumber: normalizedItemNumber,
                     slug,
                     alternativeNames: alternativeNames?.length ? alternativeNames : Prisma.JsonNull,
@@ -152,15 +105,15 @@ export async function createProduct(data: ProductInput) {
         })
 
         revalidatePath('/products')
-        revalidatePath('/inventory')
+        revalidatePath('/products')
         upsertProductToMeilisearch(product.id).catch(console.warn)
         return { success: true, data: serializeProduct(product) }
     } catch (error: any) {
         console.error('Failed to create product:', error)
         if (
             error?.message === 'لا يمكن تكرار نفس الصفة على المنتج' ||
-            error?.message === 'لا يمكن وراثة الاسم بدون منتج رئيسي' ||
             error?.message === 'المنتج الرئيسي غير موجود' ||
+            error?.message === 'المنتج الرئيسي مطلوب' ||
             error?.message === 'اسم المنتج مطلوب'
         ) {
             return { success: false, error: error.message }
@@ -173,7 +126,7 @@ export async function createProduct(data: ProductInput) {
             return { success: false, error: 'تعارض في البيانات الفريدة (رقم الصنف أو الرابط)' }
         }
         if (error?.code === 'P2003') {
-            return { success: false, error: 'صفة غير موجودة أو غير صالحة' }
+            return { success: false, error: 'صفة أو منتج رئيسي غير صالح' }
         }
         return { success: false, error: 'فشل إنشاء المنتج' }
     }
@@ -195,28 +148,33 @@ export async function updateProduct(id: string, data: Partial<ProductInput>) {
         const product = await prisma.$transaction(async (tx) => {
             const existing = await tx.product.findUnique({
                 where: { id },
-                select: { name: true, familyId: true, inheritsFamilyName: true },
+                select: { name: true, familyId: true },
             })
             if (!existing) throw new Error('المنتج غير موجود')
 
-            const familyFields = await resolveFamilyFields(data, existing, tx)
+            const name =
+                data.name !== undefined ? data.name.trim() : existing.name
+            if (!name) throw new Error('اسم المنتج مطلوب')
+
+            const familyId =
+                data.familyId !== undefined
+                    ? await requireFamilyId(data.familyId, tx)
+                    : existing.familyId
 
             let slug: string | undefined
             if (inputSlug !== undefined) {
-                slug = await uniqueProductSlug(inputSlug || familyFields.name || 'product', id)
+                slug = await uniqueProductSlug(inputSlug || name || 'product', id)
             }
 
             await tx.product.update({
                 where: { id },
                 data: {
                     ...(data.brandId !== undefined ? { brandId: data.brandId.trim() } : {}),
-                    ...(data.categoryId !== undefined ? { categoryId: data.categoryId.trim() } : {}),
                     ...(data.description !== undefined ? { description: data.description } : {}),
                     ...(data.isAvailable !== undefined ? { isAvailable: data.isAvailable } : {}),
                     ...(itemNumber !== undefined ? { itemNumber: normalizeItemNumber(itemNumber)! } : {}),
-                    name: familyFields.name,
-                    familyId: familyFields.familyId,
-                    inheritsFamilyName: familyFields.inheritsFamilyName,
+                    name,
+                    familyId,
                     slug,
                     alternativeNames: alternativeNames !== undefined
                         ? (alternativeNames?.length ? alternativeNames : Prisma.JsonNull)
@@ -242,8 +200,8 @@ export async function updateProduct(id: string, data: Partial<ProductInput>) {
         console.error('Failed to update product:', error)
         if (
             error?.message === 'لا يمكن تكرار نفس الصفة على المنتج' ||
-            error?.message === 'لا يمكن وراثة الاسم بدون منتج رئيسي' ||
             error?.message === 'المنتج الرئيسي غير موجود' ||
+            error?.message === 'المنتج الرئيسي مطلوب' ||
             error?.message === 'اسم المنتج مطلوب' ||
             error?.message === 'المنتج غير موجود'
         ) {
@@ -257,7 +215,7 @@ export async function updateProduct(id: string, data: Partial<ProductInput>) {
             return { success: false, error: 'تعارض في البيانات الفريدة (رقم الصنف أو الرابط)' }
         }
         if (error?.code === 'P2003') {
-            return { success: false, error: 'صفة غير موجودة أو غير صالحة' }
+            return { success: false, error: 'صفة أو منتج رئيسي غير صالح' }
         }
         return { success: false, error: 'فشل تحديث المنتج' }
     }
@@ -283,7 +241,7 @@ export async function deleteProduct(id: string) {
         }
 
         revalidatePath('/products')
-        revalidatePath('/inventory')
+        revalidatePath('/products')
         deleteProductFromMeilisearch(id).catch(console.warn)
         return { success: true }
     } catch (error) {

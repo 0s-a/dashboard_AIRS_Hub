@@ -12,7 +12,6 @@ import type {
     SerializedProductAttribute,
 } from '@/lib/types/product'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
-import { resolveProductDisplayName } from '@/lib/utils/product-display-name'
 
 export { prisma, Prisma }
 
@@ -29,11 +28,12 @@ export const PRODUCT_FAMILY_SELECT = {
     id: true,
     code: true,
     name: true,
+    categoryId: true,
+    category: { select: { id: true, name: true, code: true } },
 } as const
 
 export const PRODUCT_INCLUDE = {
     brandRef: true,
-    category: true,
     family: { select: PRODUCT_FAMILY_SELECT },
     productAttributes: {
         include: PRODUCT_ATTRIBUTE_INCLUDE,
@@ -54,7 +54,6 @@ export const PRODUCT_INCLUDE = {
 
 export const PRODUCT_LIST_INCLUDE = {
     brandRef: { select: { id: true, name: true, code: true, logo: true } },
-    category: { select: { id: true, name: true, code: true } },
     family: { select: PRODUCT_FAMILY_SELECT },
     productAttributes: {
         include: PRODUCT_ATTRIBUTE_INCLUDE,
@@ -170,41 +169,32 @@ export function serializeProduct(product: any) {
         logo: product.brandRef.logo ?? null,
     }
 
+    const familyCategory = product.family?.category
     const category: SerializedCategory = {
-        id: product.category.id,
-        name: product.category.name,
-        code: product.category.code,
+        id: familyCategory?.id ?? '',
+        name: familyCategory?.name ?? '',
+        code: familyCategory?.code ?? '',
     }
 
-    const family = product.family
-        ? {
-            id: product.family.id,
-            code: product.family.code,
-            name: product.family.name,
-        }
-        : null
-
-    const inheritsFamilyName = Boolean(product.inheritsFamilyName)
-    const displayName = resolveProductDisplayName({
-        name: product.name,
-        inheritsFamilyName,
-        family,
-    })
+    const family = {
+        id: product.family.id,
+        code: product.family.code,
+        name: product.family.name,
+    }
 
     return {
         id: product.id,
         itemNumber: product.itemNumber,
         slug: product.slug,
         name: product.name,
-        displayName,
+        displayName: product.name,
         brandId: product.brandId,
         description: product.description ?? null,
         alternativeNames: Array.isArray(product.alternativeNames) ? product.alternativeNames : [],
         tags: Array.isArray(product.tags) ? product.tags : [],
-        categoryId: product.categoryId,
-        familyId: product.familyId ?? null,
+        categoryId: product.family.categoryId ?? category.id,
+        familyId: product.familyId,
         family,
-        inheritsFamilyName,
         productAttributes,
         isAvailable: product.isAvailable ?? true,
         order: product.order ?? 0,
@@ -244,7 +234,7 @@ export async function requireProduct(id: string, tx?: Prisma.TransactionClient):
 
 export function revalidateProduct(id: string) {
     revalidatePath('/products')
-    revalidatePath('/inventory')
+    revalidatePath('/products')
     revalidatePath(`/products/${id}`)
 }
 

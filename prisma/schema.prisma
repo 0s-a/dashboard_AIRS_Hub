@@ -38,37 +38,38 @@ model ProductFamily {
   code        String    @unique
   name        String
   description String?
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   products    Product[]
+
+  @@index([categoryId])
 }
 
 model Product {
-  id                  String                   @id @default(uuid())
-  itemNumber          String                   @unique // رقم الصنف — إلزامي وفريد
-  name                String
-  slug                String                   @unique
-  brandId             String
-  brandRef            Brand                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  description         String?
-  alternativeNames    Json?
-  tags                Json?
-  categoryId          String
-  category            Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  familyId            String?
-  family              ProductFamily?           @relation(fields: [familyId], references: [id], onDelete: SetNull)
-  inheritsFamilyName  Boolean                  @default(false)
-  isAvailable         Boolean                  @default(true)
-  order               Int                      @default(0)
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  productPrices       ProductPrice[]
-  productImages       ProductImage[]
-  productUnits        ProductUnit[]
-  productAttributes   ProductAttributeValue[]
-  orderItems          OrderItem[]
-  notifications       AiNotification[]
-  search_vector       Unsupported("tsvector")?
+  id                String                   @id @default(uuid())
+  itemNumber        String                   @unique // رقم الصنف — إلزامي وفريد
+  name              String
+  slug              String                   @unique
+  brandId           String
+  brandRef          Brand                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  description       String?
+  alternativeNames  Json?
+  tags              Json?
+  familyId          String
+  family            ProductFamily            @relation(fields: [familyId], references: [id], onDelete: Restrict)
+  isAvailable       Boolean                  @default(true)
+  order             Int                      @default(0)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  productPrices     ProductPrice[]
+  productImages     ProductImage[]
+  productUnits      ProductUnit[]
+  productAttributes ProductAttributeValue[]
+  orderItems        OrderItem[]
+  notifications     AiNotification[]
+  search_vector     Unsupported("tsvector")?
 
   @@index([familyId])
 }
@@ -107,13 +108,13 @@ model Brand {
 }
 
 model Category {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  code        String    @unique
+  id          String          @id @default(uuid())
+  name        String          @unique
+  code        String          @unique
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  products    Product[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  families    ProductFamily[]
 }
 
 // ── Customer (formerly Person) ───────────────────────────────

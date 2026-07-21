@@ -55,12 +55,15 @@ if (authError) return authError
 
 ## Bot search
 
-`GET /api/v1/bot/products/search` يستخدم Meilisearch عبر `searchProductIdsInMeilisearch`، ثم hydrate من Prisma.
+`GET /api/v1/bot/products/search` يستخدم Meilisearch عبر `searchProductIdsInMeilisearch`، ثم hydrate من Prisma، ثم **تجميع حسب `familyId`**.
 
-- تطبيع عربي على `q` / `brand` / `attr` وعلى حقول الفهرس (`ى→ي`؛ SKU بدون مسافات/شرطات)
-- حقل `searchText` يجمع الاسم/البدائل/البراند/الفئة/الصفات/الوسوم/رقم الصنف
-- تفكيك حذر لـ `q` (براندات + قيم صفات من DB، كاش قصير) — `parse=false` للتعطيل؛ الصريح يفوز؛ relax عند الصفر
-- فلاتر `brand` / `attr` / `available`: تطابق قيمة كاملة (Meili filter)
-- `meta.engine`: `"meili"` أو `"prisma"` · `meta.parsed` اختياري
-- عند تعطّل Meili: fallback Prisma بفلاتر exact وILIKE على `q`
+- الاستجابة: عائلات `{ family, category, brand, matchCount, products[] }` — المطابق فقط
+- `page`/`limit` بعدد العائلات؛ over-fetch داخلي؛ `hasMore` + `pagination.total` تقديري
+- فلتر `familyCode` → `familyId` في Meili filter
+- تطبيع عربي على `q` / `brand` / `attr` وعلى حقول الفهرس
+- حقل `searchText` يجمع الاسم/البدائل/البراند/الفئة/الصفات/الوسوم/رقم الصنف + اسم العائلة
+- تفكيك حذر لـ `q` — `parse=false` للتعطيل؛ relax عند الصفر
+- فلاتر `brand` / `attr` / `available` / `familyId`: تطابق قيمة كاملة
+- `meta.engine` · `meta.parsed` · `skuMatch` لمسار رقم الصنف
+- عند تعطّل Meili: fallback Prisma بنفس التجميع
 - بعد تغيير شكل المستند أو الإعدادات: **مزامنة كاملة مرة واحدة من لوحة search-engine**

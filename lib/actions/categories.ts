@@ -5,7 +5,7 @@ import { safeAction, safeActionWithRevalidation } from '@/lib/action-utils'
 import { requireAuth } from '@/lib/auth-utils'
 import { PRODUCT_CODE_CONFIG } from '@/lib/config/product-code.config'
 
-const PATHS = ['/categories', '/products', '/inventory']
+const PATHS = ['/categories', '/products']
 
 function assertCategoryCode(code: string) {
     if (!PRODUCT_CODE_CONFIG.category.pattern.test(code)) {

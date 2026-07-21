@@ -37,10 +37,10 @@ export default function CategoriesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight bg-linear-to-l from-primary to-indigo-400 bg-clip-text text-transparent">
-                        التصنيفات الرئيسية
+                        التصنيفات
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        إدارة تصنيفات المنتجات والمجموعات
+                        إدارة التصنيفات — تُربَط بالمنتجات عبر المنتج الرئيسي
                     </p>
                 </div>
                 <Button

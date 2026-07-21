@@ -16,6 +16,7 @@ import {
     Search,
     Tags,
     Boxes,
+    FileUp,
     LucideIcon
 } from "lucide-react"
 
@@ -46,6 +47,7 @@ export const navigationGroups: NavigationGroup[] = [
         items: [
             { href: "/orders", label: "الطلبات", icon: ShoppingCart, keywords: "orders sales طلبات مبيعات فاتورة" },
             { href: "/products", label: "المنتجات", icon: Package, keywords: "products منتجات مخزون أصناف" },
+            { href: "/inventory/import", label: "استيراد المنتجات", icon: FileUp, keywords: "import csv استيراد منتجات" },
             { href: "/inventory/new-tags", label: "المنتجات الجديدة", icon: Sparkles, keywords: "new tags جديد" },
             { href: "/inventory/search-engine", label: "محرك البحث", icon: Search, keywords: "search meilisearch بحث" },
             { href: "/categories", label: "التصنيفات", icon: Layers, keywords: "categories تصنيفات أقسام" },

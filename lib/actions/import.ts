@@ -4,16 +4,18 @@ import { prisma } from './inventory/_shared'
 import { uniqueProductSlug } from '@/lib/utils/slug'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth-utils'
-import { BRAND_CODE_CONFIG, CATEGORY_CODE_CONFIG } from '@/lib/config/product-number.config'
+import { BRAND_CODE_CONFIG } from '@/lib/config/product-number.config'
 
 const ATTR_CODES = ['color', 'size', 'capacity', 'volume', 'weight'] as const
 type AttrCode = (typeof ATTR_CODES)[number]
+
+const FAMILY_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{0,31}$/
 
 export type ImportRow = {
     _id: string
     name: string
     itemNumber: string
-    categoryCode: string
+    familyCode: string
     brandCode: string
     color?: string
     size?: string
@@ -25,7 +27,7 @@ export type ImportRow = {
 export type ValidatedRow = ImportRow & {
     isValid: boolean
     errors: string[]
-    resolvedCategoryId?: string
+    resolvedFamilyId?: string
     resolvedBrandId?: string
     attributeValues?: { attributeId: string; value: string }[]
 }
@@ -35,31 +37,36 @@ export async function validateImportData(rows: ImportRow[]): Promise<ValidatedRo
     if (!rows || rows.length === 0) return []
 
     const itemNumbers = rows.map(r => r.itemNumber).filter(Boolean)
-    const categoryCodes = Array.from(new Set(rows.map(r => r.categoryCode?.trim().toUpperCase()).filter(Boolean)))
-    const brandCodes = Array.from(new Set(rows.map(r => r.brandCode?.trim().toUpperCase()).filter(Boolean)))
+    const familyCodes = Array.from(
+        new Set(rows.map(r => r.familyCode?.trim().toUpperCase()).filter(Boolean))
+    )
+    const brandCodes = Array.from(
+        new Set(rows.map(r => r.brandCode?.trim().toUpperCase()).filter(Boolean))
+    )
 
-    const [existingCategories, existingBrands, attributes, existingByItemNumber] = await Promise.all([
-        prisma.category.findMany({
-            where: { code: { in: categoryCodes } },
-            select: { id: true, code: true },
-        }),
-        prisma.brand.findMany({
-            where: { code: { in: brandCodes } },
-            select: { id: true, code: true },
-        }),
-        prisma.productAttribute.findMany({
-            where: { code: { in: [...ATTR_CODES] } },
-            select: { id: true, code: true },
-        }),
-        itemNumbers.length > 0
-            ? prisma.product.findMany({
-                where: { itemNumber: { in: itemNumbers } },
-                select: { itemNumber: true },
-            })
-            : [],
-    ])
+    const [existingFamilies, existingBrands, attributes, existingByItemNumber] =
+        await Promise.all([
+            prisma.productFamily.findMany({
+                where: { code: { in: familyCodes } },
+                select: { id: true, code: true },
+            }),
+            prisma.brand.findMany({
+                where: { code: { in: brandCodes } },
+                select: { id: true, code: true },
+            }),
+            prisma.productAttribute.findMany({
+                where: { code: { in: [...ATTR_CODES] } },
+                select: { id: true, code: true },
+            }),
+            itemNumbers.length > 0
+                ? prisma.product.findMany({
+                      where: { itemNumber: { in: itemNumbers } },
+                      select: { itemNumber: true },
+                  })
+                : [],
+        ])
 
-    const categoryMap = new Map(existingCategories.map(c => [c.code, c.id]))
+    const familyMap = new Map(existingFamilies.map(f => [f.code, f.id]))
     const brandMap = new Map(existingBrands.map(b => [b.code, b.id]))
     const attrByCode = new Map(attributes.map(a => [a.code, a.id]))
 
@@ -91,32 +98,36 @@ export async function validateImportData(rows: ImportRow[]): Promise<ValidatedRo
             batchItemNumbers.add(row.itemNumber.trim())
         }
 
-        let resolvedCategoryId: string | undefined
+        let resolvedFamilyId: string | undefined
         let resolvedBrandId: string | undefined
 
-        const categoryCode = row.categoryCode?.trim().toUpperCase()
-        if (!categoryCode) {
-            errors.push('كود التصنيف مطلوب')
+        const familyCode = row.familyCode?.trim().toUpperCase()
+        if (!familyCode) {
+            errors.push('كود المنتج الرئيسي مطلوب')
             isValid = false
-        } else if (!CATEGORY_CODE_CONFIG.pattern.test(categoryCode)) {
-            errors.push(`كود التصنيف يجب أن يكون من ${CATEGORY_CODE_CONFIG.minLength} إلى ${CATEGORY_CODE_CONFIG.maxLength} خانات (أحرف أو أرقام)`)
+        } else if (!FAMILY_CODE_PATTERN.test(familyCode)) {
+            errors.push(
+                'كود المنتج الرئيسي: حروف/أرقام إنجليزية، ويمكن شرطة أو شرطة سفلية (حتى 32 خانة)'
+            )
             isValid = false
-        } else if (!categoryMap.has(categoryCode)) {
-            errors.push('كود التصنيف غير موجود')
+        } else if (!familyMap.has(familyCode)) {
+            errors.push('كود المنتج الرئيسي غير موجود')
             isValid = false
         } else {
-            resolvedCategoryId = categoryMap.get(categoryCode)
+            resolvedFamilyId = familyMap.get(familyCode)
         }
 
         const brandCode = row.brandCode?.trim().toUpperCase()
         if (!brandCode) {
-            errors.push('كود الماركة مطلوب')
+            errors.push('كود البراند مطلوب')
             isValid = false
         } else if (!BRAND_CODE_CONFIG.pattern.test(brandCode)) {
-            errors.push(`كود الماركة يجب أن يكون ${BRAND_CODE_CONFIG.length} خانات (أحرف أو أرقام)`)
+            errors.push(
+                `كود البراند يجب أن يكون ${BRAND_CODE_CONFIG.length} خانات (أحرف أو أرقام)`
+            )
             isValid = false
         } else if (!brandMap.has(brandCode)) {
-            errors.push('كود الماركة غير موجود')
+            errors.push('كود البراند غير موجود')
             isValid = false
         } else {
             resolvedBrandId = brandMap.get(brandCode)
@@ -139,7 +150,7 @@ export async function validateImportData(rows: ImportRow[]): Promise<ValidatedRo
             ...row,
             isValid,
             errors,
-            resolvedCategoryId,
+            resolvedFamilyId,
             resolvedBrandId,
             attributeValues,
         }
@@ -158,7 +169,7 @@ export async function importProductsBatch(rows: ValidatedRow[]) {
 
     for (const row of validRows) {
         try {
-            await prisma.$transaction(async (tx) => {
+            await prisma.$transaction(async tx => {
                 const slug = await uniqueProductSlug(row.name)
 
                 const created = await tx.product.create({
@@ -166,7 +177,7 @@ export async function importProductsBatch(rows: ValidatedRow[]) {
                         name: row.name.trim(),
                         slug,
                         itemNumber: row.itemNumber.trim(),
-                        categoryId: row.resolvedCategoryId!,
+                        familyId: row.resolvedFamilyId!,
                         brandId: row.resolvedBrandId!,
                     },
                 })
@@ -189,7 +200,7 @@ export async function importProductsBatch(rows: ValidatedRow[]) {
     }
 
     revalidatePath('/products')
-    revalidatePath('/inventory')
+    revalidatePath('/products')
 
     return {
         success: successCount > 0,

@@ -219,6 +219,20 @@ async function main() {
     })
     logItem(`${sampleCategory.name} (${sampleCategory.code})`)
 
+    const sampleFamily = await prisma.productFamily.upsert({
+        where: { code: 'SAMPLE' },
+        update: {
+            categoryId: sampleCategory.id,
+        },
+        create: {
+            code: 'SAMPLE',
+            name: 'عائلة اختبار',
+            description: 'منتج رئيسي تجريبي',
+            categoryId: sampleCategory.id,
+        },
+    })
+    logItem(`${sampleFamily.name} (${sampleFamily.code})`)
+
     log('📦', 'Seeding Sample Product...')
 
     // جلب الوحدة والعملة وتسمية السعر المطلوبة عبر itemNumber (أكثر أماناً من البحث بالاسم)
@@ -234,7 +248,7 @@ async function main() {
         where: { itemNumber: 'TEST-001' },
         update: {
             brandId: sampleBrand.id,
-            categoryId: sampleCategory.id,
+            familyId: sampleFamily.id,
         },
         create: {
             itemNumber: 'TEST-001',
@@ -242,7 +256,7 @@ async function main() {
             name: 'منتج اختبار',
             description: 'منتج تجريبي — يمكن حذفه بعد التشغيل الأول',
             brandId: sampleBrand.id,
-            categoryId: sampleCategory.id,
+            familyId: sampleFamily.id,
             isAvailable: true,
         },
     })

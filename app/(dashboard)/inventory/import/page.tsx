@@ -6,19 +6,28 @@ import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getProductFilterOptions } from '@/lib/actions/inventory'
+import { getProductFamilies } from '@/lib/actions/product-families'
 
 export const metadata = {
     title: 'استيراد المنتجات | إدارة المنتجات',
 }
 
 export default async function ImportPage() {
-    const { categories, brands } = await getProductFilterOptions()
+    const [{ brands }, familiesRes] = await Promise.all([
+        getProductFilterOptions(),
+        getProductFamilies(),
+    ])
+
+    const families = (familiesRes.success && familiesRes.data
+        ? familiesRes.data
+        : []
+    ).map(f => ({ id: f.id, code: f.code, name: f.name }))
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 max-w-6xl mx-auto">
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-4">
-                    <Link href="/inventory">
+                    <Link href="/products">
                         <Button variant="ghost" size="icon" className="rounded-full">
                             <ArrowRight className="w-5 h-5" />
                         </Button>
@@ -32,7 +41,7 @@ export default async function ImportPage() {
                 </div>
             </div>
 
-            <ImportWizard categories={categories} brands={brands} />
+            <ImportWizard families={families} brands={brands} />
         </div>
     )
 }

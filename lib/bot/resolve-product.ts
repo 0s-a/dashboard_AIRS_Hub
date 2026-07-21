@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { BotServiceError } from './errors'
-import { resolveProductDisplayName } from '@/lib/utils/product-display-name'
 
 export const ProductRefSchema = z
     .object({
@@ -18,14 +17,13 @@ const productRefSelect = {
     id: true,
     itemNumber: true,
     name: true,
-    inheritsFamilyName: true,
-    family: { select: { name: true } },
 } as const
 
 export type ResolvedProduct = {
     id: string
     itemNumber: string
     name: string
+    /** Alias of name — Bot API compatibility */
     displayName: string
 }
 
@@ -57,6 +55,6 @@ export async function resolveProductRef(
         id: product.id,
         itemNumber: product.itemNumber,
         name: product.name,
-        displayName: resolveProductDisplayName(product),
+        displayName: product.name,
     }
 }

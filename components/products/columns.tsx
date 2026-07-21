@@ -207,18 +207,36 @@ export const columns: ColumnDef<SerializedProduct>[] = [
             return (
                 <Link href={`/products/${product.id}`} className="flex flex-col gap-0.5 min-w-0 hover:text-primary transition-colors">
                     <span className="font-bold text-sm truncate">{product.name}</span>
-                    {product.family && (
-                        <span className="text-xs text-muted-foreground truncate">
-                            الرئيسي: {product.family.name}
-                            <span className="font-mono text-[10px] mr-1 opacity-80" dir="ltr">
-                                ({product.family.code})
-                            </span>
-                        </span>
-                    )}
                     {variantTitle !== '—' && (
                         <span className="text-xs text-muted-foreground truncate">{variantTitle}</span>
                     )}
                 </Link>
+            )
+        },
+    },
+    {
+        accessorKey: "familyId",
+        id: "family",
+        enableColumnFilter: true,
+        meta: {
+            filterType: "select" as const,
+            cellVariant: "text" as const,
+            align: "start" as const,
+        },
+        filterFn: "select",
+        header: "المنتج الرئيسي",
+        size: 160,
+        maxSize: 200,
+        cell: ({ row }) => {
+            const family = row.original.family
+            if (!family) return <span className="text-xs text-muted-foreground">—</span>
+            return (
+                <span className="text-xs font-medium truncate" title={`${family.name} (${family.code})`}>
+                    {family.name}
+                    <span className="font-mono text-[10px] text-muted-foreground mr-1" dir="ltr">
+                        ({family.code})
+                    </span>
+                </span>
             )
         },
     },

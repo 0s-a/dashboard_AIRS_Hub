@@ -3,7 +3,6 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { paginationMeta } from '@/lib/api-utils'
 import { searchProductIdsInMeilisearch } from '@/lib/utils/meilisearch-sync'
-import { resolveProductDisplayName } from '@/lib/utils/product-display-name'
 import { BotServiceError } from './errors'
 import {
     looksLikeSingleSkuToken,
@@ -18,6 +17,11 @@ import {
     type ParseDictionary,
     type ParsedProductQuery,
 } from './parse-product-query'
+
+const FAMILY_FETCH_MULTIPLIER = 5
+const FAMILY_FETCH_CAP = 100
+/** Safety cap on how many product hits to scan while filling a family page */
+const FAMILY_SCAN_PRODUCT_CAP = 300
 
 const availableQueryParam = z.preprocess((val) => {
     if (val === undefined || val === null || val === '') return undefined
@@ -41,6 +45,8 @@ export const ProductSearchQuerySchema = z.object({
     available: availableQueryParam,
     /** When false, skip high-confidence parse of q into brand/attr */
     parse: parseQueryParam.default(true),
+    /** Optional ProductFamily.code filter */
+    familyCode: z.string().trim().min(1).optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(50).default(20),
 })
@@ -49,7 +55,8 @@ export type ProductSearchQuery = z.infer<typeof ProductSearchQuerySchema>
 
 export type SearchEngine = 'meili' | 'prisma'
 
-export interface ProductSearchSibling {
+/** Matched product inside a family group */
+export interface ProductSearchProduct {
     id: string
     itemNumber: string
     name: string
@@ -58,22 +65,17 @@ export interface ProductSearchSibling {
     attributes: Array<{ code: string; name: string; value: string }>
 }
 
-export interface ProductSearchResult {
-    id: string
-    itemNumber: string
-    /** Stored product name (always Product.name) */
-    name: string
-    /** Resolved display name (family name when inheriting) */
-    displayName: string
-    isAvailable: boolean
-    familyId: string | null
-    family: { id: string; code: string; name: string } | null
-    brand: { id: string; name: string } | null
+/** One search hit grouped by ProductFamily (matched products only) */
+export interface ProductSearchFamilyGroup {
+    family: { id: string; code: string; name: string }
     category: { id: string; name: string }
-    attributes: Array<{ code: string; name: string; value: string }>
-    /** Other products in the same family (empty when no family) */
-    siblings: ProductSearchSibling[]
+    brand: { id: string; name: string } | null
+    matchCount: number
+    products: ProductSearchProduct[]
 }
+
+/** @deprecated Use ProductSearchFamilyGroup — kept alias during transition */
+export type ProductSearchResult = ProductSearchFamilyGroup
 
 export interface ProductSearchParsedMeta {
     brand?: string
@@ -86,7 +88,23 @@ export interface ProductSearchMeta {
     count: number
     pagination: ReturnType<typeof paginationMeta>
     engine: SearchEngine
+    hasMore: boolean
+    skuMatch?: boolean
     parsed?: ProductSearchParsedMeta
+}
+
+/** Internal flat product row before family grouping */
+interface MappedProduct {
+    id: string
+    itemNumber: string
+    name: string
+    displayName: string
+    isAvailable: boolean
+    familyId: string
+    family: { id: string; code: string; name: string }
+    brand: { id: string; name: string } | null
+    category: { id: string; name: string }
+    attributes: Array<{ code: string; name: string; value: string }>
 }
 
 const productSelect = {
@@ -95,10 +113,15 @@ const productSelect = {
     name: true,
     isAvailable: true,
     familyId: true,
-    inheritsFamilyName: true,
-    family: { select: { id: true, code: true, name: true } },
+    family: {
+        select: {
+            id: true,
+            code: true,
+            name: true,
+            category: { select: { id: true, name: true } },
+        },
+    },
     brandRef: { select: { id: true, name: true } },
-    category: { select: { id: true, name: true } },
     productAttributes: {
         select: {
             value: true,
@@ -110,35 +133,27 @@ const productSelect = {
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof productSelect }>
 
-function mapProduct(p: ProductRow): ProductSearchResult {
-    const family = p.family
-        ? { id: p.family.id, code: p.family.code, name: p.family.name }
-        : null
-    const displayName = resolveProductDisplayName({
-        name: p.name,
-        inheritsFamilyName: p.inheritsFamilyName,
-        family,
-    })
+function mapProduct(p: ProductRow): MappedProduct {
+    const category = p.family.category
     return {
         id: p.id,
         itemNumber: p.itemNumber,
         name: p.name,
-        displayName,
+        displayName: p.name,
         isAvailable: p.isAvailable,
-        familyId: p.familyId ?? null,
-        family,
+        familyId: p.familyId,
+        family: { id: p.family.id, code: p.family.code, name: p.family.name },
         brand: p.brandRef ? { id: p.brandRef.id, name: p.brandRef.name } : null,
-        category: { id: p.category.id, name: p.category.name },
+        category: { id: category.id, name: category.name },
         attributes: p.productAttributes.map(pa => ({
             code: pa.attribute.code,
             name: pa.attribute.name,
             value: pa.value,
         })),
-        siblings: [],
     }
 }
 
-function toSibling(p: ProductSearchResult): ProductSearchSibling {
+function toSearchProduct(p: MappedProduct): ProductSearchProduct {
     return {
         id: p.id,
         itemNumber: p.itemNumber,
@@ -149,45 +164,40 @@ function toSibling(p: ProductSearchResult): ProductSearchSibling {
     }
 }
 
-async function attachSiblings(
-    results: ProductSearchResult[]
-): Promise<ProductSearchResult[]> {
-    const familyIds = [
-        ...new Set(results.map(r => r.familyId).filter((id): id is string => Boolean(id))),
-    ]
-    if (familyIds.length === 0) return results
+/** Group flat matched products by familyId, preserving first-seen family order. */
+export function groupProductsIntoFamilies(
+    products: MappedProduct[]
+): ProductSearchFamilyGroup[] {
+    const order: string[] = []
+    const buckets = new Map<string, MappedProduct[]>()
 
-    const rows = await prisma.product.findMany({
-        where: { familyId: { in: familyIds } },
-        select: productSelect,
-    })
-    const byFamily = new Map<string, ProductSearchResult[]>()
-    for (const row of rows) {
-        const mapped = mapProduct(row)
-        if (!mapped.familyId) continue
-        const list = byFamily.get(mapped.familyId) ?? []
-        list.push(mapped)
-        byFamily.set(mapped.familyId, list)
+    for (const p of products) {
+        let list = buckets.get(p.familyId)
+        if (!list) {
+            list = []
+            buckets.set(p.familyId, list)
+            order.push(p.familyId)
+        }
+        if (!list.some(x => x.id === p.id)) {
+            list.push(p)
+        }
     }
 
-    return results.map(r => {
-        if (!r.familyId) return r
-        const all = byFamily.get(r.familyId) ?? []
+    return order.map(familyId => {
+        const list = buckets.get(familyId)!
+        const first = list[0]
         return {
-            ...r,
-            siblings: all.filter(s => s.id !== r.id).map(toSibling),
+            family: first.family,
+            category: first.category,
+            brand: first.brand,
+            matchCount: list.length,
+            products: list.map(toSearchProduct),
         }
     })
 }
 
-async function withSiblings(result: {
-    results: ProductSearchResult[]
-    meta: ProductSearchMeta
-}): Promise<{ results: ProductSearchResult[]; meta: ProductSearchMeta }> {
-    return {
-        ...result,
-        results: await attachSiblings(result.results),
-    }
+function internalFetchLimit(pageLimit: number): number {
+    return Math.min(pageLimit * FAMILY_FETCH_MULTIPLIER, FAMILY_FETCH_CAP)
 }
 
 /** Normalize q / brand / attr for Meili filters and Prisma fallback. */
@@ -200,6 +210,7 @@ function prepareSearchQuery(query: ProductSearchQuery): ProductSearchQuery {
         attr: query.attr
             .map(v => normalizeSearchQuery(v))
             .filter((v): v is string => Boolean(v)),
+        familyCode: query.familyCode?.trim() || undefined,
     }
 }
 
@@ -208,11 +219,6 @@ function escapeLikePattern(value: string) {
     return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
 }
 
-/**
- * Product IDs whose alternativeNames match q.
- * Some rows store a JSON array; others may be a scalar string — guard typeof
- * so jsonb_array_elements_text never runs on non-arrays.
- */
 async function findIdsByAlternativeName(q: string): Promise<string[]> {
     const pattern = `%${escapeLikePattern(q)}%`
     const rows = await prisma.$queryRaw<{ id: string }[]>`
@@ -249,6 +255,7 @@ export function parseProductSearchQuery(searchParams: URLSearchParams) {
         attr: searchParams.getAll('attr').map(v => v.trim()).filter(Boolean),
         available: searchParams.get('available') ?? undefined,
         parse: searchParams.get('parse') ?? undefined,
+        familyCode: searchParams.get('familyCode') ?? undefined,
         page: searchParams.get('page') ?? undefined,
         limit: searchParams.get('limit') ?? undefined,
     })
@@ -270,11 +277,12 @@ function availabilityFilter(
     return [{ isAvailable: available }]
 }
 
-/**
- * Soft filters for Prisma exact-SKU pin: compare normalized brand/attr
- * against DB values so hamza/taa differences still match.
- */
-function matchesPreparedFilters(row: ProductRow, query: ProductSearchQuery): boolean {
+function matchesPreparedFilters(
+    row: ProductRow,
+    query: ProductSearchQuery,
+    familyId?: string | null
+): boolean {
+    if (familyId && row.familyId !== familyId) return false
     if (query.available !== undefined && row.isAvailable !== query.available) {
         return false
     }
@@ -295,7 +303,8 @@ function matchesPreparedFilters(row: ProductRow, query: ProductSearchQuery): boo
 
 async function findExactByItemNumber(
     q: string,
-    query: ProductSearchQuery
+    query: ProductSearchQuery,
+    familyId?: string | null
 ): Promise<ProductRow | null> {
     const skuNorm = normalizeItemNumberForSearch(q)
     const candidates = [
@@ -304,9 +313,12 @@ async function findExactByItemNumber(
         ),
     ]
 
+    const familyWhere = familyId ? { familyId } : {}
+
     let row = await prisma.product.findFirst({
         where: {
             itemNumber: { in: candidates },
+            ...familyWhere,
             ...(query.available !== undefined
                 ? { isAvailable: query.available }
                 : {}),
@@ -325,6 +337,7 @@ async function findExactByItemNumber(
             const rows = await prisma.product.findMany({
                 where: {
                     id: { in: ids.map(r => r.id) },
+                    ...familyWhere,
                     ...(query.available !== undefined
                         ? { isAvailable: query.available }
                         : {}),
@@ -332,29 +345,27 @@ async function findExactByItemNumber(
                 select: productSelect,
             })
             row =
-                rows.find(r => matchesPreparedFilters(r, query)) ??
-                rows[0] ??
+                rows.find(r => matchesPreparedFilters(r, query, familyId)) ??
                 null
-            if (row && !matchesPreparedFilters(row, query)) row = null
             return row
         }
     }
 
     if (!row) return null
-    return matchesPreparedFilters(row, query) ? row : null
+    return matchesPreparedFilters(row, query, familyId) ? row : null
 }
 
-/**
- * Exact brand/attr filters (aligned with Meili) using dictionary originals
- * so Arabic normalization still matches DB values.
- */
 function buildExactAndFilters(
     query: ProductSearchQuery,
-    dict: ParseDictionary
+    dict: ParseDictionary,
+    familyId?: string | null
 ): Prisma.ProductWhereInput[] {
     const filters: Prisma.ProductWhereInput[] = [
         ...availabilityFilter(query.available),
     ]
+    if (familyId) {
+        filters.push({ familyId })
+    }
     if (query.brand) {
         const originals = resolveBrandOriginals(query.brand, dict)
         filters.push({
@@ -380,7 +391,7 @@ function buildExactAndFilters(
     return filters
 }
 
-async function hydrateProductsInOrder(ids: string[]): Promise<ProductSearchResult[]> {
+async function hydrateProductsInOrder(ids: string[]): Promise<MappedProduct[]> {
     if (ids.length === 0) return []
     const rows = await prisma.product.findMany({
         where: { id: { in: ids } },
@@ -407,21 +418,60 @@ function buildParsedMeta(
 }
 
 function withMeta(
-    result: {
-        results: ProductSearchResult[]
-        meta: { count: number; pagination: ReturnType<typeof paginationMeta> }
-    },
-    engine: SearchEngine,
-    parsedMeta?: ProductSearchParsedMeta
-): { results: ProductSearchResult[]; meta: ProductSearchMeta } {
+    groups: ProductSearchFamilyGroup[],
+    opts: {
+        engine: SearchEngine
+        page: number
+        limit: number
+        estimatedFamilyTotal: number
+        hasMore: boolean
+        skuMatch?: boolean
+        parsedMeta?: ProductSearchParsedMeta
+    }
+): { results: ProductSearchFamilyGroup[]; meta: ProductSearchMeta } {
+    const total = Math.max(
+        opts.estimatedFamilyTotal,
+        (opts.page - 1) * opts.limit + groups.length
+    )
     return {
-        results: result.results,
+        results: groups,
         meta: {
-            ...result.meta,
-            engine,
-            ...(parsedMeta ? { parsed: parsedMeta } : {}),
+            count: groups.length,
+            pagination: paginationMeta(total, opts.page, opts.limit),
+            engine: opts.engine,
+            hasMore: opts.hasMore,
+            ...(opts.skuMatch ? { skuMatch: true } : {}),
+            ...(opts.parsedMeta ? { parsed: opts.parsedMeta } : {}),
         },
     }
+}
+
+function emptyResult(
+    engine: SearchEngine,
+    page: number,
+    limit: number,
+    parsedMeta?: ProductSearchParsedMeta
+) {
+    return withMeta([], {
+        engine,
+        page,
+        limit,
+        estimatedFamilyTotal: 0,
+        hasMore: false,
+        parsedMeta,
+    })
+}
+
+/** Resolve familyCode → id; null means not found (caller returns empty). */
+async function resolveFamilyIdByCode(
+    familyCode: string | undefined
+): Promise<string | null | undefined> {
+    if (!familyCode) return undefined
+    const family = await prisma.productFamily.findUnique({
+        where: { code: familyCode },
+        select: { id: true },
+    })
+    return family?.id ?? null
 }
 
 type ResolvedSearch = {
@@ -431,13 +481,18 @@ type ResolvedSearch = {
     parsed: ParsedProductQuery | null
     extractedApplied: boolean
     dict: ParseDictionary
+    /** undefined = no filter; null = code not found */
+    familyId: string | null | undefined
 }
 
 async function resolveSearchContext(
     query: ProductSearchQuery
 ): Promise<ResolvedSearch> {
     const prepared = prepareSearchQuery(query)
-    const dict = await getParseDictionary()
+    const [dict, familyId] = await Promise.all([
+        getParseDictionary(),
+        resolveFamilyIdByCode(prepared.familyCode),
+    ])
 
     let parsed: ParsedProductQuery | null = null
     let searchQ = prepared.q
@@ -449,8 +504,6 @@ async function resolveSearchContext(
             explicitBrand: prepared.brand,
             explicitAttr: prepared.attr,
         })
-        // Prefer residual; if parse removed everything, keep original q for text search
-        // unless we extracted filters (then filter-only / empty Meili q is OK).
         const hasExtracted =
             Boolean(parsed.extractedBrand) || parsed.extractedAttr.length > 0
         searchQ = hasExtracted
@@ -465,24 +518,62 @@ async function resolveSearchContext(
         extractedApplied = hasExtracted
     }
 
-    return { prepared, searchQ, filterQuery, parsed, extractedApplied, dict }
+    return {
+        prepared,
+        searchQ,
+        filterQuery,
+        parsed,
+        extractedApplied,
+        dict,
+        familyId,
+    }
 }
 
-function skuFastPathResult(
-    row: ProductRow,
-    parsedMeta?: ProductSearchParsedMeta
+function ingestMappedIntoFamilies(
+    products: MappedProduct[],
+    familyOrder: string[],
+    buckets: Map<string, MappedProduct[]>,
+    familyIdFilter?: string | null
 ) {
-    return withMeta(
-        {
-            results: [mapProduct(row)],
-            meta: {
-                count: 1,
-                pagination: paginationMeta(1, 1, 1),
-            },
-        },
-        'prisma',
-        parsedMeta
-    )
+    for (const p of products) {
+        if (familyIdFilter && p.familyId !== familyIdFilter) continue
+        let list = buckets.get(p.familyId)
+        if (!list) {
+            list = []
+            buckets.set(p.familyId, list)
+            familyOrder.push(p.familyId)
+        }
+        if (!list.some(x => x.id === p.id)) {
+            list.push(p)
+        }
+    }
+}
+
+function sliceFamilyPage(
+    familyOrder: string[],
+    buckets: Map<string, MappedProduct[]>,
+    page: number,
+    limit: number
+): {
+    groups: ProductSearchFamilyGroup[]
+    hasMoreFromBuffer: boolean
+} {
+    const skip = (page - 1) * limit
+    const sliceIds = familyOrder.slice(skip, skip + limit)
+    const groups = sliceIds.map(id => {
+        const list = buckets.get(id)!
+        return {
+            family: list[0].family,
+            category: list[0].category,
+            brand: list[0].brand,
+            matchCount: list.length,
+            products: list.map(toSearchProduct),
+        }
+    })
+    return {
+        groups,
+        hasMoreFromBuffer: familyOrder.length > skip + limit,
+    }
 }
 
 /** Prisma ILIKE search — used only when Meilisearch is unavailable. */
@@ -492,15 +583,21 @@ export async function searchProductsPrisma(
     relaxed = false
 ) {
     const resolved = ctx ?? (await resolveSearchContext(query))
-    const { searchQ, filterQuery, parsed, extractedApplied, dict } = resolved
-    const q = searchQ
+    const { searchQ, filterQuery, parsed, extractedApplied, dict, familyId } =
+        resolved
     const { page, limit } = filterQuery
-    const offset = (page - 1) * limit
-    const andFilters = buildExactAndFilters(filterQuery, dict)
+    const parsedMeta = buildParsedMeta(parsed, relaxed)
+
+    if (familyId === null) {
+        return emptyResult('prisma', page, limit, parsedMeta)
+    }
+
+    const q = searchQ
+    const andFilters = buildExactAndFilters(filterQuery, dict, familyId)
 
     const [exact, altIds] = await Promise.all([
         q
-            ? findExactByItemNumber(q, filterQuery)
+            ? findExactByItemNumber(q, filterQuery, familyId)
             : Promise.resolve(null),
         q ? findIdsByAlternativeName(q) : Promise.resolve([] as string[]),
     ])
@@ -561,13 +658,10 @@ export async function searchProductsPrisma(
         ],
     }
 
-    const exactBonus = exact ? 1 : 0
     const fuzzyTotal = await prisma.product.count({ where: fuzzyWhere })
-    const total = fuzzyTotal + exactBonus
+    const productTotal = fuzzyTotal + (exact ? 1 : 0)
 
-    const parsedMeta = buildParsedMeta(parsed, relaxed)
-
-    if (total === 0 && extractedApplied && !relaxed) {
+    if (productTotal === 0 && extractedApplied && !relaxed) {
         const withoutExtracted: ResolvedSearch = {
             prepared: { ...resolved.prepared, parse: false },
             searchQ: resolved.prepared.q,
@@ -581,90 +675,61 @@ export async function searchProductsPrisma(
             parsed: resolved.parsed,
             extractedApplied: false,
             dict: resolved.dict,
+            familyId: resolved.familyId,
         }
         return searchProductsPrisma(query, withoutExtracted, true)
     }
 
-    if (page === 1 && exact) {
-        const take = Math.max(0, limit - 1)
-        const rest =
-            take > 0
-                ? await prisma.product.findMany({
-                      where: fuzzyWhere,
-                      select: productSelect,
-                      orderBy: { name: 'asc' },
-                      take,
-                      skip: 0,
-                  })
-                : []
+    const needFamilies = (page - 1) * limit + limit + 1
+    const take = Math.min(
+        Math.max(needFamilies * FAMILY_FETCH_MULTIPLIER, internalFetchLimit(limit)),
+        FAMILY_SCAN_PRODUCT_CAP
+    )
 
-        return withMeta(
-            {
-                results: [mapProduct(exact), ...rest.map(mapProduct)],
-                meta: {
-                    count: 1 + rest.length,
-                    pagination: paginationMeta(total, page, limit),
-                },
-            },
-            'prisma',
-            parsedMeta
-        )
+    const mapped: MappedProduct[] = []
+    if (exact) {
+        mapped.push(mapProduct(exact))
     }
-
-    const skip = exact ? Math.max(0, offset - 1) : offset
     const rows = await prisma.product.findMany({
         where: fuzzyWhere,
         select: productSelect,
         orderBy: { name: 'asc' },
-        take: limit,
-        skip,
+        take,
+        skip: 0,
     })
+    for (const row of rows) {
+        mapped.push(mapProduct(row))
+    }
 
-    return withMeta(
-        {
-            results: rows.map(mapProduct),
-            meta: {
-                count: rows.length,
-                pagination: paginationMeta(total, page, limit),
-            },
-        },
-        'prisma',
-        parsedMeta
+    const familyOrder: string[] = []
+    const buckets = new Map<string, MappedProduct[]>()
+    ingestMappedIntoFamilies(mapped, familyOrder, buckets, familyId)
+
+    const { groups, hasMoreFromBuffer } = sliceFamilyPage(
+        familyOrder,
+        buckets,
+        page,
+        limit
     )
-}
+    const hasMore =
+        hasMoreFromBuffer ||
+        mapped.length >= take ||
+        productTotal > mapped.length
 
-async function hydrateWithRefill(
-    ids: string[],
-    searchQ: string,
-    filterQuery: ProductSearchQuery,
-    needed: number,
-    meiliOffset: number,
-    excludeId?: string
-): Promise<ProductSearchResult[]> {
-    let results = await hydrateProductsInOrder(ids)
-    if (results.length >= needed || ids.length === 0) {
-        return results.slice(0, needed)
-    }
+    // Rough family total estimate from product hits
+    const estimatedFamilyTotal = Math.max(
+        familyOrder.length,
+        Math.ceil(productTotal / 2)
+    )
 
-    const missing = needed - results.length
-    const refill = await searchProductIdsInMeilisearch(searchQ, {
-        limit: missing + ids.length,
-        offset: meiliOffset + ids.length,
-        brand: filterQuery.brand,
-        attributeValues:
-            filterQuery.attr.length > 0 ? filterQuery.attr : undefined,
-        isAvailable: filterQuery.available,
-        excludeId,
+    return withMeta(groups, {
+        engine: 'prisma',
+        page,
+        limit,
+        estimatedFamilyTotal,
+        hasMore,
+        parsedMeta,
     })
-    if (refill.unavailable || refill.ids.length === 0) {
-        return results
-    }
-
-    const seen = new Set(results.map(r => r.id))
-    const extraIds = refill.ids.filter(id => !seen.has(id))
-    const extra = await hydrateProductsInOrder(extraIds)
-    results = [...results, ...extra]
-    return results.slice(0, needed)
 }
 
 async function searchProductsMeili(
@@ -673,40 +738,62 @@ async function searchProductsMeili(
     relaxed = false
 ) {
     const resolved = ctx ?? (await resolveSearchContext(query))
-    const { searchQ, filterQuery, parsed, extractedApplied } = resolved
+    const { searchQ, filterQuery, parsed, extractedApplied, familyId } =
+        resolved
     const { page, limit } = filterQuery
-    const offset = (page - 1) * limit
-
-    const exact = await findExactByItemNumber(searchQ, filterQuery)
-
-    const exactBonus = exact ? 1 : 0
-    const meiliLimit = page === 1 && exact ? Math.max(0, limit - 1) : limit
-    const meiliOffset =
-        exact && page > 1
-            ? Math.max(0, offset - 1)
-            : page === 1 && exact
-              ? 0
-              : offset
-
-    const meili = await searchProductIdsInMeilisearch(searchQ, {
-        limit: meiliLimit,
-        offset: meiliOffset,
-        brand: filterQuery.brand,
-        attributeValues:
-            filterQuery.attr.length > 0 ? filterQuery.attr : undefined,
-        isAvailable: filterQuery.available,
-        excludeId: exact?.id,
-    })
-
-    if (meili.unavailable) {
-        return null
-    }
-
     const parsedMeta = buildParsedMeta(parsed, relaxed)
 
+    if (familyId === null) {
+        return emptyResult('meili', page, limit, parsedMeta)
+    }
+
+    const needFamilies = (page - 1) * limit + limit + 1
+    const batchSize = internalFetchLimit(limit)
+    const familyOrder: string[] = []
+    const buckets = new Map<string, MappedProduct[]>()
+
+    let offset = 0
+    let estimatedProductTotal = 0
+    let exhausted = false
+    let scanned = 0
+
+    while (familyOrder.length < needFamilies && !exhausted) {
+        const meili = await searchProductIdsInMeilisearch(searchQ, {
+            limit: batchSize,
+            offset,
+            brand: filterQuery.brand,
+            attributeValues:
+                filterQuery.attr.length > 0 ? filterQuery.attr : undefined,
+            isAvailable: filterQuery.available,
+            familyId: familyId ?? undefined,
+        })
+
+        if (meili.unavailable) {
+            return null
+        }
+
+        estimatedProductTotal = meili.estimatedTotal
+
+        if (meili.ids.length === 0) {
+            exhausted = true
+            break
+        }
+
+        const products = await hydrateProductsInOrder(meili.ids)
+        ingestMappedIntoFamilies(products, familyOrder, buckets, familyId)
+
+        offset += meili.ids.length
+        scanned += meili.ids.length
+        if (meili.ids.length < batchSize) {
+            exhausted = true
+        }
+        if (scanned >= FAMILY_SCAN_PRODUCT_CAP) {
+            break
+        }
+    }
+
     if (
-        meili.ids.length === 0 &&
-        !exact &&
+        familyOrder.length === 0 &&
         extractedApplied &&
         !relaxed
     ) {
@@ -723,64 +810,87 @@ async function searchProductsMeili(
             parsed: resolved.parsed,
             extractedApplied: false,
             dict: resolved.dict,
+            familyId: resolved.familyId,
         }
         return searchProductsMeili(query, withoutExtracted, true)
     }
 
-    const needed = page === 1 && exact ? Math.max(0, limit - 1) : limit
-    const rest = await hydrateWithRefill(
-        meili.ids,
-        searchQ,
-        filterQuery,
-        needed,
-        meiliOffset,
-        exact?.id
+    const { groups, hasMoreFromBuffer } = sliceFamilyPage(
+        familyOrder,
+        buckets,
+        page,
+        limit
+    )
+    const hasMore =
+        hasMoreFromBuffer ||
+        (!exhausted && estimatedProductTotal > scanned) ||
+        scanned >= FAMILY_SCAN_PRODUCT_CAP
+
+    const estimatedFamilyTotal = Math.max(
+        (page - 1) * limit + groups.length + (hasMore ? 1 : 0),
+        Math.ceil(estimatedProductTotal / 2)
     )
 
-    const total = meili.estimatedTotal + exactBonus
-    const results =
-        page === 1 && exact ? [mapProduct(exact), ...rest] : rest
+    return withMeta(groups, {
+        engine: 'meili',
+        page,
+        limit,
+        estimatedFamilyTotal,
+        hasMore,
+        parsedMeta,
+    })
+}
 
-    return withMeta(
-        {
-            results,
-            meta: {
-                count: results.length,
-                pagination: paginationMeta(total, page, limit),
-            },
-        },
-        'meili',
-        parsedMeta
-    )
+function skuFamilyResult(
+    row: ProductRow,
+    parsedMeta?: ProductSearchParsedMeta
+) {
+    const groups = groupProductsIntoFamilies([mapProduct(row)])
+    return withMeta(groups, {
+        engine: 'prisma',
+        page: 1,
+        limit: 1,
+        estimatedFamilyTotal: 1,
+        hasMore: false,
+        skuMatch: true,
+        parsedMeta,
+    })
 }
 
 /**
- * Bot product search: Meilisearch (fuzzy + full-text) with Prisma hydrate.
- * Falls back to Prisma ILIKE when Meili is unavailable.
+ * Bot product search: Meilisearch (fuzzy + full-text) with Prisma hydrate,
+ * results grouped by ProductFamily (matched products only).
  */
 export async function searchProducts(query: ProductSearchQuery) {
     const prepared = prepareSearchQuery(query)
+    const familyId = await resolveFamilyIdByCode(prepared.familyCode)
 
-    // Fast path: single SKU token → return immediately without Meili
+    if (familyId === null) {
+        return emptyResult('prisma', prepared.page, prepared.limit)
+    }
+
+    // Fast path: single SKU token → one family group
     if (looksLikeSingleSkuToken(query.q)) {
-        const exact = await findExactByItemNumber(query.q, {
-            ...prepared,
-            brand: prepared.brand,
-            attr: prepared.attr,
-        })
+        const exact = await findExactByItemNumber(
+            query.q,
+            {
+                ...prepared,
+                brand: prepared.brand,
+                attr: prepared.attr,
+            },
+            familyId
+        )
         if (exact) {
-            return withSiblings(
-                skuFastPathResult(exact, {
-                    attr: prepared.attr,
-                    residualQ: prepared.q,
-                    brand: prepared.brand,
-                })
-            )
+            return skuFamilyResult(exact, {
+                attr: prepared.attr,
+                residualQ: prepared.q,
+                brand: prepared.brand,
+            })
         }
     }
 
     const ctx = await resolveSearchContext(query)
     const meiliResult = await searchProductsMeili(query, ctx)
-    if (meiliResult) return withSiblings(meiliResult)
-    return withSiblings(await searchProductsPrisma(query, ctx))
+    if (meiliResult) return meiliResult
+    return searchProductsPrisma(query, ctx)
 }

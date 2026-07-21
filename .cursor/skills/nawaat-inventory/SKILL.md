@@ -12,30 +12,28 @@ description: مخزون Nawaat — منتجات مسطّحة، صفات منتج
 | الحقل | الوصف |
 |-------|--------|
 | `itemNumber` | رقم الصنف — يدخله المستخدم (فريد) |
-| `name` | اسم المنتج (نسخة احتياطية عند الوراثة) |
-| `familyId` | اختياري — ربط بمنتج رئيسي (`ProductFamily`) |
-| `inheritsFamilyName` | إن `true` → اسم العرض من العائلة |
-| `brandId` | البراند |
-| `categoryId` | التصنيف |
+| `name` | اسم المنتج (دائماً مستقل) |
+| `familyId` | **إلزامي** — ربط بمنتج رئيسي (`ProductFamily`) |
+| `brandId` | البراند (يبقى على المنتج) |
 | `isAvailable` | التوفر |
 
-**اسم العرض:** `resolveProductDisplayName()` في `lib/utils/product-display-name.ts` — يُرجع `family.name` عند الوراثة وإلا `Product.name`. يظهر كـ `displayName` في `serializeProduct` (عنوان مختصر لحوارات الحذف/التسعير فقط).
+**التصنيف** ليس على `Product` — يُؤخذ من `ProductFamily.categoryId` ويُسرَّل كـ `product.category` للعرض.
 
-**تفريق الأسماء في UI:** الشاشات الرئيسية تعرض دائماً الحقلين منفصلين — **اسم المنتج** = `Product.name`، و**اسم المنتج الرئيسي** = `family.name` — حتى عند تفعيل الوراثة. لا تُدمج التسميتان في عنوان القائمة/التفاصيل.
+**الأسماء:** لا وراثة. `Product.name` و `family.name` منفصلان دائماً. `displayName` في التسلسل/Bot = مرادف لـ `name` فقط (توافق API).
 
-## المنتجات الرئيسية (تجميع فقط)
+## المنتجات الرئيسية (تجميع + تصنيف)
 
 | الجدول | الدور |
 |--------|--------|
-| `ProductFamily` | طبقة تجميع: `code`, `name`, `description` — **لا** أسعار/صور/طلبات |
-| `Product.familyId` | ربط اختياري؛ `onDelete: SetNull` |
+| `ProductFamily` | تجميع + `categoryId` إلزامي — **لا** أسعار/صور/طلبات |
+| `Product.familyId` | إلزامي؛ `onDelete: Restrict` |
 
 - البيع يبقى على `Product`
 - UI: `app/(dashboard)/product-families/` · Actions: `lib/actions/product-families.ts`
 - حذف العائلة يُرفض إن وُجدت منتجات مرتبطة
-- الواجهة تفرّق دائماً بين اسم العائلة واسم المنتج؛ `displayName` ليس بديلاً عن إخفاء أحدهما
+- تغيير تصنيف العائلة يظهر على كل أصنافها
 
-**لا يوجد:** Color، SKC، SKU، `sizeLabel`، `specKind`، `productNumber`
+**لا يوجد:** Color، SKC، SKU، `sizeLabel`، `specKind`، `productNumber`، `inheritsFamilyName`، `Product.categoryId`
 
 ## صفات المنتج
 
@@ -66,7 +64,6 @@ lib/actions/product-families.ts    # المنتجات الرئيسية (تجمي
 lib/actions/product-images.ts
 lib/actions/import.ts
 lib/utils/product-attributes.ts    # formatProductAttributes
-lib/utils/product-display-name.ts  # displayName / وراثة الاسم
 ```
 
 ## التسعير والوحدات
@@ -78,12 +75,14 @@ lib/utils/product-display-name.ts  # displayName / وراثة الاسم
 ## Constraints
 
 - `itemNumber` unique (إلزامي)
+- `familyId` إلزامي؛ `ProductFamily.categoryId` إلزامي
 - `ProductAttribute.code` و `name` فريدان
 - `ProductAttributeValue`: unique `(productId, attributeId)`
 
 ## Import CSV
 
-أعمدة إلزامية: `name`, `itemNumber`, `categoryCode`, `brandCode`  
+أعمدة إلزامية: `name`, `itemNumber`, `familyCode`, `brandCode`  
+التصنيف من العائلة (لا `categoryCode` على صف المنتج)  
 أعمدة صفات اختيارية: `color`, `size`, `capacity`, `volume`, `weight`
 
 ## Gallery & images

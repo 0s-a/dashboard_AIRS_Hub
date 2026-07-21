@@ -62,7 +62,7 @@ export function RecentProducts({ products }: RecentProductsProps) {
                         <span className="text-base font-bold">أحدث المنتجات</span>
                     </CardTitle>
                     <Link
-                        href="/inventory"
+                        href="/products"
                         className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-bold group transition-colors"
                     >
                         عرض الكل

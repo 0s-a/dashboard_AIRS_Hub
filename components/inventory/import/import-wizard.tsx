@@ -6,16 +6,17 @@ import { ImportUploader } from './import-uploader'
 import { ImportTable } from './import-table'
 import { validateImportData, importProductsBatch, ImportRow, ValidatedRow } from '@/lib/actions/import'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Save, Download } from 'lucide-react'
+import { Save, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import { SerializedCategory } from '@/lib/types/product'
+
+type FamilyOption = { id: string; code: string; name: string }
 
 interface ImportWizardProps {
-    categories: SerializedCategory[]
-    brands: any[] // Or SerializedBrand if defined
+    families: FamilyOption[]
+    brands: { id: string; code: string; name: string }[]
 }
 
-export function ImportWizard({ categories, brands }: ImportWizardProps) {
+export function ImportWizard({ families, brands }: ImportWizardProps) {
     const router = useRouter()
     const [rows, setRows] = useState<ValidatedRow[]>([])
     const [isProcessing, setIsProcessing] = useState(false)
@@ -37,13 +38,11 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
     const revalidateRows = useCallback(async (currentRows: ValidatedRow[]) => {
         setIsProcessing(true)
         try {
-            // Re-validate only the basic structure, or just pass to server again.
-            // Since it might contain new itemNumbers, we should pass to server.
             const rawRows = currentRows.map(r => ({
                 _id: r._id,
                 name: r.name,
                 itemNumber: r.itemNumber,
-                categoryCode: r.categoryCode,
+                familyCode: r.familyCode,
                 brandCode: r.brandCode,
                 color: r.color ?? '',
                 size: r.size ?? '',
@@ -68,15 +67,11 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
         setRows(prev => prev.filter(r => r._id !== id))
     }
 
-    // Debounce revalidation when inline editing stops
     useEffect(() => {
         if (step !== 2) return
         const timer = setTimeout(() => {
-            // Only revalidate if we have rows
             if (rows.length > 0) {
-                // We could optimize to only revalidate if dirty, but simpler is to revalidate
-                // Actually, let's just do it manually via a "Check again" button to avoid spamming the server
-                // Or we can leave it as manual
+                // revalidation is manual via button
             }
         }, 1000)
         return () => clearTimeout(timer)
@@ -98,7 +93,7 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
             const result = await importProductsBatch(validRows)
             if (result.success) {
                 toast.success(result.message)
-                router.push('/inventory')
+                router.push('/products')
             } else {
                 toast.error(result.message)
             }
@@ -118,7 +113,6 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
             const result = await importProductsBatch([row])
             if (result.success) {
                 toast.success('تم استيراد الصف بنجاح')
-                // Remove the row from the list after successful import
                 setRows(prev => prev.filter(r => r._id !== id))
             } else {
                 toast.error(result.message)
@@ -131,7 +125,7 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
     }
 
     const handleDownloadTemplate = () => {
-        const headers = ['name', 'itemNumber', 'categoryCode', 'brandCode', 'color', 'size', 'capacity', 'volume', 'weight']
+        const headers = ['name', 'itemNumber', 'familyCode', 'brandCode', 'color', 'size', 'capacity', 'volume', 'weight']
         const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n"
         const encodedUri = encodeURI(csvContent)
         const link = document.createElement("a")
@@ -198,12 +192,12 @@ export function ImportWizard({ categories, brands }: ImportWizardProps) {
                             جاري المعالجة...
                         </div>
                     ) : (
-                        <ImportTable 
-                            rows={rows} 
-                            onRowChange={handleRowChange} 
+                        <ImportTable
+                            rows={rows}
+                            onRowChange={handleRowChange}
                             onRemoveRow={handleRemoveRow}
                             onImportRow={handleImportSingleRow}
-                            categories={categories}
+                            families={families}
                             brands={brands}
                         />
                     )}

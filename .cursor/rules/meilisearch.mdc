@@ -7,11 +7,15 @@ alwaysApply: false
 # Meilisearch
 
 - العميل: `lib/meilisearch.ts` — `getMeilisearchClient()`, `MEILI_INDEX`
-- المزامنة: `lib/utils/meilisearch-sync.ts`
+- المزامنة: `lib/utils/meilisearch-sync.ts` — يتضمن `searchProductIdsInMeilisearch`
+- تطبيع عربي: `lib/bot/normalize-search-query.ts` (فهرسة + بحث البوت)
 - APIs: `app/api/v1/dashboard/meilisearch/*` — `requireDashboardAuth()`
 
 ## قواعد
 
-- resilient: `.catch(console.warn)` — لا تعطّل التطبيق عند تعطّل Meili
-- بعد تعديل منتج/سعر: `upsertProductToMeilisearch(id).catch(console.warn)`
+- resilient: `.catch(console.warn)` / `{ unavailable: true }` — لا تعطّل التطبيق عند تعطّل Meili
+- بعد تعديل منتج/توفر/وحدات: `upsertProductToMeilisearch(id).catch(console.warn)`
+- تعديل الأسعار لا يُحدّث Meili
+- بحث البوت: Meili-first (`searchText` + تفكيك حذر) ثم hydrate Prisma؛ fallback فلاتر exact + ILIKE على `q`
+- بعد تغيير `MEILI_SETTINGS` أو شكل المستند (`searchText`): مزامنة كاملة مرة واحدة من لوحة search-engine
 - `MEILISEARCH_HOST`, `MEILISEARCH_MASTER_KEY` من env

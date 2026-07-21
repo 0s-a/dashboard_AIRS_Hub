@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { getCustomerById } from "@/lib/actions/customers"
 import { Badge } from "@/components/ui/badge"
 import { CustomerSheet } from "@/components/customers/customer-sheet"
+import { calcOrderTotal } from "@/lib/order-utils"
 import {
     Phone, Mail, MessageCircle,
     Tag, Users, ShoppingCart, ArrowRight, ArrowLeft, Calendar,
@@ -37,11 +38,13 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
     const raw = result.data as any
 
     // ── حسابات الصفحة ────────────────────────────────────────────
-    const totalOrders = raw.orders?.length ?? 0
-    const totalAmount = (raw.orders ?? []).reduce(
-        (sum: number, o: any) => sum + (parseFloat(String(o.totalAmount)) || 0),
-        0
-    )
+    const customerPriceLabelId = raw.priceLabelId ?? null
+    const orders = (raw.orders ?? []).map((o: any) => {
+        const total = calcOrderTotal(o.items ?? [], customerPriceLabelId)
+        return { ...o, totalAmount: total }
+    })
+    const totalOrders = orders.length
+    const totalAmount = orders.reduce((sum: number, o: { totalAmount: number }) => sum + o.totalAmount, 0)
     const primaryPhone = raw.contacts?.find((c: any) => c.type === "phone" && c.isPrimary) ?? raw.contacts?.[0]
     const resolvedCurrencies = (raw.customerCurrencies || []).map((pc: any) => pc.currency).filter(Boolean)
 
@@ -50,6 +53,8 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
     const customerForForm = {
         id:               raw.id,
         name:             raw.name,
+        type:             raw.type ?? "customer",
+        notes:            raw.notes ?? null,
         source:           raw.source,
         isActive:         raw.isActive,
         priceLabelId:     raw.priceLabelId,
@@ -61,12 +66,6 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
         customerCurrencies: raw.customerCurrencies ?? [],
         priceLabel:       raw.priceLabel ?? null,
     }
-
-    // للعرض فقط — نحول totalAmount من Decimal إلى string
-    const orders = (raw.orders ?? []).map((o: any) => ({
-        ...o,
-        totalAmount: String(o.totalAmount ?? "0"),
-    }))
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -89,12 +88,25 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <h1 className="text-2xl font-bold tracking-tight">{raw.name ?? "بدون اسم"}</h1>
+                            <Badge
+                                variant="outline"
+                                className={
+                                    raw.type === "supervisor"
+                                        ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+                                        : "bg-sky-500/10 text-sky-700 border-sky-500/30"
+                                }
+                            >
+                                {raw.type === "supervisor" ? "مشرف" : "عميل"}
+                            </Badge>
                             <Badge className={raw.isActive ? "bg-emerald-500/10 text-emerald-600 border-0" : "bg-muted text-muted-foreground border-0"}>
                                 {raw.isActive ? <><CircleCheck className="h-3 w-3 ml-1" />نشط</> : <><CircleX className="h-3 w-3 ml-1" />غير نشط</>}
                             </Badge>
                         </div>
                         {primaryPhone && (
                             <p className="text-sm text-muted-foreground mt-1 font-mono" dir="ltr">{primaryPhone.value}</p>
+                        )}
+                        {raw.notes && (
+                            <p className="text-sm text-muted-foreground mt-2 max-w-xl">{raw.notes}</p>
                         )}
                     </div>
                 </div>
@@ -230,8 +242,8 @@ export default async function CustomerProfilePage({ params }: CustomerPageProps)
                                         <span className="text-xs text-muted-foreground">{order.items?.length ?? 0} منتج</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        {order.totalAmount && (
-                                            <span className="font-semibold text-sm">{parseFloat(order.totalAmount).toLocaleString("ar")}</span>
+                                        {order.totalAmount > 0 && (
+                                            <span className="font-semibold text-sm">{order.totalAmount.toLocaleString("ar-YE")}</span>
                                         )}
                                         <span className="text-xs text-muted-foreground">
                                             {new Date(order.createdAt).toLocaleDateString("ar-SA")}

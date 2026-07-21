@@ -8,12 +8,10 @@ import {
     serializeProductUnits,
     PRODUCT_PRICE_INCLUDE,
 } from './_shared'
-import { upsertProductToMeilisearch } from '@/lib/utils/meilisearch-sync'
 import { requireAuth } from '@/lib/auth-utils'
 
 async function afterPriceChange(productId: string) {
     revalidateProductPricing(productId)
-    upsertProductToMeilisearch(productId).catch(console.warn)
 }
 
 export async function addProductPrice(productId: string, data: {

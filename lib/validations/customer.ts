@@ -3,7 +3,7 @@ import { contactsArraySchema } from '@/lib/config/contact.config'
 
 // Re-export contact types from the central config
 export type { ContactInput } from '@/lib/config/contact.config'
-export { contactSchema } from '@/lib/config/contact.config'
+export { contactSchema, contactsArraySchema } from '@/lib/config/contact.config'
 
 // ── Source enum ──────────────────────────────────────────────────────────────
 
@@ -17,6 +17,8 @@ const sourcePreprocess = (val: unknown) => {
 
 export const createCustomerSchema = z.object({
     name: z.string().min(1, 'الاسم مطلوب'),
+    type: z.enum(['customer', 'supervisor']).optional(),
+    notes: z.string().nullable().optional(),
     source: z.preprocess(
         sourcePreprocess,
         z.enum(['bot', 'manual', 'import', 'api']).nullable().optional()
@@ -33,6 +35,8 @@ export const createCustomerSchema = z.object({
 
 export const updateCustomerSchema = z.object({
     name: z.string().min(1, 'الاسم مطلوب').optional(),
+    type: z.enum(['customer', 'supervisor']).optional(),
+    notes: z.string().nullable().optional(),
     source: z.preprocess(
         sourcePreprocess,
         z.enum(['bot', 'manual', 'import', 'api']).nullable().optional()

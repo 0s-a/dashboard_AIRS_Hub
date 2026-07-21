@@ -8,10 +8,13 @@ export {
     getContactTypeLabel,
     getContactTypeIcon,
     getContactTypeConfig,
+    normalizeContactValue,
     CONTACT_TYPE_KEYS,
     CONTACT_TYPE_OPTIONS,
     PHONE_CONTACT_TYPES,
 } from '@/lib/config/contact.config'
+
+export { canonicalizePhone } from '@/lib/phone-utils'
 
 // Record type (from DB — has id)
 export interface ContactRecord {

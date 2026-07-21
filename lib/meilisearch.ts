@@ -27,27 +27,41 @@ export function getMeilisearchClient(): Meilisearch {
 // ── Index settings ────────────────────────────────────────────────────────────
 export const MEILI_SETTINGS = {
     searchableAttributes: [
-        'name',
         'itemNumber',
-        'description',
-        'brand',
-        'category',
-        'attributeText',
+        'name',
         'alternativeNames',
+        'searchText',
+        'brand',
+        'attributeText',
+        'category',
         'tags',
     ],
     filterableAttributes: [
+        'id',
         'isAvailable',
-        'brandId',
-        'categoryId',
-        'tags',
+        'brand',
+        'category',
+        'attributeValues',
+        'familyId',
     ],
     sortableAttributes: [
-        'minPrice',
         'name',
-        'createdAt',
     ],
-    displayedAttributes: ['*'],
+    displayedAttributes: [
+        'id',
+        'itemNumber',
+        'name',
+        'productName',
+        'familyId',
+        'brand',
+        'category',
+        'attributeText',
+        'attributeValues',
+        'tags',
+        'alternativeNames',
+        'searchText',
+        'isAvailable',
+    ],
     rankingRules: [
         'words',
         'typo',
@@ -56,6 +70,18 @@ export const MEILI_SETTINGS = {
         'sort',
         'exactness',
     ],
+    /** Small seed — extend as catalog synonyms grow */
+    synonyms: {
+        L: ['لارج', 'كبير', 'large'],
+        لارج: ['L', 'كبير', 'large'],
+        M: ['ميديم', 'وسط', 'medium'],
+        ميديم: ['M', 'وسط', 'medium'],
+        S: ['سمول', 'صغير', 'small'],
+        سمول: ['S', 'صغير', 'small'],
+        XL: ['اكس لارج', 'كبير جدا', 'xlarge'],
+        قطن: ['cotton', 'قطنيه'],
+        cotton: ['قطن', 'قطنيه'],
+    },
 } as const
 
 // ── Ensure index is configured — may throw if Meilisearch is unreachable ──────

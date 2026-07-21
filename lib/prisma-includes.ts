@@ -48,9 +48,13 @@ export const CUSTOMER_INCLUDE = {
     customerCurrencies: { include: { currency: { select: { id: true, name: true, code: true, symbol: true } } } },
 } as const
 
+/** Bot CRM flows — exclude supervisors (PersonType.supervisor) */
+export const BOT_CUSTOMER_WHERE = { type: 'customer' as const }
+
 export const PRODUCT_INCLUDE = {
     category: { select: { id: true, name: true, code: true } },
     brandRef: { select: { id: true, name: true, code: true } },
+    family: { select: { id: true, code: true, name: true } },
     productAttributes: {
         include: {
             attribute: { select: { id: true, code: true, name: true, examples: true } },

@@ -131,25 +131,65 @@ export const columns: ColumnDef<CustomerRow>[] = [
 
 
     // ──────────────────────────────────────
-    // Column 2.5: نوع العميل (Price Label)
+    // Column: التصنيف (عميل / مشرف)
+    // ──────────────────────────────────────
+    {
+        accessorKey: "type",
+        header: "التصنيف",
+        enableColumnFilter: true,
+        meta: {
+            filterType: 'select' as const,
+            filterOptions: [
+                { label: "عميل", value: "customer" },
+                { label: "مشرف", value: "supervisor" },
+            ],
+            align: 'center' as const,
+        },
+        filterFn: "select",
+        size: 110,
+        minSize: 90,
+        maxSize: 140,
+        cell: ({ row }) => {
+            const type = row.original.type
+            const isSupervisor = type === "supervisor"
+            return (
+                <div className="flex justify-center">
+                    <Badge
+                        variant="outline"
+                        className={
+                            isSupervisor
+                                ? "text-[10px] font-medium bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400"
+                                : "text-[10px] font-medium bg-sky-500/10 text-sky-700 border-sky-500/30 dark:text-sky-400"
+                        }
+                    >
+                        {isSupervisor ? "مشرف" : "عميل"}
+                    </Badge>
+                </div>
+            )
+        }
+    },
+
+    // ──────────────────────────────────────
+    // Column: تسعيرة العميل (Price Label)
     // ──────────────────────────────────────
     {
         id: "priceLabel",
         accessorFn: (row) => row.priceLabel?.name,
-        header: "نوع العميل",
+        header: "تسعيرة العميل",
         enableColumnFilter: true,
         meta: {
             filterType: 'text' as const,
-            filterPlaceholder: 'بحث بنوع العميل...',
+            filterPlaceholder: 'بحث بالتسعيرة...',
             cellVariant: 'text' as const,
             align: 'center' as const,
         },
         filterFn: (row, _columnId, filterValue: string) => {
             const pl = row.original.priceLabel
             if (!pl) return false
-            return (
-                pl.name?.toLowerCase().includes(filterValue.toLowerCase()) ||
-                pl.customerType?.toLowerCase().includes(filterValue.toLowerCase())
+            const q = filterValue.toLowerCase()
+            return Boolean(
+                pl.name?.toLowerCase().includes(q) ||
+                pl.customerType?.toLowerCase().includes(q)
             )
         },
         size: 190,

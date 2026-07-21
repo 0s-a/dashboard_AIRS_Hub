@@ -12,10 +12,28 @@ description: مخزون Nawaat — منتجات مسطّحة، صفات منتج
 | الحقل | الوصف |
 |-------|--------|
 | `itemNumber` | رقم الصنف — يدخله المستخدم (فريد) |
-| `name` | اسم المنتج |
+| `name` | اسم المنتج (نسخة احتياطية عند الوراثة) |
+| `familyId` | اختياري — ربط بمنتج رئيسي (`ProductFamily`) |
+| `inheritsFamilyName` | إن `true` → اسم العرض من العائلة |
 | `brandId` | البراند |
 | `categoryId` | التصنيف |
 | `isAvailable` | التوفر |
+
+**اسم العرض:** `resolveProductDisplayName()` في `lib/utils/product-display-name.ts` — يُرجع `family.name` عند الوراثة وإلا `Product.name`. يظهر كـ `displayName` في `serializeProduct` (عنوان مختصر لحوارات الحذف/التسعير فقط).
+
+**تفريق الأسماء في UI:** الشاشات الرئيسية تعرض دائماً الحقلين منفصلين — **اسم المنتج** = `Product.name`، و**اسم المنتج الرئيسي** = `family.name` — حتى عند تفعيل الوراثة. لا تُدمج التسميتان في عنوان القائمة/التفاصيل.
+
+## المنتجات الرئيسية (تجميع فقط)
+
+| الجدول | الدور |
+|--------|--------|
+| `ProductFamily` | طبقة تجميع: `code`, `name`, `description` — **لا** أسعار/صور/طلبات |
+| `Product.familyId` | ربط اختياري؛ `onDelete: SetNull` |
+
+- البيع يبقى على `Product`
+- UI: `app/(dashboard)/product-families/` · Actions: `lib/actions/product-families.ts`
+- حذف العائلة يُرفض إن وُجدت منتجات مرتبطة
+- الواجهة تفرّق دائماً بين اسم العائلة واسم المنتج؛ `displayName` ليس بديلاً عن إخفاء أحدهما
 
 **لا يوجد:** Color، SKC، SKU، `sizeLabel`، `specKind`، `productNumber`
 
@@ -44,9 +62,11 @@ lib/actions/inventory/
 ├── new-tags.queries.ts   # منتجات جديدة
 └── _shared.ts            # helpers + serialize
 lib/actions/product-attributes.ts  # كتالوج الصفات
+lib/actions/product-families.ts    # المنتجات الرئيسية (تجميع)
 lib/actions/product-images.ts
 lib/actions/import.ts
 lib/utils/product-attributes.ts    # formatProductAttributes
+lib/utils/product-display-name.ts  # displayName / وراثة الاسم
 ```
 
 ## التسعير والوحدات

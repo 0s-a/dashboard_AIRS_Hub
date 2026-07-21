@@ -41,7 +41,7 @@ export default async function CRMPage({
                         إدارة العملاء
                     </h1>
                     <p className="text-muted-foreground mt-1">
-                        إدارة قاعدة بيانات العملاء وتتبع نشاطهم وتصنيفاتهم
+                        إدارة العملاء والمشرفين وتتبع نشاطهم وتصنيفاتهم
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -50,7 +50,7 @@ export default async function CRMPage({
                         trigger={
                             <Button className="rounded-xl gap-2">
                                 <UserPlus className="h-4 w-4" />
-                                عميل جديد
+                                إضافة شخص
                             </Button>
                         }
                     />

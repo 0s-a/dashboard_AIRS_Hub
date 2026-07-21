@@ -2,8 +2,8 @@
  * ─── Contact Information Configuration ─────────────────────
  * Central config for all contact types used across the system.
  *
- * Governs which contact types are available for Customers,
- * Supervisors, and any future entity that uses the Contact model.
+ * Governs which contact types are available for Customers
+ * (including type=supervisor) and any future entity that uses the Contact model.
  *
  * To add a new contact type:
  *   1. Add it to CONTACT_TYPES below
@@ -12,6 +12,7 @@
  */
 
 import { z } from 'zod'
+import { canonicalizePhone } from '@/lib/phone-utils'
 
 // ── Type Definitions ────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export interface ContactTypeConfig {
     icon: string
     /** Placeholder text shown in input fields */
     placeholder: string
-    /** Regex pattern for validation */
+    /** Regex pattern for validation (applied after preprocess/canonicalize) */
     pattern: RegExp
     /** Arabic error message when pattern fails */
     patternError: string
@@ -43,8 +44,8 @@ export const CONTACT_TYPES: readonly ContactTypeConfig[] = [
         key: 'phone',
         label: 'هاتف',
         icon: 'Phone',
-        placeholder: '+966XXXXXXXXX',
-        pattern: /^\+?\d{7,15}$/,
+        placeholder: '0501234567',
+        pattern: /^\d{7,15}$/,
         patternError: 'رقم الهاتف يجب أن يحتوي 7-15 رقماً (بدون مسافات أو رموز)',
         requiredError: 'رقم الهاتف مطلوب',
         isPhoneType: true,
@@ -54,8 +55,8 @@ export const CONTACT_TYPES: readonly ContactTypeConfig[] = [
         key: 'whatsapp',
         label: 'واتساب',
         icon: 'MessageCircle',
-        placeholder: '+966XXXXXXXXX',
-        pattern: /^\+?\d{7,15}$/,
+        placeholder: '0501234567',
+        pattern: /^\d{7,15}$/,
         patternError: 'رقم الواتساب يجب أن يحتوي 7-15 رقماً (بدون مسافات أو رموز)',
         requiredError: 'رقم الواتساب مطلوب',
         isPhoneType: true,
@@ -114,6 +115,23 @@ export function getContactTypeIcon(key: string): string {
     return CONTACT_TYPE_MAP[key]?.icon ?? 'Contact'
 }
 
+/**
+ * Normalize a contact value for storage.
+ * Phones → canonical digits; email → trim + lowercase; other → trim.
+ */
+export function normalizeContactValue(type: string, value: string): string | null {
+    const config = CONTACT_TYPE_MAP[type]
+    if (config?.isPhoneType) {
+        return canonicalizePhone(value)
+    }
+    if (type === 'email') {
+        const v = value.trim().toLowerCase()
+        return v || null
+    }
+    const v = value.trim()
+    return v || null
+}
+
 // ── Zod Schemas (auto-generated from config) ────────────────
 
 /**
@@ -121,11 +139,34 @@ export function getContactTypeIcon(key: string): string {
  * Used internally to construct the discriminated union.
  */
 function buildContactTypeSchema(config: ContactTypeConfig) {
+    const valueSchema = config.isPhoneType
+        ? z
+            .string()
+            .min(1, config.requiredError)
+            .transform((val, ctx) => {
+                const canon = canonicalizePhone(val)
+                if (!canon || !config.pattern.test(canon)) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: config.patternError,
+                    })
+                    return z.NEVER
+                }
+                return canon
+            })
+        : config.key === 'email'
+            ? z
+                .string()
+                .min(1, config.requiredError)
+                .transform((val) => val.trim().toLowerCase())
+                .pipe(z.string().regex(config.pattern, config.patternError))
+            : z.string()
+                .min(1, config.requiredError)
+                .regex(config.pattern, config.patternError)
+
     return z.object({
         type: z.literal(config.key),
-        value: z.string()
-            .min(1, config.requiredError)
-            .regex(config.pattern, config.patternError),
+        value: valueSchema,
         label: z.string().nullable().optional(),
         isPrimary: z.boolean().default(false),
     })
@@ -151,48 +192,66 @@ export type ContactInput = z.infer<typeof contactSchema>
  * Contacts array with strict uniqueness rules:
  *   1. No duplicate values — same phone/email cannot appear twice
  *   2. No duplicate types — only ONE contact per type (one phone, one whatsapp, one email)
- * Reusable in any form (Customer, Supervisor, etc.)
+ *   3. At most one isPrimary (transform assigns first phone if none)
+ * Reusable in any customer form (عميل أو مشرف).
  */
-export const contactsArraySchema = z.array(contactSchema).superRefine((contacts, ctx) => {
-    const seenValues = new Map<string, number>()
-    const seenTypes = new Map<string, number>()
+export const contactsArraySchema = z
+    .array(contactSchema)
+    .superRefine((contacts, ctx) => {
+        const seenValues = new Map<string, number>()
+        const seenTypes = new Map<string, number>()
+        const primaryIndices: number[] = []
 
-    contacts.forEach((c, i) => {
-        const val = c.value.trim()
+        contacts.forEach((c, i) => {
+            const val = c.value.trim()
 
-        // Rule 1: no duplicate values
-        if (seenValues.has(val)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: [i, 'value'],
-                message: 'هذا الرقم/البريد مكرر في القائمة',
+            if (c.isPrimary) primaryIndices.push(i)
+
+            if (seenValues.has(val)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: [i, 'value'],
+                    message: 'هذا الرقم/البريد مكرر في القائمة',
+                })
+            } else {
+                seenValues.set(val, i)
+            }
+
+            if (seenTypes.has(c.type)) {
+                const typeLabel = CONTACT_TYPE_MAP[c.type]?.label ?? c.type
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: [i, 'type'],
+                    message: `يمكن إضافة ${typeLabel} واحد فقط لكل شخص`,
+                })
+            } else {
+                seenTypes.set(c.type, i)
+            }
+        })
+
+        if (primaryIndices.length > 1) {
+            primaryIndices.slice(1).forEach(i => {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: [i, 'isPrimary'],
+                    message: 'يمكن تعيين جهة اتصال أساسية واحدة فقط',
+                })
             })
-        } else {
-            seenValues.set(val, i)
-        }
-
-        // Rule 2: no duplicate types (one phone, one whatsapp, one email per entity)
-        if (seenTypes.has(c.type)) {
-            const typeLabel = CONTACT_TYPE_MAP[c.type]?.label ?? c.type
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: [i, 'type'],
-                message: `يمكن إضافة ${typeLabel} واحد فقط لكل عميل/مشرف`,
-            })
-        } else {
-            seenTypes.set(c.type, i)
         }
     })
-})
+    .transform(ensureSinglePrimary)
 
-// ── Default Contact Labels ──────────────────────────────────
-
-/** Common label suggestions for contact fields */
-export const CONTACT_LABEL_SUGGESTIONS = [
-    'جوال',
-    'عمل',
-    'منزل',
-    'شخصي',
-    'رئيسي',
-    'بديل',
-] as const
+/**
+ * Ensure at most one isPrimary; if none set, mark first phone-type (or first) as primary.
+ */
+function ensureSinglePrimary<T extends { type: string; isPrimary?: boolean }>(
+    contacts: T[]
+): T[] {
+    const primaryCount = contacts.filter(c => c.isPrimary).length
+    if (primaryCount === 0 && contacts.length > 0) {
+        const phoneIdx = contacts.findIndex(c => CONTACT_TYPE_MAP[c.type]?.isPhoneType)
+        const idx = phoneIdx >= 0 ? phoneIdx : 0
+        return contacts.map((c, i) => ({ ...c, isPrimary: i === idx }))
+    }
+    return contacts
+}

@@ -1,10 +1,32 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { safeAction, safeActionWithRevalidation } from '@/lib/action-utils'
 import { requireAuth } from '@/lib/auth-utils'
 import type { ContactInput } from '@/lib/customer-types'
+import { normalizeContactValue } from '@/lib/config/contact.config'
+import type { PersonType } from '@prisma/client'
+
+function contactsForWrite(contacts: ContactInput[] | null | undefined) {
+    if (!contacts?.length) return []
+    const out: Array<{
+        type: string
+        value: string
+        label: string | null
+        isPrimary: boolean
+    }> = []
+    for (const c of contacts) {
+        const value = normalizeContactValue(c.type, c.value ?? '')
+        if (!value) continue
+        out.push({
+            type: c.type,
+            value,
+            label: c.label || null,
+            isPrimary: c.isPrimary || false,
+        })
+    }
+    return out
+}
 
 const PATHS = '/customers'
 
@@ -42,11 +64,13 @@ export async function getCustomers(options?: {
     page?: number
     pageSize?: number
     search?: string
+    type?: PersonType
 }) {
-    const { page = 1, pageSize = 100, search } = options ?? {}
+    const { page = 1, pageSize = 100, search, type } = options ?? {}
 
     return safeAction(async () => {
         const where: any = {
+            ...(type && { type }),
             ...(search && {
                 OR: [
                     { name: { contains: search, mode: 'insensitive' } },
@@ -63,6 +87,8 @@ export async function getCustomers(options?: {
                 select: {
                     id: true,
                     name: true,
+                    type: true,
+                    notes: true,
                     source: true,
                     contacts: { select: { id: true, type: true, value: true, label: true, isPrimary: true } },
                     tags: { include: { tag: { select: { id: true, name: true } } } },
@@ -96,7 +122,11 @@ export async function getCustomerById(id: string) {
                     take: 20,
                     include: {
                         items: {
-                            include: {
+                            select: {
+                                quantity: true,
+                                unitPrice: true,
+                                currency: { select: { symbol: true } },
+                                priceLabel: { select: { name: true } },
                                 product: {
                                     select: {
                                         id: true,
@@ -123,10 +153,11 @@ export async function getCustomerStats() {
     return safeAction(async () => {
         const sevenDaysAgo = new Date()
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        const base = { type: 'customer' as const }
         const [total, newInWeek, disabled] = await Promise.all([
-            prisma.customer.count(),
-            prisma.customer.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-            prisma.customer.count({ where: { isActive: false } }),
+            prisma.customer.count({ where: base }),
+            prisma.customer.count({ where: { ...base, createdAt: { gte: sevenDaysAgo } } }),
+            prisma.customer.count({ where: { ...base, isActive: false } }),
         ])
         return { total, newInWeek, disabled }
     }, 'تعذّر جلب إحصائيات العملاء')
@@ -136,6 +167,8 @@ export async function getCustomerStats() {
 
 export interface CreateCustomerData {
     name: string
+    type?: PersonType
+    notes?: string | null
     source?: 'bot' | 'manual' | 'import' | 'api' | null
     contacts?: ContactInput[] | null
     tags?: string[] | null
@@ -148,20 +181,17 @@ export async function createCustomer(data: CreateCustomerData) {
         async () => {
             await requireAuth()
             try {
+                const personType = data.type ?? 'customer'
                 return await prisma.customer.create({
                     data: {
                         name: data.name.trim(),
+                        type: personType,
+                        notes: data.notes?.trim() || null,
                         source: data.source || null,
-                        contacts: data.contacts && data.contacts.length > 0 ? {
-                            create: data.contacts
-                                .filter(c => c.value?.trim())
-                                .map(c => ({
-                                    type: c.type,
-                                    value: c.value.trim(),
-                                    label: c.label || null,
-                                    isPrimary: c.isPrimary || false,
-                                }))
-                        } : undefined,
+                        contacts: (() => {
+                            const rows = contactsForWrite(data.contacts)
+                            return rows.length > 0 ? { create: rows } : undefined
+                        })(),
                         tags: data.tags?.length ? {
                             create: data.tags.map(name => ({
                                 tag: {
@@ -175,7 +205,7 @@ export async function createCustomer(data: CreateCustomerData) {
                         customerCurrencies: data.currencyIds && data.currencyIds.length > 0 ? {
                             create: data.currencyIds.map(currencyId => ({ currencyId }))
                         } : undefined,
-                        priceLabelId: data.priceLabelId || null,
+                        priceLabelId: personType === 'supervisor' ? null : (data.priceLabelId || null),
                         lastInteraction: new Date(),
                     },
                 })
@@ -184,7 +214,7 @@ export async function createCustomer(data: CreateCustomerData) {
                     const constraint = err?.meta?.target as string | string[] | undefined
                     const name = Array.isArray(constraint) ? constraint.join(',') : constraint
                     if (name?.includes('value')) {
-                        throw new Error('هذا الرقم/البريد مسجّل بالفعل في النظام لعميل أو مشرف آخر')
+                        throw new Error('هذا الرقم/البريد مسجّل بالفعل لشخص آخر في النظام')
                     }
                     if (name?.includes('customer_type')) {
                         throw new Error('لا يمكن إضافة أكثر من وسيلة اتصال واحدة من نفس النوع')
@@ -203,6 +233,8 @@ export async function createCustomer(data: CreateCustomerData) {
 
 export interface UpdateCustomerData {
     name?: string
+    type?: PersonType
+    notes?: string | null
     source?: 'bot' | 'manual' | 'import' | 'api' | null
     contacts?: ContactInput[] | null
     tags?: string[] | null
@@ -215,20 +247,18 @@ export async function updateCustomer(id: string, data: UpdateCustomerData) {
         async () => {
             await requireAuth()
             try {
+                const clearPricing = data.type === 'supervisor'
                 return await prisma.customer.update({
                     where: { id },
                     data: {
                         name: data.name,
+                        ...(data.type !== undefined && { type: data.type }),
+                        ...(data.notes !== undefined && { notes: data.notes?.trim() || null }),
                         source: data.source !== undefined ? data.source || null : undefined,
                         ...(data.contacts !== undefined && {
                             contacts: {
                                 deleteMany: {},
-                                create: (data.contacts || []).filter(c => c.value?.trim()).map(c => ({
-                                    type: c.type,
-                                    value: c.value.trim(),
-                                    label: c.label || null,
-                                    isPrimary: c.isPrimary || false,
-                                })),
+                                create: contactsForWrite(data.contacts),
                             },
                         }),
                         ...(data.tags !== undefined && {
@@ -247,12 +277,14 @@ export async function updateCustomer(id: string, data: UpdateCustomerData) {
                         ...(data.currencyIds !== undefined && {
                             customerCurrencies: {
                                 deleteMany: {},
-                                create: (data.currencyIds || []).map(currencyId => ({ currencyId })),
+                                create: clearPricing ? [] : (data.currencyIds || []).map(currencyId => ({ currencyId })),
                             },
                         }),
-                        ...(data.priceLabelId !== undefined && {
-                            priceLabelId: data.priceLabelId || null,
-                        }),
+                        ...(clearPricing
+                            ? { priceLabelId: null }
+                            : data.priceLabelId !== undefined
+                                ? { priceLabelId: data.priceLabelId || null }
+                                : {}),
                         lastInteraction: new Date(),
                     },
                 })
@@ -261,7 +293,7 @@ export async function updateCustomer(id: string, data: UpdateCustomerData) {
                     const constraint = err?.meta?.target as string | string[] | undefined
                     const name = Array.isArray(constraint) ? constraint.join(',') : constraint
                     if (name?.includes('value')) {
-                        throw new Error('هذا الرقم/البريد مسجّل بالفعل في النظام لعميل أو مشرف آخر')
+                        throw new Error('هذا الرقم/البريد مسجّل بالفعل لشخص آخر في النظام')
                     }
                     if (name?.includes('customer_type')) {
                         throw new Error('لا يمكن إضافة أكثر من وسيلة اتصال واحدة من نفس النوع')

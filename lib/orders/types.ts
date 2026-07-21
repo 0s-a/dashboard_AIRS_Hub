@@ -22,6 +22,7 @@ export interface UpdateOrderInput {
     notes?: string | null
     deliveryInfo?: string | null
     customerId?: string | null
+    items?: OrderItemInput[]
 }
 
 export interface ListOrdersInput {

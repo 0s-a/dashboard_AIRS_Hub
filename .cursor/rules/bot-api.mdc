@@ -6,6 +6,18 @@ alwaysApply: false
 
 # Bot API Routes
 
+## حدود الطبقات
+
+| المسار | الغرض | Auth |
+|--------|--------|------|
+| `/api/v1/bot/**` | HTTP للبوت فقط | `validateApiKey` (`x-api-key`) |
+| `/api/v1/dashboard/**` | ops (Meilisearch) فقط | JWT عبر `requireDashboardAuth` |
+| `lib/actions/**` | CRUD لوحة التحكم | `requireAuth` |
+
+- لا تحوّل Dashboard CRUD إلى REST Bot endpoints.
+- لا تضف endpoint Dashboard لعمل ينجزه Server Action.
+- العقد المنشور: `public/openapi.json` — يُحدَّث يدوياً مع كل تغيير مسار.
+
 ## النمط الإلزامي
 
 ```typescript
@@ -14,16 +26,67 @@ if (authError) return authError
 
 const parsed = Schema.safeParse(body)
 if (!parsed.success) {
-  return apiError('Missing or invalid fields', 400, { code: 'VALIDATION_ERROR', details: parsed.error.flatten() })
+  return apiError('البيانات غير صالحة', 400, {
+    code: 'VALIDATION_ERROR',
+    details: parsed.error.flatten(),
+  })
 }
 
 return apiSuccess(data)
 ```
 
-## قواعد
+Route رفيع فقط: auth → Zod → استدعاء service → `apiSuccess` / `apiError`.
+
+## أين يذهب المنطق
+
+| Domain | المجلد |
+|--------|--------|
+| Orders | `lib/orders/` (المرجع الذهبي) |
+| Customers | `lib/customers/` |
+| product price / image / search / notifications | `lib/bot/` |
+
+امنع Prisma الثقيل داخل `route.ts` إذا تجاوز المنطق ~80–100 سطر — انقله إلى service.
+
+## Envelope
+
+- نجاح: `{ success: true, data, ...meta }` عبر `apiSuccess`
+- خطأ: `{ success: false, error, code?, details? }` عبر `apiError`
+- رسائل `error` بالعربية؛ `code` إنجليزي آلي للبوت
+
+## أكواد الخطأ
+
+| code | متى |
+|------|-----|
+| `UNAUTHORIZED` | مفتاح API ناقص/خاطئ |
+| `MISCONFIGURED` | `BOT_API_KEY` غير مضبوط (503) |
+| `VALIDATION_ERROR` | Zod أو حقول ناقصة |
+| `NOT_FOUND` | مورد غير موجود |
+| `DUPLICATE_CONTACT` | هاتف/بريد مكرر |
+| `DUPLICATE_FIELD` | حقل فريد مكرر |
+| `INVALID_PHONE` | رقم هاتف غير صالح |
+| `MISSING_PHONE` | معاملات الهاتف ناقصة |
+| `SUPERVISOR_CONTACT` | الرقم يعود لمشرف |
+| `HAS_ORDERS` | حذف عميل له طلبات |
+| `INTERNAL_ERROR` | خطأ غير متوقع |
+
+(أكواد domain مثل `ORDER_NOT_MUTABLE` تبقى في `lib/orders`.)
+
+## قواعد إلزامية
 
 - كل route يبدأ بـ `validateApiKey` من `lib/api-utils.ts`
-- تحقق من المدخلات بـ Zod
-- استخدم `normalizePhonePatterns()` لبحث العملاء بالهاتف
+- تحقق من المدخلات بـ Zod قبل أي side-effect
+- الهاتف دائماً عبر `normalizePhonePatterns()` / `validatePhoneInput()`
+- الصفحات عبر `parsePagination` / `paginationMeta`
 - استخدم `apiSuccess` / `apiError` — لا `{ error }` مباشرة
-- أضف `code` للأخطاء الآلية (مثل `NOT_FOUND`, `UNAUTHORIZED`)
+- أضف `code` لكل خطأ آلي
+- بادئة السجلات: `[Bot METHOD /path]`
+
+## SOP — endpoint جديد
+
+1. Zod schema في `lib/<domain>/` أو `lib/bot/`
+2. منطق في `service.ts`
+3. `route.ts` رفيع بالنمط أعلاه
+4. حدّث `public/openapi.json`
+5. حدّث skill `nawaat-bot-api` إن تغيّر سلوك domain
+
+راجع skill: `.cursor/skills/nawaat-bot-api/SKILL.md`

@@ -23,10 +23,18 @@ export interface ProductInput {
     brandId: string
     description?: string | null
     categoryId: string
+    familyId?: string | null
+    inheritsFamilyName?: boolean
     productAttributes?: ProductAttributeInput[]
     alternativeNames?: string[]
     tags?: string[]
     isAvailable?: boolean
+}
+
+export type SerializedProductFamilyRef = {
+    id: string
+    code: string
+    name: string
 }
 
 export type SerializedPrice = {
@@ -91,6 +99,7 @@ export type SerializedProduct = {
     itemNumber: string
     slug: string
     name: string
+    displayName: string
     brandId: string
     brandRef: {
         id: string
@@ -103,6 +112,9 @@ export type SerializedProduct = {
     tags: string[]
     categoryId: string
     category: SerializedCategory
+    familyId: string | null
+    family: SerializedProductFamilyRef | null
+    inheritsFamilyName: boolean
     productAttributes: SerializedProductAttribute[]
     isAvailable: boolean
     order: number

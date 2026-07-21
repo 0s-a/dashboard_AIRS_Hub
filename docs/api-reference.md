@@ -223,29 +223,40 @@ GET /api/v1/bot/customers/{uuid}/pricing
 
 ## Products API
 
-### `GET /products` — قائمة المنتجات
+### `GET /products/search` — بحث بالاسم أو رقم الصنف
+
+بحث Meilisearch-first (fuzzy + full-text + typo + تطبيع عربي بما فيه `ى→ي` وحقل `searchText`) مع hydrate من Prisma. تفكيك حذر لـ `q` إلى `brand`/`attr` (افتراضي؛ `parse=false` للتعطيل) مع أولوية للفلاتر الصريحة وإعادة محاولة بدون الفلاتر المستخرجة عند الصفر (`meta.parsed.relaxed`). رقم صنف وحيد يُرجع فوراً بدون Meili. عند تعطّل Meili يُستخدم Prisma بفلاتر exact وILIKE على النص (`engine` في الـ meta).
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `search` / `q` | string | بحث بالاسم أو الرقم أو العلامة التجارية |
-| `available` | `true` \| `false` | فلترة بالتوفر |
-| `category` | uuid | فلترة بالتصنيف |
+| `q` | string | **مطلوب** — اسم أو رقم أو اسم بديل أو براند أو صفة |
+| `brand` | string | اختياري صريح — تطابق كامل لاسم العلامة بعد التطبيع (يتفوّق على المستخرج) |
+| `attr` | string (متكرر) | اختياري — تطابق كامل لقيمة صفة بعد التطبيع؛ عدة `attr` = AND |
+| `available` | boolean | اختياري — `true` للمتاح فقط / `false` لغير المتاح |
+| `parse` | boolean | اختياري — افتراضي `true`؛ `false` يعطّل تفكيك `q` |
+| `page` / `limit` | number | pagination (حد أقصى 50) |
+
+**الاستجابة:** معلومات أساسية فقط (`id`, `itemNumber`, `name`, `isAvailable`, `brand`, `category`, `attributes`) — بدون أسعار أو صور. الـ meta يتضمن `engine: "meili" | "prisma"` و`parsed?: { brand?, attr[], residualQ, relaxed? }`.
+
+**بعد الشحن:** من لوحة search-engine نفّذ مزامنة كاملة مرة واحدة لفهرسة `searchText` والتطبيع الجديد.
 
 ---
 
-### `GET /products/search` — بحث نصي متقدم
-
-يستخدم PostgreSQL Full-Text Search مع fallback لـ ILIKE.
+### `GET /products/price` — سعر منتج
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `q` | string | **مطلوب** — نص البحث |
-| `customerId` | uuid | فلترة الأسعار حسب تسعيرة العميل |
-| `available` | `true` \| `false` | فلترة بالتوفر |
-| `category` | uuid | فلترة بالتصنيف |
-| `brand` | string | فلترة بالعلامة التجارية |
+| `productId` أو `itemNumber` | string | **أحدهما مطلوب** |
+| `customerId` | uuid | اختياري — تسمية التسعير وعملات العميل |
+| `currency` | string | اختياري — رمز عملة هدف (مثل `USD`) |
 
-**الاستجابة تتضمن:** `searchMode: "fulltext" | "ilike_fallback"`
+---
+
+### `GET /products/image` — الصورة الرئيسية
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `productId` أو `itemNumber` | string | **أحدهما مطلوب** |
 
 ---
 
@@ -286,46 +297,42 @@ GET /api/v1/bot/customers/{uuid}/pricing
 
 ## Notifications API
 
-### `POST /notifications` — إنشاء إشعار AI
+### `POST /notifications` — إنشاء إشعار بحث (عقد خفيف)
+
+البوت يرسل الحد الأدنى؛ الخادم يشتق `productName` و`source` ويحل العميل من الهاتف. Dedup خلال 24 ساعة يعيد الإشعار الموجود بـ `created: false` و`200`.
 
 ```json
-{
-  "type": "out_of_stock",
-  "searchQuery": "جهاز تكييف",
-  "productId": "uuid",
-  "productName": "تكييف سامسونج",
-  "phoneNumber": "0501234567",
-  "customerId": "uuid",
-  "source": "bot"
-}
+{ "type": "not_found", "q": "تكييف سامسونج", "phone": "0501234567" }
 ```
 
-| type | الاستخدام |
-|------|-----------|
-| `out_of_stock` | المنتج موجود لكن غير متوفر |
-| `not_found` | المنتج غير موجود في الكتالوج |
+```json
+{ "type": "out_of_stock", "q": "ABC-1", "itemNumber": "ABC-1", "phone": "0501234567" }
+```
 
----
+| حقل | مطلوب | ملاحظات |
+|------|--------|---------|
+| `type` | نعم | `out_of_stock` \| `not_found` |
+| `q` | نعم | alias: `searchQuery` |
+| `phone` | لا | alias: `phoneNumber`؛ يُطبَّع ويُحل `customerId` إن أمكن |
+| `customerId` | لا | إن وُجد يجب أن يكون صالحاً |
+| `productId` / `itemNumber` | لـ `out_of_stock` | أحدهما إلزامي عند نفاد المخزون |
 
-### `GET /notifications` — قائمة الإشعارات
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `type` | string | فلترة بالنوع |
-| `isRead` | `true` \| `false` | فلترة بحالة القراءة |
-| `page` / `limit` | number | pagination |
-
----
-
-## Check Price API
-
-### `POST /check-price` — استعلام عن سعر منتج لشخص
+**الاستجابة:**
 
 ```json
-{
-  "phoneNumber": "0501234567",
-  "productId": "uuid"
-}
+{ "success": true, "data": { "id": "...", "type": "not_found", "created": true } }
+```
+
+القراءة والأرشفة عبر لوحة التحكم فقط — لا يوجد `GET` على Bot API.
+
+---
+
+## Product Price API
+
+### `GET /products/price` — استعلام عن سعر منتج
+
+```
+GET /api/v1/bot/products/price?itemNumber=ABC-1&customerId=uuid&currency=SAR
 ```
 
 **الاستجابة:**
@@ -334,8 +341,9 @@ GET /api/v1/bot/customers/{uuid}/pricing
   "success": true,
   "data": {
     "productId": "...",
+    "itemNumber": "ABC-1",
     "productName": "...",
-    "customerName": "...",
+    "customerId": "...",
     "prices": [
       { "label": "سعر الجملة", "value": 150, "currency": { "code": "SAR", "symbol": "ر.س" }, "unit": "كرتون" }
     ]
@@ -343,5 +351,5 @@ GET /api/v1/bot/customers/{uuid}/pricing
 }
 ```
 
-> إذا لم يُعثر على العميل → تُعاد جميع أسعار المنتج.  
-> إذا وُجد العميل → تُعاد فقط الأسعار المخصصة له.
+> بدون `customerId` → التسمية الافتراضية والعملة الافتراضية (أو `currency` إن مُرِّرت).  
+> مع `customerId` → تسعيرة العميل وعملاته (ما لم تُفرض `currency`).

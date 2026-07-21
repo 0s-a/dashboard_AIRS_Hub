@@ -37,12 +37,12 @@ export const CustomerSheet = React.memo(function CustomerSheet({ customer, mode 
             <SheetContent className="overflow-y-auto sm:max-w-md">
                 <SheetHeader>
                     <SheetTitle>
-                        {isCreate ? 'إضافة عميل جديد' : 'تعديل بيانات العميل'}
+                        {isCreate ? 'إضافة شخص جديد' : 'تعديل البيانات'}
                     </SheetTitle>
                     <SheetDescription>
                         {isCreate
-                            ? 'أدخل بيانات العميل الجديد وأضفه إلى قاعدة البيانات.'
-                            : 'تحديث تفاصيل العميل في قاعدة البيانات.'}
+                            ? 'أدخل البيانات واختر التصنيف (عميل أو مشرف).'
+                            : 'تحديث التفاصيل والتصنيف في قاعدة البيانات.'}
                     </SheetDescription>
                 </SheetHeader>
                 <div className="py-4">

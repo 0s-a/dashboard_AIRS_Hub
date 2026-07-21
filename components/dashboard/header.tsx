@@ -84,12 +84,16 @@ export function Header({ isCollapsed, toggleSidebar }: HeaderProps) {
     const [userColor, setUserColor] = useState("#6366f1")
 
     const loadNotifications = useCallback(async () => {
-        const [countRes, notifsRes] = await Promise.all([
-            getUnreadCount(),
-            getNotifications({ limit: 5 }),
-        ])
-        if (countRes.success && countRes.data !== undefined) setUnreadCount(countRes.data as number)
-        if (notifsRes.success && notifsRes.data) setRecentNotifs(notifsRes.data)
+        try {
+            const [countRes, notifsRes] = await Promise.all([
+                getUnreadCount(),
+                getNotifications({ limit: 5 }),
+            ])
+            if (countRes.success && countRes.data !== undefined) setUnreadCount(countRes.data as number)
+            if (notifsRes.success && notifsRes.data) setRecentNotifs(notifsRes.data)
+        } catch {
+            // Stale Server Action IDs after HMR/restart, or auth redirects — skip this poll cycle
+        }
     }, [])
 
     useEffect(() => {

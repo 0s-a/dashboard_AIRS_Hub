@@ -54,8 +54,6 @@ interface SearchHit {
     brand:        string | null
     category:     string | null
     isAvailable:  boolean
-    minPrice:     number | null
-    primaryImage: string | null
 }
 
 interface SearchResult {
@@ -470,12 +468,9 @@ function SearchHitRow({ hit, rank }: { hit: SearchHit; rank: number }) {
             {/* Rank */}
             <span className="text-xs font-mono text-muted-foreground/60 w-5 shrink-0 text-center">{rank}</span>
 
-            {/* Image placeholder */}
+            {/* Icon placeholder — image paths are not synced to Meilisearch */}
             <div className="h-9 w-9 rounded-lg bg-muted/50 shrink-0 overflow-hidden flex items-center justify-center">
-                {hit.primaryImage
-                    ? <img src={hit.primaryImage} alt={hit.name} className="h-full w-full object-cover" />
-                    : <Package className="h-4 w-4 text-muted-foreground/40" />
-                }
+                <Package className="h-4 w-4 text-muted-foreground/40" />
             </div>
 
             {/* Info */}
@@ -490,11 +485,6 @@ function SearchHitRow({ hit, rank }: { hit: SearchHit; rank: number }) {
 
             {/* Right side */}
             <div className="flex items-center gap-2 shrink-0">
-                {hit.minPrice !== null && (
-                    <span className="text-xs font-semibold text-foreground/80">
-                        {hit.minPrice.toLocaleString('ar')}
-                    </span>
-                )}
                 <span className={cn(
                     'text-xs px-2 py-0.5 rounded-full font-medium',
                     hit.isAvailable

@@ -2,6 +2,8 @@ export type OrderErrorCode =
     | 'NOT_FOUND'
     | 'VALIDATION_ERROR'
     | 'ORDER_NOT_MUTABLE'
+    | 'INVALID_STATUS_TRANSITION'
+    | 'ORDER_NOT_DELETABLE'
     | 'INTERNAL_ERROR'
 
 export class OrderServiceError extends Error {

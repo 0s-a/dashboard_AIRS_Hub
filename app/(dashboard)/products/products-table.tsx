@@ -90,18 +90,22 @@ export function ProductsTable({
         limit?: number
     }) => {
         startTransition(async () => {
-            const res = await getProductsPaginated({
-                search: params.search,
-                categoryId: params.categoryId,
-                brandId: params.brandId,
-                page: params.page ?? 1,
-                limit: params.limit ?? limit,
-                sortBy: "createdAt",
-                sortDir: "desc",
-            })
-            if (res.success) {
-                setProducts(res.data)
-                setPagination(res.pagination)
+            try {
+                const res = await getProductsPaginated({
+                    search: params.search,
+                    categoryId: params.categoryId,
+                    brandId: params.brandId,
+                    page: params.page ?? 1,
+                    limit: params.limit ?? limit,
+                    sortBy: "createdAt",
+                    sortDir: "desc",
+                })
+                if (res.success) {
+                    setProducts(res.data)
+                    setPagination(res.pagination)
+                }
+            } catch {
+                // Stale Server Action IDs after HMR/restart, or auth redirects
             }
         })
     }, [limit])

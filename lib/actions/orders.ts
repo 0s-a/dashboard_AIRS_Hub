@@ -1,19 +1,27 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import {
     safeAction,
     safeActionWithRevalidation,
-    generateItemNumber,
 } from '@/lib/action-utils'
-import { validateOrderStatus, VALID_ORDER_STATUSES } from '@/lib/order-constants'
-import { ORDER_INCLUDE } from '@/lib/prisma-includes'
+import { VALID_ORDER_STATUSES } from '@/lib/order-constants'
 import { requireAuth } from '@/lib/auth-utils'
-import { resolveItemSnapshot } from '@/lib/orders/snapshot'
+import {
+    createOrder as createOrderService,
+    deleteOrder as deleteOrderService,
+    getOrderById as getOrderByIdService,
+    listOrders,
+    updateOrder as updateOrderService,
+    OrderServiceError,
+} from '@/lib/orders'
+import type {
+    CreateOrderInput,
+    UpdateOrderInput,
+} from '@/lib/orders'
 
 // ============================================================
-// Types
+// Types — keep Action signatures stable for existing UI
 // ============================================================
 
 export interface OrderItemInput {
@@ -21,7 +29,6 @@ export interface OrderItemInput {
     quantity: number
     notes?: string | null
     unitId?: string | null
-    // Snapshot — السعر المُثبَّت وقت إنشاء الطلب
     unitPrice?: number | null
     currencyId?: string | null
     priceLabelId?: string | null
@@ -46,58 +53,50 @@ export interface GetOrdersOptions {
     page?: number
     limit?: number
     status?: string
-    customerId?: string    // فلتر بالعميل
-    search?: string        // بحث برقم الطلب
-    dateFrom?: string      // فلتر بالتاريخ (ISO string)
-    dateTo?: string        // فلتر بالتاريخ
+    customerId?: string
+    search?: string
+    dateFrom?: string
+    dateTo?: string
 }
 
+function toActionError(error: unknown, fallback: string): never {
+    if (error instanceof OrderServiceError) {
+        throw new Error(error.message)
+    }
+    throw error instanceof Error ? error : new Error(fallback)
+}
 
 // ============================================================
 // Read
 // ============================================================
 
-/**
- * Fetch orders with pagination + server-side filtering.
- * Defaults: page=1, limit=50
- */
 export async function getOrders(opts?: GetOrdersOptions) {
-    const page  = Math.max(1, opts?.page ?? 1)
-    const limit = Math.max(1, Math.min(100, opts?.limit ?? 50))
-    const skip  = (page - 1) * limit
-
-    const where: Record<string, unknown> = {}
-    if (opts?.status)     where.status     = opts.status
-    if (opts?.customerId) where.customerId = opts.customerId
-    if (opts?.search)     where.orderNumber = { contains: opts.search, mode: 'insensitive' }
-    if (opts?.dateFrom || opts?.dateTo) {
-        where.createdAt = {
-            ...(opts.dateFrom ? { gte: new Date(opts.dateFrom) } : {}),
-            ...(opts.dateTo   ? { lte: new Date(opts.dateTo)   } : {}),
-        }
-    }
-
     return safeAction(
         async () => {
             await requireAuth()
-            const [data, total] = await Promise.all([
-                prisma.order.findMany({
-                    where,
-                    orderBy: { createdAt: 'desc' },
-                    skip,
-                    take: limit,
-                    include: ORDER_INCLUDE,
-                }),
-                prisma.order.count({ where }),
-            ])
-            return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+            const result = await listOrders({
+                page: opts?.page,
+                limit: opts?.limit,
+                status: opts?.status,
+                customerId: opts?.customerId,
+                search: opts?.search,
+                dateFrom: opts?.dateFrom,
+                dateTo: opts?.dateTo,
+            })
+            return {
+                data: result.orders,
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+                totalPages: result.totalPages,
+            }
         },
         'تعذّر جلب الطلبات'
     )
 }
 
 /**
- * Get order stats (counts by status) — استعلام واحد بـ groupBy بدلاً من 6 استعلامات منفصلة.
+ * Get order stats (counts by status) — استعلام واحد بـ groupBy.
  */
 export async function getOrderStats() {
     return safeAction(
@@ -132,12 +131,11 @@ export async function getOrderStats() {
 export async function getOrderById(id: string) {
     return safeAction(
         async () => {
-            const order = await prisma.order.findUnique({
-                where: { id },
-                include: ORDER_INCLUDE,
-            })
-            if (!order) throw Object.assign(new Error('الطلب غير موجود'), { code: 'P2025' })
-            return order
+            try {
+                return await getOrderByIdService(id)
+            } catch (error) {
+                toActionError(error, 'تعذّر جلب الطلب')
+            }
         },
         'تعذّر جلب الطلب'
     )
@@ -151,40 +149,18 @@ export async function createOrder(data: CreateOrderData) {
     return safeActionWithRevalidation(
         async () => {
             await requireAuth()
-            const itemCreates = await Promise.all(
-                data.items.map(async (it) => {
-                    const snapshot = await resolveItemSnapshot({
-                        customerId: data.customerId,
-                        productId: it.productId,
-                        unitId: it.unitId,
-                        unitPrice: it.unitPrice,
-                        currencyId: it.currencyId,
-                        priceLabelId: it.priceLabelId,
-                    })
-                    return {
-                        productId: it.productId,
-                        unitId: it.unitId ?? null,
-                        quantity: it.quantity,
-                        notes: it.notes ?? null,
-                        unitPrice: snapshot.unitPrice,
-                        currencyId: snapshot.currencyId,
-                        priceLabelId: snapshot.priceLabelId,
-                    }
-                })
-            )
-
-            return prisma.$transaction(async (tx) => {
-                const orderNumber = await generateItemNumber('order')
-                return tx.order.create({
-                    data: {
-                        orderNumber,
-                        customerId: data.customerId ?? null,
-                        notes: data.notes ?? null,
-                        deliveryInfo: data.deliveryInfo ?? null,
-                        items: { create: itemCreates },
-                    },
-                })
-            })
+            try {
+                const input: CreateOrderInput = {
+                    customerId: data.customerId,
+                    notes: data.notes,
+                    deliveryInfo: data.deliveryInfo,
+                    items: data.items,
+                }
+                const { order, reused } = await createOrderService(input)
+                return { order, reused }
+            } catch (error) {
+                toActionError(error, 'تعذّر إنشاء الطلب')
+            }
         },
         '/orders',
         'تعذّر إنشاء الطلب'
@@ -199,71 +175,18 @@ export async function updateOrder(id: string, data: UpdateOrderData) {
     return safeActionWithRevalidation(
         async () => {
             await requireAuth()
-            if (data.status !== undefined) {
-                const valid = validateOrderStatus(data.status)
-                if (!valid) throw new Error(`حالة غير صالحة: ${data.status}`)
-            }
-
-            let itemsPayload: { deleteMany: Record<string, never>; create: any[] } | undefined
-
-            if (data.items !== undefined) {
-                // حماية: رفض items فارغة بدلاً من حذف جميع البنود صامتاً
-                if (data.items.length === 0) {
-                    throw new Error('لا يمكن حفظ طلب بدون منتجات — أضف منتجاً واحداً على الأقل')
+            try {
+                const input: UpdateOrderInput = {
+                    customerId: data.customerId,
+                    notes: data.notes,
+                    deliveryInfo: data.deliveryInfo,
+                    status: data.status as UpdateOrderInput['status'],
+                    items: data.items,
                 }
-
-                const customerId =
-                    data.customerId !== undefined ? data.customerId : undefined
-                const existing =
-                    customerId === undefined
-                        ? await prisma.order.findUnique({
-                              where: { id },
-                              select: { customerId: true },
-                          })
-                        : null
-                const snapshotCustomerId =
-                    customerId !== undefined ? customerId : existing?.customerId
-
-                const createItems = await Promise.all(
-                    data.items.map(async (it) => {
-                        const snapshot = await resolveItemSnapshot({
-                            customerId: snapshotCustomerId,
-                            productId: it.productId,
-                            unitId: it.unitId,
-                            unitPrice: it.unitPrice,
-                            currencyId: it.currencyId,
-                            priceLabelId: it.priceLabelId,
-                        })
-                        return {
-                            productId: it.productId,
-                            unitId: it.unitId ?? null,
-                            quantity: it.quantity,
-                            notes: it.notes ?? null,
-                            unitPrice: snapshot.unitPrice,
-                            currencyId: snapshot.currencyId,
-                            priceLabelId: snapshot.priceLabelId,
-                        }
-                    })
-                )
-
-                itemsPayload = {
-                    deleteMany: {},
-                    create: createItems,
-                }
+                return await updateOrderService(id, input)
+            } catch (error) {
+                toActionError(error, 'تعذّر تعديل الطلب')
             }
-
-            return prisma.$transaction(async (tx) => {
-                return tx.order.update({
-                    where: { id },
-                    data: {
-                        customerId:   data.customerId !== undefined ? data.customerId ?? null : undefined,
-                        notes:        data.notes !== undefined ? data.notes ?? null : undefined,
-                        deliveryInfo: data.deliveryInfo !== undefined ? data.deliveryInfo ?? null : undefined,
-                        status:       data.status as any,
-                        ...(itemsPayload && { items: itemsPayload }),
-                    },
-                })
-            })
         },
         '/orders',
         'تعذّر تعديل الطلب'
@@ -271,9 +194,7 @@ export async function updateOrder(id: string, data: UpdateOrderData) {
 }
 
 export async function updateOrderStatus(id: string, status: string) {
-    // Validate status before updating
-    const validStatus = validateOrderStatus(status)
-    if (!validStatus) {
+    if (!VALID_ORDER_STATUSES.includes(status as (typeof VALID_ORDER_STATUSES)[number])) {
         return {
             success: false as const,
             error: `حالة غير صالحة: "${status}". القيم المسموحة: ${VALID_ORDER_STATUSES.join(', ')}`,
@@ -283,7 +204,13 @@ export async function updateOrderStatus(id: string, status: string) {
     return safeActionWithRevalidation(
         async () => {
             await requireAuth()
-            return prisma.order.update({ where: { id }, data: { status: validStatus as any } })
+            try {
+                return await updateOrderService(id, {
+                    status: status as UpdateOrderInput['status'],
+                })
+            } catch (error) {
+                toActionError(error, 'تعذّر تحديث حالة الطلب')
+            }
         },
         '/orders',
         'تعذّر تحديث حالة الطلب'
@@ -298,8 +225,12 @@ export async function deleteOrder(id: string) {
     return safeActionWithRevalidation(
         async () => {
             await requireAuth()
-            await prisma.order.delete({ where: { id } })
-            return null
+            try {
+                await deleteOrderService(id)
+                return null
+            } catch (error) {
+                toActionError(error, 'تعذّر حذف الطلب')
+            }
         },
         '/orders',
         'تعذّر حذف الطلب'

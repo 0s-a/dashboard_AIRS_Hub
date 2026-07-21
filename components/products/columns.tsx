@@ -71,6 +71,7 @@ function ActionCell({
     const [isDeleting, setIsDeleting] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const router = useRouter()
+    const displayName = product.displayName || product.name
 
     const handleDelete = async () => {
         setIsDeleting(true)
@@ -99,7 +100,7 @@ function ActionCell({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        aria-label={`إجراءات ${product.name}`}
+                        aria-label={`إجراءات ${displayName}`}
                     >
                         <MoreHorizontal className="h-4 w-4" />
                     </Button>
@@ -126,7 +127,7 @@ function ActionCell({
                     />
                     <ProductPricingSheet
                         productId={product.id}
-                        label={product.name}
+                        label={displayName}
                         productUnits={product.productUnits}
                         onUpdated={() => onUpdated?.()}
                         trigger={
@@ -152,7 +153,7 @@ function ActionCell({
                     <AlertDialogHeader>
                         <AlertDialogTitle>حذف المنتج؟</AlertDialogTitle>
                         <AlertDialogDescription>
-                            سيتم حذف &quot;{product.name}&quot; نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                            سيتم حذف &quot;{displayName}&quot; نهائياً. لا يمكن التراجع عن هذا الإجراء.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -184,7 +185,7 @@ export const columns: ColumnDef<SerializedProduct>[] = [
         cell: ({ row }) => {
             const product = row.original
             const primaryImage = product.primaryImage ?? product.mediaImages?.[0]?.url
-            return <ProductImageCell src={primaryImage} alt={product.name} />
+            return <ProductImageCell src={primaryImage} alt={product.displayName || product.name} />
         },
     },
     {
@@ -206,6 +207,14 @@ export const columns: ColumnDef<SerializedProduct>[] = [
             return (
                 <Link href={`/products/${product.id}`} className="flex flex-col gap-0.5 min-w-0 hover:text-primary transition-colors">
                     <span className="font-bold text-sm truncate">{product.name}</span>
+                    {product.family && (
+                        <span className="text-xs text-muted-foreground truncate">
+                            الرئيسي: {product.family.name}
+                            <span className="font-mono text-[10px] mr-1 opacity-80" dir="ltr">
+                                ({product.family.code})
+                            </span>
+                        </span>
+                    )}
                     {variantTitle !== '—' && (
                         <span className="text-xs text-muted-foreground truncate">{variantTitle}</span>
                     )}
@@ -284,7 +293,7 @@ export const columns: ColumnDef<SerializedProduct>[] = [
             return (
                 <ProductPricingSheet
                     productId={product.id}
-                    label={product.name}
+                    label={product.displayName || product.name}
                     productUnits={product.productUnits}
                     onUpdated={() => (table.options.meta as { onRefresh?: () => void })?.onRefresh?.()}
                     trigger={

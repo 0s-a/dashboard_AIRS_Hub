@@ -103,6 +103,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
     const [availabilityLoading, setAvailabilityLoading] = useState(false)
     const [available, setAvailable] = useState(product.isAvailable)
 
+    const displayName = product.displayName || product.name
     const variantTitle = formatItemTitle(product.productAttributes)
 
     function handleRefresh() {
@@ -162,6 +163,11 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                         <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{product.name}</h1>
+                                {product.inheritsFamilyName && product.family && (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                        موروث من الرئيسي
+                                    </Badge>
+                                )}
                                 <AvailabilityBadge available={available} />
                             </div>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -174,6 +180,16 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             </div>
                         </div>
                     </div>
+
+                    {product.family && (
+                        <div className="text-sm">
+                            <span className="text-muted-foreground">المنتج الرئيسي: </span>
+                            <span className="font-medium">{product.family.name}</span>
+                            <span className="font-mono text-xs text-muted-foreground mr-2" dir="ltr">
+                                ({product.family.code})
+                            </span>
+                        </div>
+                    )}
 
                     <div className="flex flex-wrap gap-2 text-sm">
                         <Badge variant="outline">{product.brandRef.name}</Badge>
@@ -198,7 +214,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                     />
                     <ProductPricingSheet
                         productId={product.id}
-                        label={product.name}
+                        label={displayName}
                         initialPrices={product.productPrices}
                         productUnits={product.productUnits}
                         onUpdated={handleRefresh}
@@ -229,7 +245,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    سيؤدي هذا الإجراء إلى حذف المنتج &quot;{product.name}&quot; نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                                    سيؤدي هذا الإجراء إلى حذف المنتج &quot;{displayName}&quot; نهائياً. لا يمكن التراجع عن هذا الإجراء.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter className="gap-2 sm:gap-0">
@@ -262,7 +278,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <ImageGallery images={product.mediaImages} name={product.name} />
+                            <ImageGallery images={product.mediaImages} name={displayName} />
                         </CardContent>
                     </Card>
 
@@ -396,7 +412,7 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                     </div>
                     <ProductPricingSheet
                         productId={product.id}
-                        label={product.name}
+                        label={displayName}
                         initialPrices={product.productPrices}
                         productUnits={product.productUnits}
                         onUpdated={handleRefresh}
@@ -440,10 +456,16 @@ export function ProductDetailsClient({ product }: ProductDetailsClientProps) {
                 </span>
                 <span dir="ltr">slug: {product.slug}</span>
                 <span>
-                    أُنشئ: {new Date(product.createdAt).toLocaleDateString("ar-SA")}
+                    أُنشئ:{" "}
+                    {new Date(product.createdAt).toLocaleDateString("ar-YE", {
+                        timeZone: "Asia/Aden",
+                    })}
                 </span>
                 <span>
-                    آخر تحديث: {new Date(product.updatedAt).toLocaleDateString("ar-SA")}
+                    آخر تحديث:{" "}
+                    {new Date(product.updatedAt).toLocaleDateString("ar-YE", {
+                        timeZone: "Asia/Aden",
+                    })}
                 </span>
             </div>
         </div>

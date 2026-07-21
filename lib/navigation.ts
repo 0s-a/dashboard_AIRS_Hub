@@ -5,7 +5,6 @@ import {
     Layers, 
     Images, 
     Tag, 
-    UserCog, 
     Coins,
     ShoppingCart,
     Bell,
@@ -14,9 +13,9 @@ import {
     Ruler,
     Sparkles,
     Bookmark,
-    ShieldCheck,
     Search,
     Tags,
+    Boxes,
     LucideIcon
 } from "lucide-react"
 
@@ -51,15 +50,15 @@ export const navigationGroups: NavigationGroup[] = [
             { href: "/inventory/search-engine", label: "محرك البحث", icon: Search, keywords: "search meilisearch بحث" },
             { href: "/categories", label: "التصنيفات", icon: Layers, keywords: "categories تصنيفات أقسام" },
             { href: "/brands", label: "البراندات", icon: Bookmark, keywords: "brands براندات ماركات" },
+            { href: "/product-families", label: "المنتجات الرئيسية", icon: Boxes, keywords: "product families منتجات رئيسية تجميع أصناف" },
             { href: "/product-attributes", label: "صفات المنتج", icon: Tags, keywords: "attributes صفات لون مقاس سعة وزن" },
             { href: "/gallery", label: "معرض الصور", icon: Images, keywords: "gallery images صور معرض" },
         ]
     },
     {
-        title: "العملاء والمشرفون",
+        title: "العملاء",
         items: [
-            { href: "/customers", label: "العملاء", icon: Users, keywords: "customers عملاء زبائن" },
-            { href: "/supervisors", label: "المشرفون", icon: ShieldCheck, keywords: "supervisors مشرفون" },
+            { href: "/customers", label: "العملاء", icon: Users, keywords: "customers عملاء زبائن مشرفون" },
         ]
     },
     {

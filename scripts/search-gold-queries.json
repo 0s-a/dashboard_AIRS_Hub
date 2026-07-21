@@ -1,0 +1,100 @@
+{
+  "description": "Gold cases for bot product search — run via npm run test:search-gold. After deploy: full Meili sync from search-engine panel.",
+  "normalize": [
+    {
+      "id": "ya-alef-maqsura",
+      "input": "قمصى قطن",
+      "expected": "قمصي قطن"
+    },
+    {
+      "id": "hamza-taa",
+      "input": "أحمر",
+      "expected": "احمر"
+    },
+    {
+      "id": "eastern-digits",
+      "input": "صنف ١٢٣",
+      "expected": "صنف 123"
+    }
+  ],
+  "skuNormalize": [
+    {
+      "id": "sku-spaces-dashes",
+      "input": "ABC-12 34",
+      "expected": "abc1234"
+    },
+    {
+      "id": "sku-underscores",
+      "input": "SKU_99",
+      "expected": "sku99"
+    },
+    {
+      "id": "sku-eastern",
+      "input": "١٢٣-٤",
+      "expected": "1234"
+    }
+  ],
+  "parse": [
+    {
+      "id": "extract-brand-and-attr",
+      "q": "قميص نايك احمر L",
+      "dict": {
+        "brands": { "نايك": "نايك" },
+        "attrs": { "احمر": "أحمر", "l": "L" }
+      },
+      "expected": {
+        "brand": "نايك",
+        "attr": ["احمر", "l"],
+        "residualQ": "قميص"
+      }
+    },
+    {
+      "id": "explicit-brand-wins",
+      "q": "قميص نايك احمر",
+      "explicitBrand": "اديداس",
+      "dict": {
+        "brands": { "نايك": "نايك", "اديداس": "أديداس" },
+        "attrs": { "احمر": "أحمر" }
+      },
+      "expected": {
+        "brand": "اديداس",
+        "attr": ["احمر"],
+        "residualQ": "قميص نايك"
+      }
+    },
+    {
+      "id": "multiword-brand-first",
+      "q": "قميص نيو بالانس اسود",
+      "dict": {
+        "brands": { "نيو بالانس": "New Balance", "نيو": "Neo" },
+        "attrs": { "اسود": "أسود" }
+      },
+      "expected": {
+        "brand": "نيو بالانس",
+        "attr": ["اسود"],
+        "residualQ": "قميص"
+      }
+    }
+  ],
+  "search": [
+    {
+      "id": "sku-single-token",
+      "q": "NOTE: replace with a real itemNumber from your DB",
+      "skip": true,
+      "expectMinResults": 1
+    },
+    {
+      "id": "loose-phrase",
+      "q": "قميص",
+      "parse": true,
+      "expectMinResults": 0,
+      "note": "Smoke — adjust expectMinResults after seeding"
+    },
+    {
+      "id": "parse-false",
+      "q": "قميص",
+      "parse": false,
+      "expectMinResults": 0
+    }
+  ]
+}

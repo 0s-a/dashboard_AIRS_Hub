@@ -78,6 +78,9 @@
 | `app/api/v1/bot/` | Bot API (x-api-key) |
 | `app/api/v1/bot/orders/` | Orders Bot API (`x-api-key`) — مصدر HTTP واحد |
 | `lib/orders/` | منطق Bot Orders API (service, snapshot, schemas) |
+| `lib/customers/` | منطق Bot Customers API |
+| `lib/bot/` | product-search، product-price، product-image، notifications |
+| `public/openapi.json` | عقد Bot API المنشور |
 | `lib/actions/` | منطق الأعمال (Server Actions) |
 | `lib/api-utils.ts` | validateApiKey, apiSuccess, apiError |
 | `lib/action-utils.ts` | safeAction, safeActionWithRevalidation |
@@ -86,7 +89,9 @@
 | `lib/prisma-includes.ts` | Prisma include/select constants |
 | `prisma/schema.prisma` | مصدر الحقيقة للبيانات |
 | `app/(dashboard)/product-attributes/` | كتالوج صفات المنتج (`ProductAttribute`) |
+| `app/(dashboard)/product-families/` | المنتجات الرئيسية (`ProductFamily`) — تجميع فقط |
 | `lib/actions/product-attributes.ts` | CRUD صفات المنتج |
+| `lib/actions/product-families.ts` | CRUD المنتجات الرئيسية |
 
 ## قواعد التسعير
 
@@ -101,7 +106,7 @@
  2. تسعيرة العميل من ProductPrice
  3. التسعيرة الافتراضية (isDefault)
  4. أي سعر
-- Bot check-price: يفلتر بـ `customer.priceLabelId` ويحوّل لعملات العميل
+- Bot product price: يفلتر بـ `customer.priceLabelId` ويحوّل لعملة مطلوبة أو عملات العميل (`GET /api/v1/bot/products/price`)
 
 ## قواعد الطلبات
 
@@ -135,6 +140,15 @@ if (authError) return authError
 return apiSuccess(data) // أو apiError(message, status, { code })
 ```
 
+## Bot API Contract
+
+- **Bot = HTTP** تحت `app/api/v1/bot/**` (`x-api-key`)؛ **Dashboard CRUD = Server Actions**؛ Dashboard HTTP = Meilisearch ops؛ بحث منتجات البوت = Meili + Prisma fallback
+- مصدر الحقيقة للمسارات: الكود — و`public/openapi.json` مرآة يدوية (لا `/persons`)
+- Route رفيع؛ المنطق في `lib/orders/`, `lib/customers/`, `lib/bot/`
+- Envelope: `apiSuccess` / `apiError` مع `code` إنجليزي ورسالة عربية
+- الهاتف: `normalizePhonePatterns` / `validatePhoneInput`؛ الصفحات: `parsePagination`
+- قواعد مفصّلة: `.cursor/rules/bot-api.mdc` · Skill: `nawaat-bot-api`
+
 ## ما يجب تجنّبه
 
 - لا تضع أسراراً في الملفات المُلتزَم بها
@@ -153,7 +167,7 @@ return apiSuccess(data) // أو apiError(message, status, { code })
 
 ## Skills و Rules
 
-- Skills: `nawaat-pricing`, `nawaat-orders`, `nawaat-meilisearch`, `nawaat-inventory`
+- Skills: `nawaat-pricing`, `nawaat-orders`, `nawaat-meilisearch`, `nawaat-inventory`, `nawaat-bot-api`
 - Rules: `.cursor/rules/*.mdc`
 - Frontend: `frontend-architecture`, `frontend-design`, `frontend-patterns`, `frontend-state`
 - خريطة معمارية: [PROJECT.md](PROJECT.md)

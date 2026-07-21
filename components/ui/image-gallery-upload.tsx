@@ -11,7 +11,6 @@ import {
     ImageIcon,
     GripVertical,
     AlertCircle,
-    Tag,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -22,14 +21,7 @@ import {
     reorderProductImages,
 } from "@/lib/actions/product-images"
 import type { ProductImageRecord } from "@/lib/actions/product-images"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-    DropdownMenuSeparator,
-    DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
+import { IMAGE_STORAGE_CONFIG } from "@/lib/config/image-storage.config"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,8 +48,8 @@ interface ImageGalleryUploadProps {
 export function ImageGalleryUpload({
     images,
     productId,
-    productItemNumber,
-    maxImages = 10,
+    productItemNumber: _productItemNumber,
+    maxImages = IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct,
     disabled = false,
     className,
     onImagesChange,
@@ -67,7 +59,6 @@ export function ImageGalleryUpload({
     const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
     const [removingId, setRemovingId] = useState<string | null>(null)
     const [settingPrimary, setSettingPrimary] = useState<string | null>(null)
-    const [updatingVariantId, setUpdatingVariantId] = useState<string | null>(null)
     const dragItem = useRef<number | null>(null)
 
     const canUploadMore = images.length + uploading.length < maxImages
@@ -420,24 +411,5 @@ export function ImageGalleryUpload({
                 </div>
             )}
         </div>
-    )
-}
-
-function Check(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <polyline points="20 6 9 17 4 12" />
-        </svg>
     )
 }

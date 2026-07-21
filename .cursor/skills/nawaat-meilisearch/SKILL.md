@@ -8,9 +8,10 @@ description: Meilisearch في Nawaat — مزامنة منتجات، بحث، ل
 ## الملفات
 
 | الملف | الدور |
-|-------|-------|
+|-------|--------|
 | `lib/meilisearch.ts` | عميل singleton + إعدادات index |
-| `lib/utils/meilisearch-sync.ts` | مزامنة، upsert، delete، stats |
+| `lib/utils/meilisearch-sync.ts` | مزامنة، upsert، delete، stats، `searchProductIdsInMeilisearch` |
+| `lib/bot/normalize-search-query.ts` | تطبيع عربي (همزات، تشكيل، أرقام) — يُطبَّق عند الفهرسة والبحث |
 | `app/api/v1/dashboard/meilisearch/*` | status, sync, search, indexes |
 
 ## Env
@@ -22,13 +23,24 @@ description: Meilisearch في Nawaat — مزامنة منتجات، بحث، ل
 ## قواعد resilient
 
 - إذا Meili غير متاح: أرجع `{ unavailable: true }` — **لا throw**
-- بعد تعديل منتج/سعر: `upsertProductToMeilisearch(id).catch(console.warn)`
+- بعد تعديل منتج/توفر/وحدات: `upsertProductToMeilisearch(id).catch(console.warn)`
 - بعد حذف منتج: `deleteProductFromMeilisearch(id).catch(console.warn)`
+- تعديل الأسعار لا يُحدّث Meili (لا سعر في المستند)
 
 ## Document shape
 
-`MeiliProductDocument` في meilisearch-sync.ts:
-- id, productCode, name, brand, category, tags, isAvailable, minPrice, ...
+`MeiliProductDocument` في meilisearch-sync.ts — حقول بحث مطبّعة:
+- `id`, `itemNumber`, `name` (displayName عند الوراثة), `productName`, `familyId`
+- `attributeText`, `attributeValues`, `tags`, `alternativeNames`, `searchText`, `isAvailable`
+- بدون سعر، وصف، تواريخ، أو brandId/categoryId
+
+`searchableAttributes` (ترتيب): `itemNumber`, `name`, `alternativeNames`, `searchText`, `brand`, `attributeText`, `category`, `tags`
+
+`filterableAttributes`: `id`, `isAvailable`, `brand`, `category`, `attributeValues`, `familyId`
+
+بعد تغيير اسم `ProductFamily`: أعد فهرسة منتجات العائلة عبر `upsertProductsToMeilisearch`.
+
+`synonyms`: بذرة صغيرة للمقاسات وقطن/cotton — قابلة للتوسيع في `MEILI_SETTINGS`
 
 ## APIs (dashboard JWT)
 
@@ -38,9 +50,17 @@ if (authError) return authError
 ```
 
 - `GET /status` — مقارنة documentCount مع db count
-- `POST /sync` — مزامنة كاملة
+- `POST /sync` — مزامنة كاملة (تطبّق إعدادات الفهرس + المستندات)
 - `GET /search` — بحث تجريبي
 
 ## Bot search
 
-`app/api/v1/bot/products/search` يستخدم PostgreSQL FTS — ليس Meili مباشرة.
+`GET /api/v1/bot/products/search` يستخدم Meilisearch عبر `searchProductIdsInMeilisearch`، ثم hydrate من Prisma.
+
+- تطبيع عربي على `q` / `brand` / `attr` وعلى حقول الفهرس (`ى→ي`؛ SKU بدون مسافات/شرطات)
+- حقل `searchText` يجمع الاسم/البدائل/البراند/الفئة/الصفات/الوسوم/رقم الصنف
+- تفكيك حذر لـ `q` (براندات + قيم صفات من DB، كاش قصير) — `parse=false` للتعطيل؛ الصريح يفوز؛ relax عند الصفر
+- فلاتر `brand` / `attr` / `available`: تطابق قيمة كاملة (Meili filter)
+- `meta.engine`: `"meili"` أو `"prisma"` · `meta.parsed` اختياري
+- عند تعطّل Meili: fallback Prisma بفلاتر exact وILIKE على `q`
+- بعد تغيير شكل المستند أو الإعدادات: **مزامنة كاملة مرة واحدة من لوحة search-engine**

@@ -456,25 +456,41 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         }
 
         startTransition(async () => {
-            let res
             if (isEdit) {
-                res = await updateOrder(order.id, { ...payload, status })
-            } else {
-                res = await createOrder(payload)
+                const res = await updateOrder(order.id, { ...payload, status })
+                if (res.success) {
+                    toast.success("تم تحديث الطلب بنجاح")
+                    if (keepOpen) {
+                        setCustomerId("none")
+                        setNotes("")
+                        setStatus("pending")
+                        setItems([])
+                        toast.info("جاهز لإدخال طلب جديد")
+                    } else {
+                        setOpen(false)
+                    }
+                } else {
+                    toast.error(res.error ?? "حدث خطأ غير متوقع")
+                }
+                return
             }
 
+            const res = await createOrder(payload)
             if (res.success) {
-                toast.success(isEdit ? "تم تحديث الطلب بنجاح" : "تم إنشاء الطلب بنجاح")
-                
-                if (keepOpen) {
-                    // Reset everything to start a fresh order
-                    setCustomerId("none")
-                    setNotes("")
-                    setStatus("pending")
-                    setItems([])
-                    toast.info("جاهز لإدخال طلب جديد")
-                } else {
+                if (res.data.reused) {
+                    toast.info("يوجد طلب معلّق — تم فتحه")
                     setOpen(false)
+                } else {
+                    toast.success("تم إنشاء الطلب بنجاح")
+                    if (keepOpen) {
+                        setCustomerId("none")
+                        setNotes("")
+                        setStatus("pending")
+                        setItems([])
+                        toast.info("جاهز لإدخال طلب جديد")
+                    } else {
+                        setOpen(false)
+                    }
                 }
             } else {
                 toast.error(res.error ?? "حدث خطأ غير متوقع")

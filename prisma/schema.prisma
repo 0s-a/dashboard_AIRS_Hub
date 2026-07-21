@@ -17,6 +17,11 @@ enum CustomerSource {
   api
 }
 
+enum PersonType {
+  customer
+  supervisor
+}
+
 enum OrderStatus {
   pending
   confirmed
@@ -28,29 +33,44 @@ enum OrderStatus {
 
 // ── Core Business Models ─────────────────────────────────────
 
+model ProductFamily {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
 model Product {
-  id               String                   @id @default(uuid())
-  itemNumber       String                   @unique // رقم الصنف — إلزامي وفريد
-  name             String
-  slug             String                   @unique
-  brandId          String
-  brandRef         Brand                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  description      String?
-  alternativeNames Json?
-  tags             Json?
-  categoryId       String
-  category         Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  isAvailable      Boolean                  @default(true)
-  order            Int                      @default(0)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-  productPrices    ProductPrice[]
-  productImages    ProductImage[]
-  productUnits     ProductUnit[]
-  productAttributes ProductAttributeValue[]
-  orderItems       OrderItem[]
-  notifications    AiNotification[]
-  search_vector    Unsupported("tsvector")?
+  id                  String                   @id @default(uuid())
+  itemNumber          String                   @unique // رقم الصنف — إلزامي وفريد
+  name                String
+  slug                String                   @unique
+  brandId             String
+  brandRef            Brand                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  description         String?
+  alternativeNames    Json?
+  tags                Json?
+  categoryId          String
+  category            Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  familyId            String?
+  family              ProductFamily?           @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  inheritsFamilyName  Boolean                  @default(false)
+  isAvailable         Boolean                  @default(true)
+  order               Int                      @default(0)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  productPrices       ProductPrice[]
+  productImages       ProductImage[]
+  productUnits        ProductUnit[]
+  productAttributes   ProductAttributeValue[]
+  orderItems          OrderItem[]
+  notifications       AiNotification[]
+  search_vector       Unsupported("tsvector")?
+
+  @@index([familyId])
 }
 
 model ProductAttribute {
@@ -101,6 +121,8 @@ model Category {
 model Customer {
   id                   String                @id @default(uuid())
   name                 String?
+  type                 PersonType            @default(customer)
+  notes                String?
   source               CustomerSource?
   contacts             Contact[]
   tags                 CustomerTag[]
@@ -115,6 +137,7 @@ model Customer {
   notifications AiNotification[]
 
   @@index([isActive])
+  @@index([type])
   @@index([priceLabelId])
   @@map("Customer")
 }
@@ -136,25 +159,10 @@ model CustomerTag {
   @@id([customerId, tagId])
 }
 
-model Supervisor {
-  id             String                    @id @default(uuid())
-  name           String
-  notes          String?
-  isActive       Boolean                   @default(true)
-  contacts  Contact[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive])
-  @@map("Supervisor")
-}
-
 model Contact {
   id           String      @id @default(uuid())
   customerId   String?
   customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  supervisorId String?
-  supervisor   Supervisor? @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
 
   type      String
   value     String
@@ -164,7 +172,6 @@ model Contact {
 
   @@unique([value], name: "contact_value_unique")
   @@unique([customerId, type], name: "contact_customer_type_unique")
-  @@unique([supervisorId, type], name: "contact_supervisor_type_unique")
 }
 
 model CustomerCurrency {

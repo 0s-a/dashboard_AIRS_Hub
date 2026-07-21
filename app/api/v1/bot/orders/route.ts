@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        const order = await createOrder(parsed.data)
-        return apiSuccess(order, 201)
+        const { order, reused } = await createOrder(parsed.data)
+        return apiSuccess(order, reused ? 200 : 201)
     } catch (error) {
         return handleOrderServiceError(error)
     }

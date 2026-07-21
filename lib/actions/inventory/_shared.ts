@@ -12,6 +12,7 @@ import type {
     SerializedProductAttribute,
 } from '@/lib/types/product'
 import { toDisplayUrl } from '@/lib/utils/image-paths'
+import { resolveProductDisplayName } from '@/lib/utils/product-display-name'
 
 export { prisma, Prisma }
 
@@ -24,9 +25,16 @@ export const PRODUCT_PRICE_INCLUDE = {
     unit: { select: { id: true, name: true, pluralName: true } },
 } as const
 
+export const PRODUCT_FAMILY_SELECT = {
+    id: true,
+    code: true,
+    name: true,
+} as const
+
 export const PRODUCT_INCLUDE = {
     brandRef: true,
     category: true,
+    family: { select: PRODUCT_FAMILY_SELECT },
     productAttributes: {
         include: PRODUCT_ATTRIBUTE_INCLUDE,
         orderBy: { attribute: { name: 'asc' as const } },
@@ -47,6 +55,7 @@ export const PRODUCT_INCLUDE = {
 export const PRODUCT_LIST_INCLUDE = {
     brandRef: { select: { id: true, name: true, code: true, logo: true } },
     category: { select: { id: true, name: true, code: true } },
+    family: { select: PRODUCT_FAMILY_SELECT },
     productAttributes: {
         include: PRODUCT_ATTRIBUTE_INCLUDE,
         orderBy: { attribute: { name: 'asc' as const } },
@@ -167,16 +176,35 @@ export function serializeProduct(product: any) {
         code: product.category.code,
     }
 
+    const family = product.family
+        ? {
+            id: product.family.id,
+            code: product.family.code,
+            name: product.family.name,
+        }
+        : null
+
+    const inheritsFamilyName = Boolean(product.inheritsFamilyName)
+    const displayName = resolveProductDisplayName({
+        name: product.name,
+        inheritsFamilyName,
+        family,
+    })
+
     return {
         id: product.id,
         itemNumber: product.itemNumber,
         slug: product.slug,
         name: product.name,
+        displayName,
         brandId: product.brandId,
         description: product.description ?? null,
         alternativeNames: Array.isArray(product.alternativeNames) ? product.alternativeNames : [],
         tags: Array.isArray(product.tags) ? product.tags : [],
         categoryId: product.categoryId,
+        familyId: product.familyId ?? null,
+        family,
+        inheritsFamilyName,
         productAttributes,
         isAvailable: product.isAvailable ?? true,
         order: product.order ?? 0,

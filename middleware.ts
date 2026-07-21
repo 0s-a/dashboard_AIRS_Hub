@@ -64,6 +64,13 @@ export async function middleware(request: NextRequest) {
     if (!authenticated) {
         const loginUrl = new URL('/login', request.url)
         loginUrl.searchParams.set('from', pathname)
+        // Server Actions expect x-action-redirect, not an HTML redirect
+        if (request.headers.has('next-action')) {
+            return new NextResponse(null, {
+                status: 303,
+                headers: { 'x-action-redirect': `${loginUrl.pathname}${loginUrl.search}` },
+            })
+        }
         return NextResponse.redirect(loginUrl)
     }
 

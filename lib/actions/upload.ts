@@ -53,17 +53,15 @@ function getProductImageSubPath(folderKey: string, filename: string): string {
 /**
  * Upload a product image with organized folder structure.
  *
- * Files are named by order: 01.webp, 02.webp, etc.
+ * Files are named with a UUID: {uuid}.webp — order lives only in the DB.
  *
  * @param file      - The image file to upload
  * @param folderKey - Folder key for storage (e.g. itemNumber or product id)
- * @param order     - 0-based image order (produces filename: 01.webp, 02.webp, ...)
  * @param oldImagePath - Optional old image path to delete before saving
  */
 export async function uploadProductImage(
     file: File,
     folderKey: string,
-    order: number = 0,
     oldImagePath?: string | null
 ): Promise<{ success: boolean; url?: string; filename?: string; sizeBytes?: number; width?: number; height?: number; error?: string }> {
     try {
@@ -106,14 +104,12 @@ export async function uploadProductImage(
         const ext = wasConverted
             ? IMAGE_STORAGE_CONFIG.processing.format
             : (file.name.split('.').pop()?.toLowerCase() || IMAGE_STORAGE_CONFIG.processing.fallbackExtension)
-        const filename = NAMING.buildFilename(order, ext)
+        const filename = NAMING.buildFilename(crypto.randomUUID(), ext)
         const filePath = join(uploadDir, filename)
 
         // ── Delete old image ─────────────────────────────────────────────────
         if (oldImagePath) {
             await deleteProductImage(oldImagePath)
-        } else if (existsSync(filePath)) {
-            await unlink(filePath)
         }
 
         await writeFile(filePath, buffer)

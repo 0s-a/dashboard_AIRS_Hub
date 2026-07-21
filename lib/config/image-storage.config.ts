@@ -7,7 +7,7 @@
  *   - Upload limits (size, count, allowed types)
  *   - Image processing (format, quality, dimensions)
  *   - Storage paths (URL prefix, disk root, folder structure)
- *   - Naming convention (file naming rules)
+ *   - Naming convention (UUID-based filenames)
  *   - Display dimensions (thumbnails, cards, gallery, full-size)
  *   - Slug sanitization rules
  *
@@ -82,16 +82,12 @@ export const IMAGE_STORAGE_CONFIG = {
     // ── Naming Convention ────────────────────────────────────
 
     naming: {
-        /** Pad order number to this width: 01, 02, ..., 99 */
-        padWidth: 2,
-
-        /** Padding character */
-        padChar: '0',
-
-        /** Build a filename from an order index (0-based) and extension */
-        buildFilename(order: number, ext: string): string {
-            const num = String(order + 1).padStart(this.padWidth, this.padChar)
-            return `${num}.${ext}`
+        /**
+         * Build a unique filename from an id and extension.
+         * Uses UUID (or any unique id) so deletions never overwrite existing files.
+         */
+        buildFilename(id: string, ext: string): string {
+            return `${id}.${ext}`
         },
     },
 

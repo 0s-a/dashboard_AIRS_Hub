@@ -6,7 +6,6 @@ import { uploadProductImage, deleteProductImage as deleteImageFile } from './upl
 import { toDisplayUrl } from '@/lib/utils/image-paths'
 import { IMAGE_STORAGE_CONFIG } from '@/lib/config/image-storage.config'
 import { requireAuth } from '@/lib/auth-utils'
-import { upsertProductToMeilisearch } from '@/lib/utils/meilisearch-sync'
 import { revalidateProduct } from '@/lib/actions/inventory/_shared'
 
 export type ProductImageRecord = {
@@ -25,7 +24,6 @@ export type ProductImageRecord = {
 async function revalidateProductImages(productId: string) {
     revalidateProduct(productId)
     revalidatePath('/gallery')
-    upsertProductToMeilisearch(productId).catch(console.warn)
 }
 
 function mapRecord(pi: {
@@ -68,9 +66,6 @@ export async function getProductImages(productId: string): Promise<{ success: bo
     }
 }
 
-/** @deprecated use getProductImages */
-export const getSkcImages = getProductImages
-
 export async function addProductImage(
     productId: string,
     file: File
@@ -89,7 +84,14 @@ export async function addProductImage(
             return { success: false, error: `الحد الأقصى ${IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct} صور للمنتج` }
         }
 
-        const result = await uploadProductImage(file, folderKey, existingCount)
+        const maxOrderRow = await prisma.productImage.findFirst({
+            where: { productId },
+            orderBy: { order: 'desc' },
+            select: { order: true },
+        })
+        const nextOrder = (maxOrderRow?.order ?? -1) + 1
+
+        const result = await uploadProductImage(file, folderKey)
         if (!result.success || !result.url) {
             return { success: false, error: result.error || 'فشل رفع الصورة' }
         }
@@ -103,7 +105,7 @@ export async function addProductImage(
                 width: result.width ?? null,
                 height: result.height ?? null,
                 isPrimary: existingCount === 0,
-                order: existingCount,
+                order: nextOrder,
             },
         })
 
@@ -114,9 +116,6 @@ export async function addProductImage(
         return { success: false, error: 'فشل إضافة الصورة' }
     }
 }
-
-/** @deprecated use addProductImage */
-export const addSkcImage = addProductImage
 
 export async function removeProductImage(productImageId: string) {
     try {
@@ -143,7 +142,7 @@ export async function removeProductImage(productImageId: string) {
 
         await revalidateProductImages(productId)
         return { success: true }
-    } catch (error) {
+    } catch {
         return { success: false, error: 'فشل حذف الصورة' }
     }
 }
@@ -168,7 +167,7 @@ export async function setPrimaryProductImage(productImageId: string) {
 
         await revalidateProductImages(pi.productId)
         return { success: true }
-    } catch (error) {
+    } catch {
         return { success: false, error: 'فشل تحديث الصورة الرئيسية' }
     }
 }
@@ -189,7 +188,7 @@ export async function reorderProductImages(productImageIds: string[]) {
             if (first) await revalidateProductImages(first.productId)
         }
         return { success: true }
-    } catch (error) {
+    } catch {
         return { success: false, error: 'فشل إعادة ترتيب الصور' }
     }
 }

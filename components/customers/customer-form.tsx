@@ -14,6 +14,7 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
     Select,
     SelectContent,
@@ -24,49 +25,42 @@ import {
 import { updateCustomer, createCustomer } from "@/lib/actions/customers"
 import { getPriceLabels } from "@/lib/actions/price-labels"
 import { getActiveCurrencies } from "@/lib/actions/currencies"
-import { contactSchema, type ContactInput } from "@/lib/validations/customer"
+import { contactsArraySchema, type ContactInput } from "@/lib/validations/customer"
+import {
+    CONTACT_TYPE_OPTIONS,
+    getContactTypeConfig,
+} from "@/lib/config/contact.config"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Customer } from "@prisma/client"
-import { User, Phone, Mail, Loader2, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins, Star, Trash2 } from "lucide-react"
+import { User, Phone, Mail, Loader2, Tag, Plus, X, MessageCircle, Globe, Wallet, Coins, Star, Trash2, StickyNote } from "lucide-react"
 import { useState, useEffect } from "react"
 import { MultiSelect, OptionType } from "@/components/ui/multi-select"
 import { TagInput } from "@/components/ui/tag-input"
 
+const CONTACT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+    Phone,
+    Mail,
+    MessageCircle,
+}
+
 const formSchema = z.object({
     name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
+    type: z.enum(["customer", "supervisor"]),
+    notes: z.string().optional(),
     source: z.string().optional(),
-    contacts: z.array(contactSchema).superRefine((contacts, ctx) => {
-        const seen = new Map<string, number>()
-        contacts.forEach((c, i) => {
-            const key = `${c.type}:${c.value.trim()}`
-            if (seen.has(key)) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    path: [i, 'value'],
-                    message: 'هذا الرقم/البريد مكرر في القائمة',
-                })
-            } else {
-                seen.set(key, i)
-            }
-        })
-    }),
+    contacts: contactsArraySchema,
     tags: z.array(z.string()).optional(),
     priceLabelId: z.string().nullable().optional(),
     currencyIds: z.array(z.string()).optional(),
 })
 
 type FormValues = z.input<typeof formSchema>
+type FormOutput = z.output<typeof formSchema>
 
 interface CustomerFormProps {
     customer?: Customer   // اختياري — غائب = إنشاء، موجود = تعديل
     onSuccess?: () => void
-}
-
-const contactTypeLabels: Record<string, { label: string; icon: any; placeholder: string }> = {
-    phone: { label: "هاتف", icon: Phone, placeholder: "0501234567" },
-    email: { label: "بريد إلكتروني", icon: Mail, placeholder: "example@domain.com" },
-    whatsapp: { label: "واتساب", icon: MessageCircle, placeholder: "0501234567" },
 }
 
 export const CustomerForm = React.memo(function CustomerForm({ customer, onSuccess }: CustomerFormProps) {
@@ -111,11 +105,13 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
         ? (customer as any).tags.map((pt: any) => pt.tag?.name ?? pt.name ?? pt).filter(Boolean)
         : []
 
-    const form = useForm<FormValues>({
+    const form = useForm<FormValues, unknown, FormOutput>({
         resolver: zodResolver(formSchema),
         defaultValues: isEditMode
             ? {
                 name: customer.name || "",
+                type: (customer as any).type === "supervisor" ? "supervisor" : "customer",
+                notes: (customer as any).notes || "",
                 source: (customer.source as string) || "",
                 contacts: existingContacts.length > 0
                     ? existingContacts.map(c => ({ ...c, label: c.label || "" }))
@@ -126,6 +122,8 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
             }
             : {
                 name: "",
+                type: "customer",
+                notes: "",
                 source: "",
                 contacts: [{ type: "phone" as const, value: "", label: "", isPrimary: true }],
                 tags: [],
@@ -134,12 +132,15 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
             },
     })
 
+    const personType = form.watch("type")
+    const isSupervisor = personType === "supervisor"
+
     const { fields, append, remove } = useFieldArray({
         control: form.control,
         name: "contacts",
     })
 
-    async function onSubmit(values: FormValues) {
+    async function onSubmit(values: FormOutput) {
         setIsSubmitting(true)
         try {
             const parsedTags = Array.isArray(values.tags) && values.tags.length > 0 ? values.tags : null
@@ -155,11 +156,15 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
 
             const payload = {
                 name: values.name,
+                type: values.type,
+                notes: values.notes?.trim() || null,
                 source: (values.source || null) as 'bot' | 'manual' | 'import' | 'api' | null,
                 contacts: cleanContacts.length > 0 ? cleanContacts : null,
                 tags: parsedTags && parsedTags.length > 0 ? parsedTags : null,
-                priceLabelId: values.priceLabelId || null,
-                currencyIds: values.currencyIds && values.currencyIds.length > 0 ? values.currencyIds : null,
+                priceLabelId: values.type === 'supervisor' ? null : (values.priceLabelId || null),
+                currencyIds: values.type === 'supervisor'
+                    ? []
+                    : (values.currencyIds && values.currencyIds.length > 0 ? values.currencyIds : null),
             }
 
             const res = isEditMode
@@ -167,7 +172,8 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                 : await createCustomer({ ...payload, name: values.name })
 
             if (res.success) {
-                toast.success(isEditMode ? 'تم تحديث العميل' : 'تم إضافة العميل', {
+                const label = values.type === 'supervisor' ? 'المشرف' : 'العميل'
+                toast.success(isEditMode ? `تم تحديث ${label}` : `تم إضافة ${label}`, {
                     description: isEditMode
                         ? `تم تحديث بيانات "${values.name}" بنجاح`
                         : `تمت إضافة "${values.name}" بنجاح`
@@ -202,7 +208,7 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                                     المعلومات الأساسية
                                 </h3>
                                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                                    الاسم والهوية العامة للعميل في النظام
+                                    الاسم والتصنيف والهوية العامة في النظام
                                 </p>
                             </div>
                         </div>
@@ -235,23 +241,21 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
-                                name="source"
+                                name="type"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
-                                            مصدر العميل
+                                            التصنيف <span className="text-destructive">*</span>
                                         </FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
                                                 <SelectTrigger className="h-10 rounded-xl bg-background/50 hover:bg-background transition-colors">
-                                                    <SelectValue placeholder="اختر المصدر" />
+                                                    <SelectValue placeholder="اختر التصنيف" />
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent className="rounded-xl">
-                                                <SelectItem value="bot">🤖 بوت / واتساب</SelectItem>
-                                                <SelectItem value="manual">✍️ إدخال يدوي</SelectItem>
-                                                <SelectItem value="import">📥 استيراد</SelectItem>
-                                                <SelectItem value="api">🔌 API</SelectItem>
+                                                <SelectItem value="customer">عميل</SelectItem>
+                                                <SelectItem value="supervisor">مشرف</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <FormMessage className="text-xs" />
@@ -261,11 +265,62 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
 
                             <FormField
                                 control={form.control}
+                                name="source"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
+                                            مصدر التسجيل
+                                        </FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                                            <FormControl>
+                                                <SelectTrigger className="h-10 rounded-xl bg-background/50 hover:bg-background transition-colors">
+                                                    <SelectValue placeholder="اختر المصدر" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="rounded-xl">
+                                                <SelectItem value="bot">بوت / واتساب</SelectItem>
+                                                <SelectItem value="manual">إدخال يدوي</SelectItem>
+                                                <SelectItem value="import">استيراد</SelectItem>
+                                                <SelectItem value="api">API</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage className="text-xs" />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <FormField
+                            control={form.control}
+                            name="notes"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
+                                        <StickyNote className="h-3.5 w-3.5" />
+                                        ملاحظات
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder="ملاحظات اختيارية..."
+                                            {...field}
+                                            value={field.value || ""}
+                                            className="min-h-[80px] rounded-xl resize-y"
+                                        />
+                                    </FormControl>
+                                    <FormMessage className="text-xs" />
+                                </FormItem>
+                            )}
+                        />
+
+                        {!isSupervisor && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
                                 name="priceLabelId"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
-                                            نوع العميل
+                                            تسعيرة العميل
                                         </FormLabel>
                                         <Select
                                             onValueChange={v => field.onChange(v === 'none' ? null : v)}
@@ -273,7 +328,7 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                                         >
                                             <FormControl>
                                                 <SelectTrigger className="h-10 rounded-xl bg-background/50 hover:bg-background transition-colors">
-                                                    <SelectValue placeholder="اختر نوع العميل" />
+                                                    <SelectValue placeholder="اختر التسعيرة" />
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent className="rounded-xl">
@@ -295,7 +350,9 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                                 )}
                             />
                         </div>
+                        )}
 
+                        {!isSupervisor && (
                         <FormField
                             control={form.control}
                             name="currencyIds"
@@ -318,6 +375,7 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                                 </FormItem>
                             )}
                         />
+                        )}
                     </div>
                 </div>
 
@@ -352,7 +410,9 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                     <div className="space-y-3.5">
                         {fields.map((field, index) => {
                             const contactType = form.watch(`contacts.${index}.type`)
-                            const typeInfo = contactTypeLabels[contactType] || contactTypeLabels.phone
+                            const typeConfig = getContactTypeConfig(contactType)
+                            const placeholder = typeConfig?.placeholder ?? '0501234567'
+                            const TypeIcon = CONTACT_ICONS[typeConfig?.icon ?? 'Phone'] ?? Phone
 
                             return (
                                 <div key={field.id} className="group/item relative overflow-hidden rounded-xl border border-border/80 bg-card p-3.5 shadow-xs hover:border-primary/30 hover:shadow-xs transition-all duration-300 animate-in fade-in-50 slide-in-from-bottom-2">
@@ -373,9 +433,11 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent className="rounded-xl">
-                                                            <SelectItem value="phone">📞 هاتف</SelectItem>
-                                                            <SelectItem value="email">📧 بريد</SelectItem>
-                                                            <SelectItem value="whatsapp">💬 واتساب</SelectItem>
+                                                            {CONTACT_TYPE_OPTIONS.map(opt => (
+                                                                <SelectItem key={opt.value} value={opt.value}>
+                                                                    {opt.label}
+                                                                </SelectItem>
+                                                            ))}
                                                         </SelectContent>
                                                     </Select>
                                                 )}
@@ -388,15 +450,16 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                                                         <FormControl>
                                                             <div className="relative">
                                                                 <Input
-                                                                    placeholder={typeInfo.placeholder}
+                                                                    placeholder={placeholder}
                                                                     {...field}
                                                                     className="h-10 text-sm font-mono rounded-xl transition-all pr-10 border-border/60 focus:ring-2 focus:ring-primary/10"
                                                                     dir="ltr"
                                                                 />
                                                                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 pointer-events-none">
-                                                                    {contactType === 'whatsapp' && <MessageCircle className="h-4.5 w-4.5 text-emerald-500" />}
-                                                                    {contactType === 'email' && <Mail className="h-4.5 w-4.5 text-sky-500" />}
-                                                                    {contactType === 'phone' && <Phone className="h-4.5 w-4.5 text-indigo-500" />}
+                                                                    <TypeIcon className={`h-4.5 w-4.5 ${
+                                                                        contactType === 'whatsapp' ? 'text-emerald-500' :
+                                                                        contactType === 'email' ? 'text-sky-500' : 'text-indigo-500'
+                                                                    }`} />
                                                                 </div>
                                                             </div>
                                                         </FormControl>
@@ -428,8 +491,15 @@ export const CustomerForm = React.memo(function CustomerForm({ customer, onSucce
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const isCurrentlyPrimary = form.watch(`contacts.${index}.isPrimary`)
-                                                        form.setValue(`contacts.${index}.isPrimary`, !isCurrentlyPrimary)
+                                                        const isCurrentlyPrimary = form.getValues(`contacts.${index}.isPrimary`)
+                                                        if (isCurrentlyPrimary) {
+                                                            form.setValue(`contacts.${index}.isPrimary`, false)
+                                                        } else {
+                                                            const contacts = form.getValues('contacts') || []
+                                                            contacts.forEach((_, i) => {
+                                                                form.setValue(`contacts.${i}.isPrimary`, i === index)
+                                                            })
+                                                        }
                                                     }}
                                                     className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all duration-300 ${
                                                         form.watch(`contacts.${index}.isPrimary`)

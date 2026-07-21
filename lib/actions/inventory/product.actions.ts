@@ -88,7 +88,7 @@ async function resolveFamilyFields(
             : (existing?.name ?? '')
 
     if (inheritsFamilyName && familyName) {
-        if (!name) name = familyName
+        name = familyName
     } else if (!name) {
         throw new Error('اسم المنتج مطلوب')
     }

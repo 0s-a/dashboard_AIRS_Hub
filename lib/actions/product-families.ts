@@ -85,6 +85,10 @@ export async function updateProductFamily(id: string, data: ProductFamilyPayload
                 where: { id },
                 data: payload,
             })
+            await prisma.product.updateMany({
+                where: { familyId: id, inheritsFamilyName: true },
+                data: { name: payload.name },
+            })
             reindexFamilyProducts(id)
             return updated
         },

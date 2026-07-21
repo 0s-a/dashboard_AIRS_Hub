@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url)
         const query = parseProductSearchQuery(searchParams)
         const { results, meta } = await searchProducts(query)
-        return apiSuccess(results, 200, meta)
+        return apiSuccess(results, 200, { ...meta })
     } catch (error) {
         return handleBotServiceError(error, '[Bot GET /products/search]')
     }

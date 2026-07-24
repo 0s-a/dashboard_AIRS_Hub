@@ -6,12 +6,11 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ServerPagination } from "@/components/ui/server-pagination"
-import { toggleProductNewTag } from "@/lib/actions/inventory"
-import { getProductsForNewTags } from "@/lib/actions/inventory/new-tags.queries"
+import { toggleItemNewTag, getItemsForNewTags } from "@/lib/actions/items"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
-import type { NewTagProduct, NewTagsPaginationMeta } from "@/lib/actions/inventory/new-tags.queries"
+import type { NewTagItem, NewTagsPaginationMeta } from "@/lib/actions/items"
 
 const DEBOUNCE_MS = 350
 
@@ -27,17 +26,15 @@ function getBrandGradient(name: string) {
     return gradients[name.charCodeAt(0) % gradients.length]
 }
 
-// ─── Product Row ─────────────────────────────────────────────────────────────
-
-function ProductRow({ product, onToggle }: { product: NewTagProduct; onToggle: (id: string, isNew: boolean) => void }) {
+function ItemRow({ item, onToggle }: { item: NewTagItem; onToggle: (id: string, isNew: boolean) => void }) {
     const [pending, startTransition] = useTransition()
 
     const handleChange = (checked: boolean) => {
         startTransition(async () => {
-            const res = await toggleProductNewTag(product.id, checked)
+            const res = await toggleItemNewTag(item.id, checked)
             if (res.success) {
                 toast.success(checked ? "تمت إضافة علامة جديد ✨" : "تمت إزالة علامة جديد")
-                onToggle(product.id, checked)
+                onToggle(item.id, checked)
             } else {
                 toast.error(res.error || "حدث خطأ أثناء التحديث")
             }
@@ -47,34 +44,32 @@ function ProductRow({ product, onToggle }: { product: NewTagProduct; onToggle: (
     return (
         <tr className={cn(
             "group border-b border-border/40 transition-colors hover:bg-muted/30",
-            product.isNew && "bg-emerald-500/5 hover:bg-emerald-500/10",
+            item.isNew && "bg-emerald-500/5 hover:bg-emerald-500/10",
         )}>
-            {/* Checkbox */}
             <td className="px-4 py-3 w-[60px]">
                 <div className="flex items-center justify-center">
                     {pending ? (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                         <Checkbox
-                            checked={product.isNew}
+                            checked={item.isNew}
                             onCheckedChange={handleChange}
                             disabled={pending}
                             className={cn(
                                 "transition-all",
-                                product.isNew && "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm shadow-emerald-500/20"
+                                item.isNew && "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 shadow-sm shadow-emerald-500/20"
                             )}
                         />
                     )}
                 </div>
             </td>
 
-            {/* Image */}
             <td className="px-4 py-3 w-[70px]">
-                {product.primaryImage ? (
+                {item.primaryImage ? (
                     <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-muted/20 shadow-sm group/img">
                         <Image
-                            src={product.primaryImage}
-                            alt={product.name}
+                            src={item.primaryImage}
+                            alt={item.name}
                             fill
                             className="object-cover transition-transform duration-500 group-hover/img:scale-110"
                         />
@@ -86,11 +81,10 @@ function ProductRow({ product, onToggle }: { product: NewTagProduct; onToggle: (
                 )}
             </td>
 
-            {/* Name + isNew badge */}
             <td className="px-4 py-3">
                 <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-semibold text-sm text-foreground truncate max-w-[280px]">{product.name}</span>
-                    {product.isNew && (
+                    <span className="font-semibold text-sm text-foreground truncate max-w-[280px]">{item.name}</span>
+                    {item.isNew && (
                         <Badge className="bg-emerald-500/10 text-emerald-600 border-0 text-[10px] font-bold px-2 py-0.5 shrink-0 gap-1">
                             <Sparkles className="h-2.5 w-2.5" />
                             جديد
@@ -99,47 +93,43 @@ function ProductRow({ product, onToggle }: { product: NewTagProduct; onToggle: (
                 </div>
             </td>
 
-            {/* Brand */}
             <td className="px-4 py-3 w-[160px]">
-                {product.brandRef ? (
+                {item.brandRef ? (
                     <div className="flex items-center gap-2">
-                        {product.brandRef.logo ? (
+                        {item.brandRef.logo ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                                src={product.brandRef.logo}
-                                alt={product.brandRef.name}
+                                src={item.brandRef.logo}
+                                alt={item.brandRef.name}
                                 className="h-6 w-6 rounded-md object-contain border border-border/40 bg-white p-0.5 shrink-0"
                             />
                         ) : (
-                            <div className={`h-6 w-6 rounded-md bg-gradient-to-br ${getBrandGradient(product.brandRef.name)} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
-                                {product.brandRef.code}
+                            <div className={`h-6 w-6 rounded-md bg-gradient-to-br ${getBrandGradient(item.brandRef.name)} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
+                                {item.brandRef.code}
                             </div>
                         )}
-                        <span className="text-xs font-medium truncate max-w-[100px]">{product.brandRef.name}</span>
+                        <span className="text-xs font-medium truncate max-w-[100px]">{item.brandRef.name}</span>
                     </div>
                 ) : (
                     <span className="text-xs text-muted-foreground">—</span>
                 )}
             </td>
 
-            {/* Product Number */}
             <td className="px-4 py-3 w-[150px]">
-                <span className="text-xs font-mono text-muted-foreground">{product.itemNumber ?? '—'}</span>
+                <span className="text-xs font-mono text-muted-foreground">{item.itemNumber ?? '—'}</span>
             </td>
         </tr>
     )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
 interface NewTagsTableProps {
-    initialProducts: NewTagProduct[]
+    initialItems: NewTagItem[]
     initialPagination: NewTagsPaginationMeta
 }
 
-export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTableProps) {
+export function NewTagsTable({ initialItems, initialPagination }: NewTagsTableProps) {
     const [isPending, startTransition] = useTransition()
-    const [products, setProducts] = useState<NewTagProduct[]>(initialProducts)
+    const [items, setItems] = useState<NewTagItem[]>(initialItems)
     const [pagination, setPagination] = useState(initialPagination)
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
@@ -149,14 +139,14 @@ export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTabl
 
     const fetch = useCallback((params: { search?: string; page?: number; limit?: number; filterNew?: boolean }) => {
         startTransition(async () => {
-            const res = await getProductsForNewTags({
+            const res = await getItemsForNewTags({
                 search: params.search,
                 page: params.page ?? 1,
                 limit: params.limit ?? limit,
                 filterNew: params.filterNew,
             })
             if (res.success) {
-                setProducts(res.data)
+                setItems(res.data)
                 setPagination(res.pagination)
             }
         })
@@ -188,18 +178,15 @@ export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTabl
         fetch({ search: search || undefined, page: 1, limit: newLimit, filterNew })
     }
 
-    // Optimistic update on toggle
     const handleToggle = (id: string, isNew: boolean) => {
-        setProducts(prev => prev.map(p => p.id === id ? { ...p, isNew } : p))
+        setItems(prev => prev.map(p => p.id === id ? { ...p, isNew } : p))
     }
 
-    const newCount = products.filter(p => p.isNew).length
+    const newCount = items.filter(p => p.isNew).length
 
     return (
         <div className="space-y-4">
-            {/* ── Toolbar ── */}
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                {/* Search */}
                 <div className="relative flex-1 max-w-sm">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     {isPending && (
@@ -221,7 +208,6 @@ export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTabl
                     )}
                 </div>
 
-                {/* Filter pills */}
                 <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-muted-foreground font-medium">عرض:</span>
                     {[
@@ -249,7 +235,6 @@ export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTabl
                 </div>
             </div>
 
-            {/* ── Table ── */}
             <div className={cn("rounded-2xl border border-border/50 overflow-hidden shadow-sm bg-card transition-opacity duration-200", isPending && "opacity-60 pointer-events-none")}>
                 <div className="overflow-auto">
                     <table className="w-full text-sm">
@@ -268,33 +253,32 @@ export function NewTagsTable({ initialProducts, initialPagination }: NewTagsTabl
                             </tr>
                         </thead>
                         <tbody>
-                            {products.length === 0 ? (
+                            {items.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="h-14 w-14 rounded-full bg-muted/30 flex items-center justify-center">
                                                 <Package className="h-7 w-7 text-muted-foreground/30" />
                                             </div>
-                                            <p className="text-sm text-muted-foreground">لا توجد منتجات مطابقة</p>
+                                            <p className="text-sm text-muted-foreground">لا توجد أصناف مطابقة</p>
                                         </div>
                                     </td>
                                 </tr>
                             ) : (
-                                products.map(p => (
-                                    <ProductRow key={p.id} product={p} onToggle={handleToggle} />
+                                items.map(p => (
+                                    <ItemRow key={p.id} item={p} onToggle={handleToggle} />
                                 ))
                             )}
                         </tbody>
                     </table>
                 </div>
 
-                {/* Footer */}
                 <div className="border-t border-border/50 bg-muted/10 flex items-center justify-between px-4 py-2">
                     <p className="text-xs text-muted-foreground">
                         محدد في هذه الصفحة:{" "}
                         <span className="font-bold text-emerald-600">{newCount}</span>
                         {" "}من{" "}
-                        <span className="font-bold text-foreground">{products.length}</span>
+                        <span className="font-bold text-foreground">{items.length}</span>
                     </p>
                     <ServerPagination
                         pagination={pagination}

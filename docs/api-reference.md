@@ -13,9 +13,10 @@ x-api-key: <BOT_API_KEY>
 
 **استجابة الخطأ عند فشل المصادقة:**
 ```json
-{ "success": false, "error": "Unauthorized — invalid or missing x-api-key", "code": "UNAUTHORIZED" }
+{ "success": false, "error": "غير مصرح — مفتاح x-api-key ناقص أو غير صحيح", "code": "UNAUTHORIZED" }
 ```
 
+Webhook اختياري لحالة الطلب: عيّن `BOT_ORDER_WEBHOOK_URL` (+ `BOT_ORDER_WEBHOOK_SECRET` اختياري). يُرسل `POST` عند تغيّر الحالة بعد `PATCH /orders`.
 ---
 
 ## صيغة الاستجابة الموحّدة
@@ -29,7 +30,7 @@ x-api-key: <BOT_API_KEY>
 }
 ```
 
-### خطأ ❌
+### خطأ أعمال ❌ (HTTP 200 — فرّع على `success` / `code`)
 ```json
 {
   "success": false,
@@ -39,19 +40,21 @@ x-api-key: <BOT_API_KEY>
 }
 ```
 
+أخطاء المصادقة فقط تُرجع رمزاً غير 200: `UNAUTHORIZED` → 401، `MISCONFIGURED` → 503.
+
 **رموز الأخطاء الشائعة:**
 
 | Code | HTTP | المعنى |
 |------|------|--------|
 | `UNAUTHORIZED` | 401 | مفتاح API غير صحيح أو غائب |
 | `MISCONFIGURED` | 503 | BOT_API_KEY غير معيّن في البيئة |
-| `VALIDATION_ERROR` | 400 | بيانات الطلب غير صحيحة |
-| `MISSING_PARAM` | 400 | معلمة مطلوبة غائبة |
-| `NOT_FOUND` | 404 | السجل غير موجود |
-| `DUPLICATE_CONTACT` | 409 | رقم هاتف/بريد مكرر |
-| `DUPLICATE_FIELD` | 409 | حقل فريد مكرر |
-| `PRICE_NOT_FOUND` | 400 | لا توجد تسعيرة مطابقة |
-| `INTERNAL_ERROR` | 500 | خطأ داخلي في الخادم |
+| `VALIDATION_ERROR` | 200 | بيانات الطلب غير صحيحة |
+| `MISSING_PARAM` | 200 | معلمة مطلوبة غائبة |
+| `NOT_FOUND` | 200 | السجل غير موجود |
+| `DUPLICATE_CONTACT` | 200 | رقم هاتف/بريد مكرر |
+| `DUPLICATE_FIELD` | 200 | حقل فريد مكرر |
+| `PRICE_NOT_FOUND` | 200 | لا توجد تسعيرة مطابقة |
+| `INTERNAL_ERROR` | 200 | خطأ داخلي في الخادم |
 
 ---
 
@@ -223,9 +226,9 @@ GET /api/v1/bot/customers/{uuid}/pricing
 
 ## Products API
 
-### `GET /products/search` — بحث مجمّع حسب المنتج الرئيسي
+### `GET /products/search` — بحث مجمّع حسب المنتج (SPU)
 
-بحث Meilisearch-first ثم hydrate من Prisma. **`data[]` دائماً عائلات**: كل عنصر = منتج رئيسي + `products[]` للأصناف **المطابقة فقط**. `page`/`limit` بعدد العائلات (مع over-fetch داخلي). تفكيك حذر لـ `q` (`parse` افتراضي true). رقم صنف وحيد → عائلة واحدة مع `skuMatch: true`. عند تعطّل Meili: Prisma fallback.
+بحث Meilisearch-first ثم hydrate من Prisma. **`data[]` دائماً مجموعات منتج**: كل عنصر = `product` + `items[]` للأصناف **المطابقة فقط**. `page`/`limit` بعدد المنتجات (مع over-fetch داخلي). تفكيك حذر لـ `q` (`parse` افتراضي true). لجلب صنف كامل برقم الصنف استخدم `GET /items/by-number`. عند تعطّل Meili: Prisma fallback.
 
 | Param | Type | Description |
 |-------|------|-------------|
@@ -234,30 +237,45 @@ GET /api/v1/bot/customers/{uuid}/pricing
 | `attr` | string (متكرر) | اختياري — تطابق كامل لقيمة صفة؛ عدة `attr` = AND |
 | `available` | boolean | اختياري — `true` للمتاح فقط / `false` لغير المتاح |
 | `parse` | boolean | اختياري — افتراضي `true`؛ `false` يعطّل تفكيك `q` |
-| `familyCode` | string | اختياري — كود المنتج الرئيسي؛ غير موجود → نتائج فارغة |
-| `page` / `limit` | number | صفحات **العائلات** (حد أقصى 50) |
+| `productCode` | string | اختياري — كود المنتج (SPU)؛ غير موجود → نتائج فارغة |
+| `customerId` | uuid | اختياري — تسعيرة وعملات العميل لأسعار الأصناف في النتائج |
+| `currency` | string | اختياري — فرض رمز عملة للأسعار المضمّنة |
+| `page` / `limit` | number | صفحات **المنتجات** (حد أقصى 50) |
 
-**الاستجابة:** عناصر من شكل `{ family, category, brand, matchCount, products[] }` بدون أسعار/صور. الـ meta: `engine`, `hasMore`, `skuMatch?`, `parsed?`, و`pagination.total` تقديري للعائلات.
+**الاستجابة:** `{ product: { code, name }, category, brand, items[] }` — لكل صنف: `id`, `itemNumber`, `name`, `isAvailable`, `alternativeNames[]`, `primaryImage`, `prices[]`, `attributes`. الـ meta: `engine`, `hasMore`, `parsed?`, و`pagination.total` تقديري؛ وعند تمرير `customerId` يُعاد `meta.customerId` للمستعمل في التسعير.
 
-**بعد الشحن:** إن لزم، مزامنة Meili من لوحة search-engine لتفعيل فلتر `familyId`.
+### `GET /items/by-number` — بطاقة صنف برقم الصنف
 
----
+عند عدم الوجود (HTTP 200 + soft error):
+```json
+{
+  "success": false,
+  "error": "الصنف غير موجود",
+  "code": "NOT_FOUND",
+  "details": { "suggestSearch": true, "q": "..." }
+}
+```
+→ البوت يستدعي `GET /products/search?q=...`.
 
-### `GET /products/price` — سعر منتج
+### `GET /items/by-id` — بطاقة صنف بـ UUID
+
+نفس شكل by-number؛ مطلوب `itemId`.
+
+### `GET /items/price` — سعر صنف
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `productId` أو `itemNumber` | string | **أحدهما مطلوب** |
+| `itemId` أو `itemNumber` | string | **أحدهما مطلوب** |
 | `customerId` | uuid | اختياري — تسمية التسعير وعملات العميل |
 | `currency` | string | اختياري — رمز عملة هدف (مثل `USD`) |
 
 ---
 
-### `GET /products/image` — الصورة الرئيسية
+### `GET /items/image` — الصورة الرئيسية للصنف
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `productId` أو `itemNumber` | string | **أحدهما مطلوب** |
+| `itemId` أو `itemNumber` | string | **أحدهما مطلوب** |
 
 ---
 
@@ -272,9 +290,9 @@ GET /api/v1/bot/customers/{uuid}/pricing
   "notes": "ملاحظات الطلب",
   "items": [
     {
-      "productId": "uuid",
+      "itemId": "uuid",
       "priceLabelId": "uuid",
-      "variantId": "uuid",
+      "unitId": "uuid",
       "quantity": 2,
       "notes": "لون أحمر"
     }
@@ -316,7 +334,7 @@ GET /api/v1/bot/customers/{uuid}/pricing
 | `q` | نعم | alias: `searchQuery` |
 | `phone` | لا | alias: `phoneNumber`؛ يُطبَّع ويُحل `customerId` إن أمكن |
 | `customerId` | لا | إن وُجد يجب أن يكون صالحاً |
-| `productId` / `itemNumber` | لـ `out_of_stock` | أحدهما إلزامي عند نفاد المخزون |
+| `itemId` / `itemNumber` | لـ `out_of_stock` | أحدهما إلزامي عند نفاد المخزون |
 
 **الاستجابة:**
 
@@ -328,12 +346,12 @@ GET /api/v1/bot/customers/{uuid}/pricing
 
 ---
 
-## Product Price API
+## Item Price API
 
-### `GET /products/price` — استعلام عن سعر منتج
+### `GET /items/price` — استعلام عن سعر صنف
 
 ```
-GET /api/v1/bot/products/price?itemNumber=ABC-1&customerId=uuid&currency=SAR
+GET /api/v1/bot/items/price?itemNumber=ABC-1&customerId=uuid&currency=SAR
 ```
 
 **الاستجابة:**
@@ -341,9 +359,9 @@ GET /api/v1/bot/products/price?itemNumber=ABC-1&customerId=uuid&currency=SAR
 {
   "success": true,
   "data": {
-    "productId": "...",
+    "itemId": "...",
     "itemNumber": "ABC-1",
-    "productName": "...",
+    "name": "...",
     "customerId": "...",
     "prices": [
       { "label": "سعر الجملة", "value": 150, "currency": { "code": "SAR", "symbol": "ر.س" }, "unit": "كرتون" }

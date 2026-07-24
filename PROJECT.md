@@ -43,9 +43,14 @@ flowchart TB
 ## Risky Areas
 
 ### التسعير
-- `ProductPrice`: unique على `(productId, priceLabelId, currencyId, unitId)`
+- `ItemPrice`: unique على `(itemId, priceLabelId, unitId)` — عملة افتراضية دائماً
 - `Customer.priceLabelId` يحدد تسعيرة البوت
 - راجع skill `nawaat-pricing`
+
+### المخزون
+- `Product` = منتج (SPU)؛ `Item` = صنف (SKU)
+- البراند والتصنيف على المنتج؛ البيع على الصنف
+- راجع skill `nawaat-inventory`
 
 ### الطلبات
 - **Snapshot إلزامي** في `OrderItem` عند الإنشاء

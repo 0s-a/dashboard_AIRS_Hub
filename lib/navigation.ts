@@ -16,7 +16,6 @@ import {
     Search,
     Tags,
     Boxes,
-    FileUp,
     LucideIcon
 } from "lucide-react"
 
@@ -46,14 +45,13 @@ export const navigationGroups: NavigationGroup[] = [
         title: "المبيعات والمنتجات",
         items: [
             { href: "/orders", label: "الطلبات", icon: ShoppingCart, keywords: "orders sales طلبات مبيعات فاتورة" },
-            { href: "/products", label: "المنتجات", icon: Package, keywords: "products منتجات مخزون أصناف" },
-            { href: "/inventory/import", label: "استيراد المنتجات", icon: FileUp, keywords: "import csv استيراد منتجات" },
-            { href: "/inventory/new-tags", label: "المنتجات الجديدة", icon: Sparkles, keywords: "new tags جديد" },
+            { href: "/products", label: "المنتجات", icon: Package, keywords: "products منتجات SPU" },
+            { href: "/items", label: "الأصناف", icon: Boxes, keywords: "items أصناف مخزون SKU" },
+            { href: "/inventory/new-tags", label: "الأصناف الجديدة", icon: Sparkles, keywords: "new tags جديد أصناف" },
             { href: "/inventory/search-engine", label: "محرك البحث", icon: Search, keywords: "search meilisearch بحث" },
             { href: "/categories", label: "التصنيفات", icon: Layers, keywords: "categories تصنيفات أقسام" },
             { href: "/brands", label: "البراندات", icon: Bookmark, keywords: "brands براندات ماركات" },
-            { href: "/product-families", label: "المنتجات الرئيسية", icon: Boxes, keywords: "product families منتجات رئيسية تجميع أصناف" },
-            { href: "/product-attributes", label: "صفات المنتج", icon: Tags, keywords: "attributes صفات لون مقاس سعة وزن" },
+            { href: "/product-attributes", label: "صفات الأصناف", icon: Tags, keywords: "attributes صفات لون مقاس سعة وزن أصناف" },
             { href: "/gallery", label: "معرض الصور", icon: Images, keywords: "gallery images صور معرض" },
         ]
     },

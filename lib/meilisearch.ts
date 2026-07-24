@@ -9,7 +9,7 @@ import { Meilisearch } from 'meilisearch'
 // ── Env config ────────────────────────────────────────────────────────────────
 const MEILISEARCH_HOST  = process.env.MEILISEARCH_HOST  || 'http://localhost:7700'
 const MEILISEARCH_KEY   = process.env.MEILISEARCH_MASTER_KEY || ''
-export const MEILI_INDEX = process.env.MEILISEARCH_INDEX || 'products'
+export const MEILI_INDEX = process.env.MEILISEARCH_INDEX || 'items'
 
 // ── Singleton client ──────────────────────────────────────────────────────────
 let _client: Meilisearch | null = null
@@ -42,7 +42,7 @@ export const MEILI_SETTINGS = {
         'brand',
         'category',
         'attributeValues',
-        'familyId',
+        'productId',
     ],
     sortableAttributes: [
         'name',
@@ -52,7 +52,7 @@ export const MEILI_SETTINGS = {
         'itemNumber',
         'name',
         'productName',
-        'familyId',
+        'productId',
         'brand',
         'category',
         'attributeText',

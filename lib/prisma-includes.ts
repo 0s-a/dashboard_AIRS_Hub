@@ -3,22 +3,22 @@
 // ============================================================
 
 export const ORDER_ITEM_INCLUDE = {
-    product: {
+    item: {
         select: {
             id: true,
             name: true,
             itemNumber: true,
-            productAttributes: {
+            itemAttributes: {
                 include: {
                     attribute: { select: { id: true, code: true, name: true } },
                 },
                 orderBy: { attribute: { name: 'asc' as const } },
             },
-            productImages: {
+            itemImages: {
                 orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }],
                 select: { url: true, alt: true, isPrimary: true },
             },
-            productPrices: {
+            itemPrices: {
                 include: {
                     priceLabel: { select: { id: true, name: true, isDefault: true } },
                 },
@@ -51,31 +51,32 @@ export const CUSTOMER_INCLUDE = {
 /** Bot CRM flows — exclude supervisors (PersonType.supervisor) */
 export const BOT_CUSTOMER_WHERE = { type: 'customer' as const }
 
-export const PRODUCT_INCLUDE = {
-    brandRef: { select: { id: true, name: true, code: true } },
-    family: {
+export const ITEM_INCLUDE = {
+    product: {
         select: {
             id: true,
             code: true,
             name: true,
             categoryId: true,
+            brandId: true,
             category: { select: { id: true, name: true, code: true } },
+            brand: { select: { id: true, name: true, code: true } },
         },
     },
-    productAttributes: {
+    itemAttributes: {
         include: {
             attribute: { select: { id: true, code: true, name: true, examples: true } },
         },
         orderBy: { attribute: { name: 'asc' as const } },
     },
-    productImages: {
+    itemImages: {
         orderBy: [{ isPrimary: 'desc' as const }, { order: 'asc' as const }],
     },
-    productPrices: {
+    itemPrices: {
         include: { priceLabel: true, unit: true },
         orderBy: { createdAt: 'asc' as const },
     },
-    productUnits: {
+    itemUnits: {
         include: { unit: true },
         orderBy: { order: 'asc' as const },
     },

@@ -82,29 +82,29 @@
       "q": "NOTE: replace with a real itemNumber from your DB",
       "skip": true,
       "expectMinResults": 1,
-      "expectFamilyShape": true
+      "expectProductShape": true
     },
     {
       "id": "loose-phrase",
       "q": "قميص",
       "parse": true,
       "expectMinResults": 0,
-      "expectFamilyShape": true,
-      "note": "Smoke — results must be family groups when count > 0"
+      "expectProductShape": true,
+      "note": "Smoke — results must be product groups when count > 0"
     },
     {
       "id": "parse-false",
       "q": "قميص",
       "parse": false,
       "expectMinResults": 0,
-      "expectFamilyShape": true
+      "expectProductShape": true
     },
     {
-      "id": "unknown-family-code",
+      "id": "unknown-product-code",
       "q": "قميص",
-      "familyCode": "__no_such_family__",
+      "productCode": "__no_such_product__",
       "expectMinResults": 0,
-      "expectFamilyShape": true
+      "expectProductShape": true
     }
   ]
 }

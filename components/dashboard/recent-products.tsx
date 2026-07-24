@@ -4,19 +4,17 @@ import { Badge } from "@/components/ui/badge"
 import { Package as PackageIcon, ArrowLeft, Clock } from "lucide-react"
 import Link from "next/link"
 
-interface Product {
+interface Item {
     id: string
     name: string
-    productPrices: Array<{ priceLabelName: string; value: number; currencySymbol: string }>
+    itemPrices: Array<{ priceLabelName: string; value: number; currencySymbol: string }>
     mediaImages: Array<{ url: string; isPrimary: boolean }> | null
     isAvailable: boolean
-    unit: string
-    packaging?: string | null
     createdAt: Date
 }
 
 interface RecentProductsProps {
-    products: Product[]
+    products: Item[]
 }
 
 function timeAgo(date: Date | string) {
@@ -38,13 +36,13 @@ export function RecentProducts({ products }: RecentProductsProps) {
                         <div className="p-2 rounded-lg bg-primary/10">
                             <PackageIcon className="h-4 w-4 text-primary" />
                         </div>
-                        <span className="text-base font-bold">أحدث المنتجات</span>
+                        <span className="text-base font-bold">أحدث الأصناف</span>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[300px] flex flex-col items-center justify-center text-muted-foreground gap-3">
                         <PackageIcon className="size-10 text-muted-foreground/20" />
-                        <span className="text-sm font-medium">لا توجد منتجات حتى الآن</span>
+                        <span className="text-sm font-medium">لا توجد أصناف حتى الآن</span>
                     </div>
                 </CardContent>
             </Card>
@@ -59,10 +57,10 @@ export function RecentProducts({ products }: RecentProductsProps) {
                         <div className="p-2 rounded-lg bg-primary/10">
                             <PackageIcon className="h-4 w-4 text-primary" />
                         </div>
-                        <span className="text-base font-bold">أحدث المنتجات</span>
+                        <span className="text-base font-bold">أحدث الأصناف</span>
                     </CardTitle>
                     <Link
-                        href="/products"
+                        href="/items"
                         className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-bold group transition-colors"
                     >
                         عرض الكل
@@ -73,16 +71,15 @@ export function RecentProducts({ products }: RecentProductsProps) {
             <CardContent>
                 <div className="space-y-1">
                     {products.map((product, index) => (
-                        <div
+                        <Link
                             key={product.id}
+                            href={`/items/${product.id}`}
                             className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/50 transition-all duration-300"
                         >
-                            {/* Number */}
                             <span className="text-[10px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums">
                                 {index + 1}
                             </span>
 
-                            {/* Image */}
                             <div className="relative h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50 shadow-sm">
                                 {(() => {
                                     const imgs = product.mediaImages
@@ -102,7 +99,6 @@ export function RecentProducts({ products }: RecentProductsProps) {
                                 })()}
                             </div>
 
-                            {/* Info */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-0.5">
                                     <p className="font-bold text-sm truncate group-hover:text-primary transition-colors duration-300">
@@ -120,20 +116,19 @@ export function RecentProducts({ products }: RecentProductsProps) {
                                 </div>
                             </div>
 
-                            {/* Price */}
                             <div className="text-left flex flex-col items-end gap-0.5">
-                                {product.productPrices && product.productPrices.length > 0 ? (
+                                {product.itemPrices && product.itemPrices.length > 0 ? (
                                     <div className="flex flex-col items-end">
                                         <p className="font-mono font-bold text-sm text-foreground tabular-nums">
-                                            {Number(product.productPrices[0].value).toFixed(2)} {product.productPrices[0].currencySymbol}
+                                            {Number(product.itemPrices[0].value).toFixed(2)} {product.itemPrices[0].currencySymbol}
                                         </p>
-                                        <p className="text-[9px] text-muted-foreground font-medium">{product.productPrices[0].priceLabelName || 'سعر'}</p>
+                                        <p className="text-[9px] text-muted-foreground font-medium">{product.itemPrices[0].priceLabelName || 'سعر'}</p>
                                     </div>
                                 ) : (
                                     <p className="text-[10px] text-muted-foreground/50 italic font-medium">بدون سعر</p>
                                 )}
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
             </CardContent>

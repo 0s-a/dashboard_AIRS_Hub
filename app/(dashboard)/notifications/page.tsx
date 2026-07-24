@@ -32,7 +32,7 @@ import {
     archiveNotification,
     unarchiveNotification,
 } from "@/lib/actions/notifications"
-import { addAlternativeNameToProduct, getProducts } from "@/lib/actions/inventory"
+import { addAlternativeNameToItem, getItems } from "@/lib/actions/items"
 function timeAgo(date: Date | string) {
     const now = new Date()
     const d = new Date(date)
@@ -81,9 +81,9 @@ export default function NotificationsPage() {
     const [isSelectionMode, setIsSelectionMode] = useState(false)
     // Link-product dialog state
     const [linkDialog, setLinkDialog] = useState<{ open: boolean; notifId: string; searchQuery: string } | null>(null)
-    const [allProducts, setAllProducts] = useState<any[]>([])
-    const [productSearch, setProductSearch] = useState("")
-    const [linkingProductId, setLinkingProductId] = useState<string | null>(null)
+    const [allItems, setAllItems] = useState<any[]>([])
+    const [itemSearch, setItemSearch] = useState("")
+    const [linkingItemId, setLinkingItemId] = useState<string | null>(null)
     const [isLinking, setIsLinking] = useState(false)
     const loadData = useCallback(async () => {
         const [notifRes, archivedRes, statsRes] = await Promise.all([
@@ -206,35 +206,35 @@ export default function NotificationsPage() {
     // ── Quick Action: Open link-product dialog ──
     const handleOpenLinkDialog = async (notif: any) => {
         setLinkDialog({ open: true, notifId: notif.id, searchQuery: notif.searchQuery })
-        setProductSearch("")
-        setLinkingProductId(null)
+        setItemSearch("")
+        setLinkingItemId(null)
         // Load products if not loaded yet
-        if (allProducts.length === 0) {
-            const res = await getProducts()
-            if (res.success && res.data) setAllProducts(res.data)
+        if (allItems.length === 0) {
+            const res = await getItems()
+            if (res.success && res.data) setAllItems(res.data)
         }
     }
-    const filteredProducts = useMemo(() => {
-        if (!productSearch.trim()) return allProducts.slice(0, 20)
-        const q = productSearch.toLowerCase()
-        return allProducts.filter(p =>
+    const filteredItems = useMemo(() => {
+        if (!itemSearch.trim()) return allItems.slice(0, 20)
+        const q = itemSearch.toLowerCase()
+        return allItems.filter(p =>
             p.name?.toLowerCase().includes(q) ||
             p.itemNumber?.toLowerCase().includes(q) ||
             p.brandRef?.name?.toLowerCase().includes(q)
         ).slice(0, 20)
-    }, [allProducts, productSearch])
-    const handleLinkProduct = async () => {
-        if (!linkDialog || !linkingProductId) return
+    }, [allItems, itemSearch])
+    const handleLinkItem = async () => {
+        if (!linkDialog || !linkingItemId) return
         setIsLinking(true)
         try {
-            const res = await addAlternativeNameToProduct(linkingProductId, linkDialog.searchQuery)
+            const res = await addAlternativeNameToItem(linkingItemId, linkDialog.searchQuery)
             if (res.success) {
                 toast.success(`تم إضافة "${linkDialog.searchQuery}" كتسمية بديلة`)
                 await archiveNotification(linkDialog.notifId, "تم ربط التسمية")
                 setLinkDialog(null)
                 loadData()
             } else {
-                toast.error(res.error || "فشل ربط المنتج")
+                toast.error(res.error || "فشل ربط الصنف")
             }
         } finally {
             setIsLinking(false)
@@ -600,9 +600,9 @@ export default function NotificationsPage() {
                                                             </div>
                                                             <span className="text-xs font-semibold text-muted-foreground">
                                                                 {notif.productName}
-                                                                {notif.product && (
+                                                                {notif.item && (
                                                                     <Link
-                                                                        href={`/products/${notif.product.id}`}
+                                                                        href={`/items/${notif.item.id}`}
                                                                         className="text-primary hover:underline mr-1.5"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >
@@ -624,7 +624,7 @@ export default function NotificationsPage() {
                                                 {/* ── Quick Action Buttons (Inbox only) ── */}
                                                 {!notif.isArchived && (
                                                     <div className="flex items-center gap-2 mt-4 flex-wrap">
-                                                        {notif.type === "out_of_stock" && notif.product && (
+                                                        {notif.type === "out_of_stock" && notif.item && (
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
@@ -632,7 +632,7 @@ export default function NotificationsPage() {
                                                                 asChild
                                                             >
                                                                 <Link
-                                                                    href={`/products/${notif.product.id}`}
+                                                                    href={`/items/${notif.item.id}`}
                                                                     onClick={(e) => e.stopPropagation()}
                                                                 >
                                                                     <Package className="h-3.5 w-3.5" />
@@ -651,7 +651,7 @@ export default function NotificationsPage() {
                                                                 }}
                                                             >
                                                                 <Link2 className="h-3.5 w-3.5" />
-                                                                ربط بمنتج
+                                                                ربط بصنف
                                                             </Button>
                                                         )}
                                                     </div>
@@ -713,40 +713,40 @@ export default function NotificationsPage() {
             <Dialog open={!!linkDialog?.open} onOpenChange={(open) => !open && setLinkDialog(null)}>
                 <DialogContent className="sm:max-w-md rounded-2xl">
                     <DialogHeader>
-                        <DialogTitle className="text-lg">ربط التسمية بمنتج</DialogTitle>
+                        <DialogTitle className="text-lg">ربط التسمية بصنف</DialogTitle>
                         <DialogDescription className="text-sm">
                             الزبون بحث عن <span className="font-bold text-primary">"{linkDialog?.searchQuery}"</span>.
-                            اختر المنتج الصحيح لإضافة هذه التسمية كاسم بديل.
+                            اختر الصنف الصحيح لإضافة هذه التسمية كاسم بديل.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 py-2">
                         <Input
-                            placeholder="ابحث عن منتج بالاسم أو الرقم..."
-                            value={productSearch}
-                            onChange={e => setProductSearch(e.target.value)}
+                            placeholder="ابحث عن صنف بالاسم أو الرقم..."
+                            value={itemSearch}
+                            onChange={e => setItemSearch(e.target.value)}
                             className="rounded-xl"
                         />
                         <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-border/50 p-1">
-                            {filteredProducts.length === 0 ? (
+                            {filteredItems.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-4">لا توجد نتائج</p>
                             ) : (
-                                filteredProducts.map(product => (
+                                filteredItems.map(item => (
                                     <button
-                                        key={product.id}
-                                        onClick={() => setLinkingProductId(product.id)}
+                                        key={item.id}
+                                        onClick={() => setLinkingItemId(item.id)}
                                         className={cn(
                                             "w-full flex items-center gap-3 p-2.5 rounded-lg text-right transition-all text-sm",
-                                            linkingProductId === product.id
+                                            linkingItemId === item.id
                                                 ? "bg-primary/10 border border-primary/30 shadow-sm"
                                                 : "hover:bg-muted/50"
                                         )}
                                     >
                                         <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-semibold truncate text-xs">{product.name}</p>
-                                            <p className="text-[10px] text-muted-foreground font-mono">{product.itemNumber ?? '—'}</p>
+                                            <p className="font-semibold truncate text-xs">{item.name}</p>
+                                            <p className="text-[10px] text-muted-foreground font-mono">{item.itemNumber ?? '—'}</p>
                                         </div>
-                                        {linkingProductId === product.id && (
+                                        {linkingItemId === item.id && (
                                             <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                                         )}
                                     </button>
@@ -759,8 +759,8 @@ export default function NotificationsPage() {
                             إلغاء
                         </Button>
                         <Button
-                            onClick={handleLinkProduct}
-                            disabled={!linkingProductId || isLinking}
+                            onClick={handleLinkItem}
+                            disabled={!linkingItemId || isLinking}
                             className="rounded-xl gap-2"
                         >
                             <Link2 className="h-4 w-4" />

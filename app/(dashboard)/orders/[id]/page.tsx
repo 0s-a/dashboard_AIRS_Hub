@@ -4,7 +4,6 @@ import { getOrderById } from "@/lib/actions/orders"
 import { getCustomers } from "@/lib/actions/customers"
 import { getDefaultCurrency } from "@/lib/actions/currencies"
 import { prisma } from "@/lib/prisma"
-import { Badge } from "@/components/ui/badge"
 import { OrderSheet } from "@/components/orders/order-sheet"
 import { OrderStatusUpdater } from "@/components/orders/order-status-updater"
 import { resolveItemPrice, calcOrderTotal } from "@/lib/order-utils"
@@ -12,7 +11,7 @@ import { ORDER_STATUS_CONFIG, type OrderStatusValue } from "@/lib/order-constant
 import {
     ArrowRight, ArrowLeft,
     ShoppingCart, User, StickyNote,
-    Package, Calendar, Hash, Coins,
+    Package, Calendar, Hash, Coins, Truck,
 } from "lucide-react"
 interface Props {
     params: Promise<{ id: string }>
@@ -22,8 +21,16 @@ export default async function OrderDetailPage({ params }: Props) {
     const [orderRes, customersRes, products, defaultCurrencyRes] = await Promise.all([
         getOrderById(id),
         getCustomers(),
-        prisma.product.findMany({
-            select: { id: true, name: true, itemNumber: true },
+        prisma.item.findMany({
+            select: {
+                id: true,
+                name: true,
+                itemNumber: true,
+                itemUnits: {
+                    include: { unit: { select: { id: true, name: true, pluralName: true } } },
+                    orderBy: { order: 'asc' },
+                },
+            },
             orderBy: { name: "asc" },
         }),
         getDefaultCurrency(),
@@ -105,7 +112,7 @@ export default async function OrderDetailPage({ params }: Props) {
                         bg: "bg-emerald-500/10",
                     },
                     {
-                        label: "عدد المنتجات",
+                        label: "عدد الأصناف",
                         value: itemsCount,
                         icon: Package,
                         color: "text-blue-600",
@@ -137,7 +144,7 @@ export default async function OrderDetailPage({ params }: Props) {
                     </div>
                 ))}
             </div>
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
                 {/* ── Customer Info ── */}
                 <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
                     <h2 className="font-semibold flex items-center gap-2 text-sm">
@@ -175,6 +182,19 @@ export default async function OrderDetailPage({ params }: Props) {
                         <p className="text-sm text-muted-foreground">لا توجد ملاحظات</p>
                     )}
                 </div>
+                {/* ── Delivery Info ── */}
+                <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+                    <h2 className="font-semibold flex items-center gap-2 text-sm">
+                        <Truck className="h-4 w-4 text-primary" /> معلومات التوصيل
+                    </h2>
+                    {order.deliveryInfo ? (
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                            {order.deliveryInfo}
+                        </p>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">لا توجد معلومات توصيل</p>
+                    )}
+                </div>
                 {/* ── Status Updater ── */}
                 <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
                     <h2 className="font-semibold flex items-center gap-2 text-sm">
@@ -188,13 +208,13 @@ export default async function OrderDetailPage({ params }: Props) {
                 <div className="p-5 border-b border-border/50 flex items-center justify-between">
                     <h2 className="font-semibold flex items-center gap-2 text-sm">
                         <Package className="h-4 w-4 text-primary" />
-                        منتجات الطلب
+                        أصناف الطلب
                     </h2>
-                    <span className="text-xs text-muted-foreground">{itemsCount} منتج · {totalQty} قطعة</span>
+                    <span className="text-xs text-muted-foreground">{itemsCount} صنف · {totalQty} قطعة</span>
                 </div>
                 {/* Header row */}
                 <div className="grid grid-cols-[1fr_80px_100px_100px_120px] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-semibold text-muted-foreground border-b border-border/30">
-                    <span>المنتج</span>
+                    <span>الصنف</span>
                     <span className="text-center">المواصفة</span>
                     <span className="text-center">الكمية</span>
                     <span className="text-center">سعر الوحدة</span>
@@ -205,18 +225,20 @@ export default async function OrderDetailPage({ params }: Props) {
                         const { price, symbol, priceLabelName } = resolveItemPrice(item, customerPLId)
                         const lineTotal = price * (item.quantity ?? 0)
                         const sym = symbol || defaultSymbol
+                        const line = item.item ?? item.product
+                        const attrs = line?.itemAttributes ?? line?.productAttributes ?? []
                         return (
                             <div
                                 key={i}
                                 className="grid grid-cols-[1fr_80px_100px_100px_120px] gap-4 px-5 py-4 items-center hover:bg-muted/20 transition-colors"
                             >
-                                {/* Product */}
+                                {/* Item */}
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className="size-9 rounded-xl bg-muted/50 flex items-center justify-center shrink-0">
                                         <Package className="h-4 w-4 text-muted-foreground" />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium truncate">{item.product?.name ?? "—"}</p>
+                                        <p className="text-sm font-medium truncate">{line?.name ?? "—"}</p>
                                         {priceLabelName && priceLabelName !== '—' && (
                                             <p className="text-xs text-muted-foreground mt-0.5">{priceLabelName}</p>
                                         )}
@@ -227,17 +249,17 @@ export default async function OrderDetailPage({ params }: Props) {
                                 </div>
                                 {/* Attributes */}
                                 <div className="flex items-center justify-center gap-1.5">
-                                    {item.product?.productAttributes?.length ? (
+                                    {attrs.length ? (
                                         <span className="text-xs text-muted-foreground truncate max-w-[90px]" title={
-                                            item.product.productAttributes.map((a: { value: string }) => a.value).join(' · ')
+                                            attrs.map((a: { value: string }) => a.value).join(' · ')
                                         }>
-                                            {item.product.productAttributes.map((a: { value: string }) => a.value).filter(Boolean).join(' / ')
-                                                || item.product.itemNumber
+                                            {attrs.map((a: { value: string }) => a.value).filter(Boolean).join(' / ')
+                                                || line?.itemNumber
                                                 || '—'}
                                         </span>
                                     ) : (
                                         <span className="text-muted-foreground text-xs">
-                                            {item.product?.itemNumber || '—'}
+                                            {line?.itemNumber || '—'}
                                         </span>
                                     )}
                                 </div>

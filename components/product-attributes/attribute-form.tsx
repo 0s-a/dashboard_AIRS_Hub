@@ -16,10 +16,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-    createProductAttribute,
-    updateProductAttribute,
-} from "@/lib/actions/product-attributes"
-import type { SerializedProductAttributeCatalog } from "@/lib/types/product-attribute"
+    createItemAttribute,
+    updateItemAttribute,
+} from "@/lib/actions/item-attributes"
+import type { SerializedItemAttributeCatalog } from "@/lib/types/item-attribute"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Loader2, Tags } from "lucide-react"
@@ -38,7 +38,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 interface ProductAttributeFormProps {
-    attribute?: SerializedProductAttributeCatalog
+    attribute?: SerializedItemAttributeCatalog
     onSuccess?: () => void
 }
 
@@ -74,8 +74,8 @@ export function ProductAttributeForm({ attribute, onSuccess }: ProductAttributeF
                 examples: textToExamples(values.examplesText),
             }
             const res = attribute
-                ? await updateProductAttribute(attribute.id, payload)
-                : await createProductAttribute(payload)
+                ? await updateItemAttribute(attribute.id, payload)
+                : await createItemAttribute(payload)
 
             if (res.success) {
                 toast.success(attribute ? "تم تحديث الصفة" : "تم إنشاء الصفة")

@@ -26,7 +26,7 @@ if (authError) return authError
 
 const parsed = Schema.safeParse(body)
 if (!parsed.success) {
-  return apiError('البيانات غير صالحة', 400, {
+  return botApiError('البيانات غير صالحة', 400, {
     code: 'VALIDATION_ERROR',
     details: parsed.error.flatten(),
   })
@@ -35,7 +35,7 @@ if (!parsed.success) {
 return apiSuccess(data)
 ```
 
-Route رفيع فقط: auth → Zod → استدعاء service → `apiSuccess` / `apiError`.
+Route رفيع فقط: auth → Zod → استدعاء service → `apiSuccess` / `botApiError`.
 
 ## أين يذهب المنطق
 
@@ -50,24 +50,25 @@ Route رفيع فقط: auth → Zod → استدعاء service → `apiSuccess` 
 ## Envelope
 
 - نجاح: `{ success: true, data, ...meta }` عبر `apiSuccess`
-- خطأ: `{ success: false, error, code?, details? }` عبر `apiError`
-- رسائل `error` بالعربية؛ `code` إنجليزي آلي للبوت
+- خطأ أعمال: HTTP **200** + `{ success: false, error, code?, details? }` عبر `botApiError` (حتى لا توقف n8n)
+- مصادقة: `validateApiKey` → **401** `UNAUTHORIZED` أو **503** `MISCONFIGURED` (رسائل عربية)
+- رسائل `error` بالعربية؛ `code` إنجليزي آلي للبوت — فرّع على `success`/`code` لا على HTTP status لأخطاء الأعمال
 
 ## أكواد الخطأ
 
-| code | متى |
-|------|-----|
-| `UNAUTHORIZED` | مفتاح API ناقص/خاطئ |
-| `MISCONFIGURED` | `BOT_API_KEY` غير مضبوط (503) |
-| `VALIDATION_ERROR` | Zod أو حقول ناقصة |
-| `NOT_FOUND` | مورد غير موجود |
-| `DUPLICATE_CONTACT` | هاتف/بريد مكرر |
-| `DUPLICATE_FIELD` | حقل فريد مكرر |
-| `INVALID_PHONE` | رقم هاتف غير صالح |
-| `MISSING_PHONE` | معاملات الهاتف ناقصة |
-| `SUPERVISOR_CONTACT` | الرقم يعود لمشرف |
-| `HAS_ORDERS` | حذف عميل له طلبات |
-| `INTERNAL_ERROR` | خطأ غير متوقع |
+| code | HTTP | متى |
+|------|------|-----|
+| `UNAUTHORIZED` | 401 | مفتاح API ناقص/خاطئ |
+| `MISCONFIGURED` | 503 | `BOT_API_KEY` غير مضبوط |
+| `VALIDATION_ERROR` | 200 | Zod أو حقول ناقصة |
+| `NOT_FOUND` | 200 | مورد غير موجود |
+| `DUPLICATE_CONTACT` | 200 | هاتف/بريد مكرر |
+| `DUPLICATE_FIELD` | 200 | حقل فريد مكرر |
+| `INVALID_PHONE` | 200 | رقم هاتف غير صالح |
+| `MISSING_PHONE` | 200 | معاملات الهاتف ناقصة |
+| `SUPERVISOR_CONTACT` | 200 | الرقم يعود لمشرف |
+| `HAS_ORDERS` | 200 | حذف عميل له طلبات |
+| `INTERNAL_ERROR` | 200 | خطأ غير متوقع |
 
 (أكواد domain مثل `ORDER_NOT_MUTABLE` تبقى في `lib/orders`.)
 
@@ -77,7 +78,7 @@ Route رفيع فقط: auth → Zod → استدعاء service → `apiSuccess` 
 - تحقق من المدخلات بـ Zod قبل أي side-effect
 - الهاتف دائماً عبر `normalizePhonePatterns()` / `validatePhoneInput()`
 - الصفحات عبر `parsePagination` / `paginationMeta`
-- استخدم `apiSuccess` / `apiError` — لا `{ error }` مباشرة
+- استخدم `apiSuccess` / `botApiError` — لا `{ error }` مباشرة
 - أضف `code` لكل خطأ آلي
 - بادئة السجلات: `[Bot METHOD /path]`
 

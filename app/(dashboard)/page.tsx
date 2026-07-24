@@ -15,24 +15,24 @@ const getDashboardData = unstable_cache(
     async () => {
         // Optimize: Run all queries in parallel using Promise.all
         const [
-            productCount,
+            itemCount,
             customerCount,
             activeCustomerCount,
-            unavailableProductCount,
-            recentProducts,
+            unavailableItemCount,
+            recentItems,
             defaultCurrency,
             recentCustomers
         ] = await Promise.all([
-            prisma.product.count(),
+            prisma.item.count(),
             prisma.customer.count(),
             prisma.customer.count({ where: { isActive: true } }),
-            prisma.product.count({ where: { isAvailable: false } }),
-            prisma.product.findMany({
+            prisma.item.count({ where: { isAvailable: false } }),
+            prisma.item.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 include: {
-                    productImages: { orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }], take: 1 },
-                    productPrices: {
+                    itemImages: { orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }], take: 1 },
+                    itemPrices: {
                         include: { priceLabel: true },
                         orderBy: { createdAt: 'asc' },
                         take: 1,
@@ -43,7 +43,6 @@ const getDashboardData = unstable_cache(
                 where: { isDefault: true },
                 select: { symbol: true },
             }),
-            // Get recent customers (last 5) - with customerType and contacts
             prisma.customer.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' },
@@ -57,25 +56,24 @@ const getDashboardData = unstable_cache(
             })
         ])
 
-        // Generate activity data for last 7 days (optimized with parallel execution)
         const activityData = await generateActivityData()
         const defaultSymbol = defaultCurrency?.symbol ?? ''
 
         return {
             stats: {
-                productCount,
+                itemCount,
                 customerCount,
                 activeCustomerCount,
-                unavailableProductCount
+                unavailableItemCount
             },
-            recentProducts: recentProducts.map((p: any) => ({
+            recentItems: recentItems.map((p: any) => ({
                 ...p,
                 isAvailable: p.isAvailable,
-                mediaImages: (p.productImages || []).map((pi: any) => ({
+                mediaImages: (p.itemImages || []).map((pi: any) => ({
                     url: toDisplayUrl(pi.url),
                     isPrimary: pi.isPrimary,
                 })),
-                productPrices: (p.productPrices || []).map((pp: any) => ({
+                itemPrices: (p.itemPrices || []).map((pp: any) => ({
                     priceLabelName: pp.priceLabel.name,
                     value: Number(pp.value),
                     currencySymbol: defaultSymbol,
@@ -109,8 +107,8 @@ async function generateActivityData() {
     // Execute all count queries in parallel
     const results = await Promise.all(
         dateRanges.map(async ({ date, nextDate }) => {
-            const [products, customers] = await Promise.all([
-                prisma.product.count({
+            const [items, customers] = await Promise.all([
+                prisma.item.count({
                     where: { createdAt: { gte: date, lt: nextDate } }
                 }),
                 prisma.customer.count({
@@ -119,7 +117,7 @@ async function generateActivityData() {
             ])
             return {
                 date: date.toLocaleDateString('ar-YE', { month: 'short', day: 'numeric' }),
-                products,
+                products: items,
                 customers
             }
         })
@@ -136,13 +134,13 @@ export default async function DashboardPage() {
     ])
     
     const userName = userRes.success && userRes.data ? userRes.data.name : ""
-    const { stats, recentProducts, recentCustomers, activityData } = dashboardData
+    const { stats, recentItems, recentCustomers, activityData } = dashboardData
 
     const statCardsData = [
-        { title: "عدد المنتجات", value: stats.productCount, iconName: "package" as const, desc: "منتج متوفر في المخزون", color: "indigo" as const },
+        { title: "عدد الأصناف", value: stats.itemCount, iconName: "package" as const, desc: "صنف متوفر في المخزون", color: "indigo" as const },
         { title: "إجمالي العملاء", value: stats.customerCount, iconName: "users" as const, desc: "عميل مسجل حالياً", color: "blue" as const },
         { title: "العملاء النشطون", value: stats.activeCustomerCount, iconName: "trending-up" as const, desc: "عميل نشط", color: "green" as const },
-        { title: "منتجات غير متوفرة", value: stats.unavailableProductCount, iconName: "alert-circle" as const, desc: "منتج غير متاح حالياً", color: "orange" as const },
+        { title: "أصناف غير متوفرة", value: stats.unavailableItemCount, iconName: "alert-circle" as const, desc: "صنف غير متاح حالياً", color: "orange" as const },
     ]
 
     return (
@@ -180,7 +178,7 @@ export default async function DashboardPage() {
             {/* Recent Items */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '500ms', animationFillMode: 'both' }}>
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-6">
-                    <RecentProducts products={recentProducts as any} />
+                    <RecentProducts products={recentItems as any} />
                     <RecentCustomers customers={recentCustomers as any} />
                 </div>
             </div>

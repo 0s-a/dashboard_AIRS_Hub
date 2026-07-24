@@ -36,9 +36,9 @@ type GoldFile = {
         parse?: boolean
         brand?: string
         attr?: string[]
-        familyCode?: string
+        productCode?: string
         expectMinResults?: number
-        expectFamilyShape?: boolean
+        expectProductShape?: boolean
         skip?: boolean
         note?: string
     }>
@@ -137,26 +137,27 @@ async function main() {
                 brand: c.brand,
                 attr: c.attr ?? [],
                 parse: c.parse ?? true,
-                familyCode: c.familyCode,
+                productCode: c.productCode,
                 page: 1,
                 limit: 20,
             })
             const min = c.expectMinResults ?? 0
             let ok = results.length >= min
-            if (ok && c.expectFamilyShape && results.length > 0) {
+            if (ok && c.expectProductShape && results.length > 0) {
                 const g = results[0] as {
-                    family?: { id?: string; code?: string; name?: string }
-                    products?: unknown[]
-                    matchCount?: number
+                    product?: { code?: string; name?: string }
+                    category?: string
+                    brand?: string | null
+                    items?: unknown[]
                 }
                 ok = Boolean(
-                    g.family?.id &&
-                        g.family?.code &&
-                        Array.isArray(g.products) &&
-                        typeof g.matchCount === 'number'
+                    g.product?.code &&
+                        g.product?.name &&
+                        typeof g.category === 'string' &&
+                        Array.isArray(g.items)
                 )
                 if (!ok) {
-                    console.error(`  FAIL ${c.id} expected family group shape`, g)
+                    console.error(`  FAIL ${c.id} expected product group shape`, g)
                 }
             }
             if (ok && typeof meta.hasMore !== 'boolean') {
@@ -165,7 +166,7 @@ async function main() {
             }
             if (ok) {
                 console.log(
-                    `  PASS ${c.id} (families=${results.length}, engine=${meta.engine}, hasMore=${meta.hasMore})`
+                    `  PASS ${c.id} (products=${results.length}, engine=${meta.engine}, hasMore=${meta.hasMore})`
                 )
             } else if (results.length < min) {
                 failed++

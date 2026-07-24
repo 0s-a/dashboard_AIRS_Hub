@@ -25,6 +25,7 @@ import type {
 // ============================================================
 
 export interface OrderItemInput {
+    /** Sellable Item (SKU) id — UI may still pass this as productId */
     productId: string
     quantity: number
     notes?: string | null
@@ -32,6 +33,13 @@ export interface OrderItemInput {
     unitPrice?: number | null
     currencyId?: string | null
     priceLabelId?: string | null
+}
+
+function mapOrderItems(items: OrderItemInput[]) {
+    return items.map(({ productId, ...rest }) => ({
+        itemId: productId,
+        ...rest,
+    }))
 }
 
 export interface CreateOrderData {
@@ -66,6 +74,11 @@ function toActionError(error: unknown, fallback: string): never {
     throw error instanceof Error ? error : new Error(fallback)
 }
 
+/** Prisma Decimal / Date → plain JSON (safe for Client Components & Server Action returns) */
+function serializeForClient<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T
+}
+
 // ============================================================
 // Read
 // ============================================================
@@ -83,13 +96,13 @@ export async function getOrders(opts?: GetOrdersOptions) {
                 dateFrom: opts?.dateFrom,
                 dateTo: opts?.dateTo,
             })
-            return {
+            return serializeForClient({
                 data: result.orders,
                 total: result.total,
                 page: result.page,
                 limit: result.limit,
                 totalPages: result.totalPages,
-            }
+            })
         },
         'تعذّر جلب الطلبات'
     )
@@ -132,7 +145,7 @@ export async function getOrderById(id: string) {
     return safeAction(
         async () => {
             try {
-                return await getOrderByIdService(id)
+                return serializeForClient(await getOrderByIdService(id))
             } catch (error) {
                 toActionError(error, 'تعذّر جلب الطلب')
             }
@@ -154,10 +167,10 @@ export async function createOrder(data: CreateOrderData) {
                     customerId: data.customerId,
                     notes: data.notes,
                     deliveryInfo: data.deliveryInfo,
-                    items: data.items,
+                    items: mapOrderItems(data.items),
                 }
                 const { order, reused } = await createOrderService(input)
-                return { order, reused }
+                return { order: serializeForClient(order), reused }
             } catch (error) {
                 toActionError(error, 'تعذّر إنشاء الطلب')
             }
@@ -181,9 +194,9 @@ export async function updateOrder(id: string, data: UpdateOrderData) {
                     notes: data.notes,
                     deliveryInfo: data.deliveryInfo,
                     status: data.status as UpdateOrderInput['status'],
-                    items: data.items,
+                    items: data.items ? mapOrderItems(data.items) : undefined,
                 }
-                return await updateOrderService(id, input)
+                return serializeForClient(await updateOrderService(id, input))
             } catch (error) {
                 toActionError(error, 'تعذّر تعديل الطلب')
             }
@@ -205,9 +218,11 @@ export async function updateOrderStatus(id: string, status: string) {
         async () => {
             await requireAuth()
             try {
-                return await updateOrderService(id, {
-                    status: status as UpdateOrderInput['status'],
-                })
+                return serializeForClient(
+                    await updateOrderService(id, {
+                        status: status as UpdateOrderInput['status'],
+                    })
+                )
             } catch (error) {
                 toActionError(error, 'تعذّر تحديث حالة الطلب')
             }
@@ -238,22 +253,25 @@ export async function deleteOrder(id: string) {
 }
 
 // ============================================================
-// Helpers: Product price labels (for order form)
+// Helpers: Item price labels (for order form)
 // ============================================================
 
-export async function getProductPriceLabels(productId: string) {
+export async function getItemPriceLabels(itemId: string) {
     return safeAction(
         async () => {
             await requireAuth()
 
-            const data = await prisma.productPrice.findMany({
-                where: { productId },
+            const data = await prisma.itemPrice.findMany({
+                where: { itemId },
                 include: { priceLabel: true },
                 orderBy: { priceLabel: { name: 'asc' } },
             })
 
-            return JSON.parse(JSON.stringify(data))
+            return serializeForClient(data)
         },
         'تعذّر جلب التسعيرات'
     )
 }
+
+/** @deprecated use getItemPriceLabels */
+export const getProductPriceLabels = getItemPriceLabels

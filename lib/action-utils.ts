@@ -137,14 +137,37 @@ export async function generateItemNumber(
 }
 
 /**
- * Resolve unit price for a product + price label combo.
+ * Resolve unit price for an item (SKU) + price label combo.
  * Catalog prices are always in the system default currency.
  */
-export async function resolveProductPrice(productId: string, priceLabelId: string, unitId?: string) {
-    const baseWhere = { productId, priceLabelId, ...(unitId ? { unitId } : {}) }
+export async function resolveItemUnitPrice(itemId: string, priceLabelId: string, unitId?: string) {
+    const include = { unit: true, priceLabel: true } as const
 
-    return prisma.productPrice.findFirst({
-        where: baseWhere,
-        include: { unit: true, priceLabel: true },
+    if (unitId) {
+        return prisma.itemPrice.findFirst({
+            where: { itemId, priceLabelId, unitId },
+            include,
+        })
+    }
+
+    // بدون unitId: فضّل سعر الوحدة الأساسية حتى لا يُلتقط سعر وحدة خاطئة
+    const baseUnit = await prisma.itemUnit.findFirst({
+        where: { itemId, isBase: true },
+        select: { unitId: true },
+    })
+    if (baseUnit) {
+        const onBase = await prisma.itemPrice.findFirst({
+            where: { itemId, priceLabelId, unitId: baseUnit.unitId },
+            include,
+        })
+        if (onBase) return onBase
+    }
+
+    return prisma.itemPrice.findFirst({
+        where: { itemId, priceLabelId },
+        include,
     })
 }
+
+/** @deprecated use resolveItemUnitPrice */
+export const resolveProductPrice = resolveItemUnitPrice

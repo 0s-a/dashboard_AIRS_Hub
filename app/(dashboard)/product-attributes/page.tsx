@@ -5,16 +5,16 @@ import { Plus, Tags } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AttributeSheet } from "@/components/product-attributes/attribute-sheet"
 import { AttributeTable } from "@/components/product-attributes/attribute-table"
-import { getProductAttributes } from "@/lib/actions/product-attributes"
-import type { SerializedProductAttributeCatalog } from "@/lib/types/product-attribute"
+import { getItemAttributes } from "@/lib/actions/item-attributes"
+import type { SerializedItemAttributeCatalog } from "@/lib/types/item-attribute"
 
 export default function ProductAttributesPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false)
-    const [selected, setSelected] = useState<SerializedProductAttributeCatalog | undefined>()
-    const [attributes, setAttributes] = useState<SerializedProductAttributeCatalog[]>([])
+    const [selected, setSelected] = useState<SerializedItemAttributeCatalog | undefined>()
+    const [attributes, setAttributes] = useState<SerializedItemAttributeCatalog[]>([])
 
     const loadAttributes = useCallback(async () => {
-        const res = await getProductAttributes()
+        const res = await getItemAttributes()
         if (res.success && res.data) {
             setAttributes(res.data)
         }
@@ -35,10 +35,10 @@ export default function ProductAttributesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight bg-linear-to-l from-primary to-indigo-400 bg-clip-text text-transparent">
-                        صفات المنتج
+                        صفات الأصناف
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        كتالوج الصفات الرئيسية — لون، مقاس، سعة… مع أمثلة قيم للتعبئة السريعة
+                        كتالوج الصفات — لون، مقاس، سعة… مع أمثلة قيم للتعبئة السريعة على الأصناف
                     </p>
                 </div>
                 <Button

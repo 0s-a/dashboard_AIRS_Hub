@@ -8,7 +8,7 @@ import { getMeilisearchStats } from '@/lib/utils/meilisearch-sync'
 import { prisma } from '@/lib/prisma'
 
 export const metadata = {
-    title: 'محرك البحث Meilisearch | إدارة المنتجات',
+    title: 'محرك البحث Meilisearch | إدارة الأصناف',
 }
 
 export default async function SearchEnginePage() {
@@ -17,11 +17,11 @@ export default async function SearchEnginePage() {
     try {
         const [stats, dbCount] = await Promise.all([
             getMeilisearchStats(),
-            prisma.product.count(),
+            prisma.item.count(),
         ])
         initialStatus = {
             ...stats,
-            dbProductCount: dbCount,
+            dbItemCount: dbCount,
             inSync: stats.connected && stats.documentCount === dbCount,
         }
     } catch {
@@ -36,7 +36,7 @@ export default async function SearchEnginePage() {
             {/* ── Page header ─────────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-4">
-                    <Link href="/products">
+                    <Link href="/items">
                         <Button variant="ghost" size="icon" className="rounded-full">
                             <ArrowRight className="w-5 h-5" />
                         </Button>

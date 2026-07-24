@@ -25,7 +25,7 @@ export async function getNotifications(filters?: {
                 ...(filters?.isRead !== undefined ? { isRead: filters.isRead } : {}),
             },
             include: {
-                product: {
+                item: {
                     select: { id: true, name: true, itemNumber: true },
                 },
                 customer: {

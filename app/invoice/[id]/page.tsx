@@ -64,9 +64,15 @@ export default async function InvoicePage({ params }: Props) {
                             <span className="font-bold truncate max-w-[120px]">{order.customer.name}</span>
                         </div>
                     )}
+                    {order.deliveryInfo && (
+                        <div className="text-right pt-1">
+                            <span className="text-gray-600 block">التوصيل:</span>
+                            <span className="whitespace-pre-wrap">{order.deliveryInfo}</span>
+                        </div>
+                    )}
                 </div>
 
-                {/* ── المنتجات ── */}
+                {/* ── الأصناف ── */}
                 <div className="w-full mb-4">
                     <div className="flex justify-between text-[10px] font-bold border-b border-gray-800 pb-1 mb-2">
                         <span className="text-right">الصنف</span>
@@ -78,11 +84,13 @@ export default async function InvoicePage({ params }: Props) {
                             const { price, symbol, priceLabelName } = resolveItemPrice(item, customerPLId)
                             const lineTotal = price * (item.quantity ?? 0)
                             const sym = symbol || defaultSymbol
+                            const line = item.item ?? item.product
+                            const attrs = line?.itemAttributes ?? line?.productAttributes ?? []
                             
                             return (
                                 <div key={i} className="text-xs text-right flex flex-col gap-0.5">
                                     <div className="font-bold leading-tight">
-                                        {item.product?.name ?? "—"}
+                                        {line?.name ?? "—"}
                                     </div>
                                     <div className="flex justify-between text-[11px] text-gray-700">
                                         <span>
@@ -92,11 +100,11 @@ export default async function InvoicePage({ params }: Props) {
                                             {lineTotal.toLocaleString("ar-YE")} {sym}
                                         </span>
                                     </div>
-                                    {(item.product?.productAttributes?.length || item.unit || priceLabelName) && (
+                                    {(attrs.length || item.unit || priceLabelName) && (
                                         <div className="text-[9px] text-gray-500 flex gap-1">
-                                            {item.product?.productAttributes?.length > 0 && (
+                                            {attrs.length > 0 && (
                                                 <span>
-                                                    ({item.product.productAttributes.map((a: { value: string }) => a.value).filter(Boolean).join(' / ')})
+                                                    ({attrs.map((a: { value: string }) => a.value).filter(Boolean).join(' / ')})
                                                 </span>
                                             )}
                                             {item.unit && <span>[{item.unit.name}]</span>}

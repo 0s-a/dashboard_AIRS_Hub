@@ -51,7 +51,7 @@ npm run db:seed                    # اختياري
 ## التسعير
 
 - كل عميل له **PriceLabel** (مسمى تسعير) اختياري
-- `GET /api/v1/bot/products/price` يحسب السعر حسب `customerId` الاختياري و/أو `currency`
+- `GET /api/v1/bot/items/price` يحسب السعر حسب `customerId` الاختياري و/أو `currency`
 
 ## API البوت
 

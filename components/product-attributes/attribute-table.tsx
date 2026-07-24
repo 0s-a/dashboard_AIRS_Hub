@@ -3,11 +3,11 @@
 import { useMemo } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import { createColumns } from "./columns"
-import type { SerializedProductAttributeCatalog } from "@/lib/types/product-attribute"
+import type { SerializedItemAttributeCatalog } from "@/lib/types/item-attribute"
 
 interface AttributeTableProps {
-    data: SerializedProductAttributeCatalog[]
-    onEdit: (attr: SerializedProductAttributeCatalog) => void
+    data: SerializedItemAttributeCatalog[]
+    onEdit: (attr: SerializedItemAttributeCatalog) => void
     onRefresh?: () => void | Promise<void>
 }
 

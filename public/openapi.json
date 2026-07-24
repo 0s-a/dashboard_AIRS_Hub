@@ -3,7 +3,7 @@
   "info": {
     "title": "Nawaat Bot API",
     "version": "1.0.0",
-    "description": "API للبوتات (WhatsApp/Telegram) — عملاء، منتجات، تسعير، طلبات، وإشعارات. مصدر الحقيقة للمسارات هو الكود تحت app/api/v1/bot؛ هذا الملف مرآة يدوية.",
+    "description": "API للبوتات (WhatsApp/Telegram) — عملاء، منتجات، تسعير، طلبات، وإشعارات. مصدر الحقيقة للمسارات هو الكود تحت app/api/v1/bot؛ هذا الملف مرآة يدوية.\n\nأخطاء الأعمال تُرجع HTTP 200 مع success=false وcode (حتى لا تتوقف أدوات مثل n8n). استثناء المصادقة: 401 UNAUTHORIZED و503 MISCONFIGURED. فرّع دائماً على success/code.",
     "contact": {
       "name": "Nawaat"
     }
@@ -30,7 +30,11 @@
     },
     {
       "name": "Products",
-      "description": "بحث المنتجات (Postgres FTS)"
+      "description": "بحث المنتجات المجمّع (SPU)"
+    },
+    {
+      "name": "Items",
+      "description": "أصناف قابلة للبيع (SKU) — جلب برقم الصنف"
     },
     {
       "name": "Pricing",
@@ -513,13 +517,252 @@
         }
       }
     },
+    "/api/v1/bot/items/by-number": {
+      "get": {
+        "tags": [
+          "Items"
+        ],
+        "summary": "جلب صنف برقم الصنف",
+        "description": "بطاقة صنف كاملة بنفس أسلوب عرض البحث: product{code,name} و brand/category أسماء، صفات {name,value}. يتضمن وحدات وأسعار وصور. عند عدم الوجود: HTTP 200 + success=false و code=NOT_FOUND مع details.suggestSearch=true و details.q.",
+        "operationId": "getItemByNumber",
+        "parameters": [
+          {
+            "name": "itemNumber",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "رقم الصنف (مع تطبيع المسافات والشرطات)"
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "اختياري — تسمية التسعير وعملات العميل"
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "رمز العملة مثل SAR أو USD"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "بطاقة الصنف",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "itemNumber",
+                        "name",
+                        "isAvailable",
+                        "product",
+                        "category",
+                        "attributes",
+                        "units",
+                        "prices",
+                        "images"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "معرّف الصنف (SKU)"
+                        },
+                        "itemNumber": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "isAvailable": {
+                          "type": "boolean"
+                        },
+                        "product": {
+                          "type": "object",
+                          "description": "منتج (SPU) — code + name فقط",
+                          "properties": {
+                            "code": { "type": "string" },
+                            "name": { "type": "string" }
+                          }
+                        },
+                        "brand": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "اسم البراند"
+                        },
+                        "category": {
+                          "type": "string",
+                          "description": "اسم التصنيف"
+                        },
+                        "attributes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": { "type": "string" },
+                              "value": { "type": "string" }
+                            }
+                          }
+                        },
+                        "units": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "unitId": { "type": "string", "format": "uuid" },
+                              "name": { "type": "string" },
+                              "isBase": { "type": "boolean" },
+                              "conversionFactor": { "type": "integer" },
+                              "barcode": { "type": "string", "nullable": true }
+                            }
+                          }
+                        },
+                        "prices": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": { "type": "string" },
+                              "value": { "type": "number" },
+                              "currency": {
+                                "type": "object",
+                                "properties": {
+                                  "code": { "type": "string" },
+                                  "symbol": { "type": "string" },
+                                  "name": { "type": "string" }
+                                }
+                              },
+                              "unit": { "type": "string", "nullable": true }
+                            }
+                          }
+                        },
+                        "images": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "url": { "type": "string" },
+                              "alt": { "type": "string", "nullable": true },
+                              "isPrimary": { "type": "boolean" }
+                            }
+                          }
+                        },
+                        "primaryImage": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "url": { "type": "string" },
+                            "alt": { "type": "string", "nullable": true }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/bot/items/by-id": {
+      "get": {
+        "tags": [
+          "Items"
+        ],
+        "summary": "جلب صنف بالمعرّف",
+        "description": "نفس بطاقة GET /items/by-number لكن بـ itemId (UUID). عند عدم الوجود: success=false و details.suggestSearch.",
+        "operationId": "getItemById",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "بطاقة الصنف أو خطأ أعمال ناعم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "object" },
+                    "error": { "type": "string" },
+                    "code": { "type": "string" },
+                    "details": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/api/v1/bot/products/search": {
       "get": {
         "tags": [
           "Products"
         ],
-        "summary": "بحث منتجات مجمّع حسب المنتج الرئيسي",
-        "description": "بحث Meilisearch-first ثم hydrate من Prisma. الاستجابة دائماً قائمة عائلات: كل عنصر = منتج رئيسي + products[] للأصناف المطابقة فقط. page/limit بعدد العائلات (مع over-fetch داخلي). تفكيك حذر لـ q (parse افتراضي true). رقم صنف وحيد → عائلة واحدة مع meta.skuMatch=true. فلتر familyCode اختياري. meta يتضمن engine و hasMore و total تقديري و parsed.",
+        "summary": "بحث منتجات مجمّع حسب المنتج (SPU)",
+        "description": "بحث Meilisearch-first ثم hydrate من Prisma. الاستجابة مجموعات: product + items[] (مع primaryImage و prices). page/limit بعدد المنتجات. تفكيك حذر لـ q. لبطاقة صنف كاملة برقم الصنف استخدم GET /items/by-number. customerId/currency اختياريان لتسعير العميل في النتائج.",
         "operationId": "searchProducts",
         "parameters": [
           {
@@ -565,12 +808,29 @@
             "description": "عند true (افتراضي): استخراج brand/attr من q. عند false: تعطيل التفكيك"
           },
           {
-            "name": "familyCode",
+            "name": "productCode",
             "in": "query",
             "schema": {
               "type": "string"
             },
-            "description": "فلتر اختياري — كود المنتج الرئيسي (ProductFamily.code). كود غير موجود → نتائج فارغة"
+            "description": "فلتر اختياري — كود المنتج (Product.code). كود غير موجود → نتائج فارغة"
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "اختياري — تسمية التسعير وعملات العميل لأسعار الأصناف المضمّنة"
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "اختياري — فرض رمز عملة لأسعار الأصناف المضمّنة"
           },
           {
             "name": "page",
@@ -579,7 +839,7 @@
               "type": "integer",
               "default": 1
             },
-            "description": "رقم صفحة العائلات"
+            "description": "رقم صفحة المنتجات (SPU)"
           },
           {
             "name": "limit",
@@ -589,12 +849,12 @@
               "default": 20,
               "maximum": 50
             },
-            "description": "أقصى عدد عائلات في الصفحة"
+            "description": "أقصى عدد منتجات في الصفحة"
           }
         ],
         "responses": {
           "200": {
-            "description": "نتائج مجمّعة حسب المنتج الرئيسي",
+            "description": "نتائج مجمّعة حسب المنتج (SPU)",
             "content": {
               "application/json": {
                 "schema": {
@@ -609,44 +869,75 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "family": {
+                          "product": {
                             "type": "object",
+                            "description": "منتج (SPU) — code + name فقط؛ بدون UUID",
                             "properties": {
-                              "id": { "type": "string", "format": "uuid" },
                               "code": { "type": "string" },
                               "name": { "type": "string" }
                             }
                           },
                           "category": {
-                            "type": "object",
-                            "properties": {
-                              "id": { "type": "string", "format": "uuid" },
-                              "name": { "type": "string" }
-                            }
+                            "type": "string",
+                            "description": "اسم التصنيف"
                           },
                           "brand": {
-                            "type": "object",
+                            "type": "string",
                             "nullable": true,
-                            "description": "براند أول صنف مطابق في ترتيب الظهور"
+                            "description": "اسم البراند"
                           },
-                          "matchCount": {
-                            "type": "integer"
-                          },
-                          "products": {
+                          "items": {
                             "type": "array",
-                            "description": "الأصناف المطابقة لهذا الاستعلام فقط",
+                            "description": "الأصناف المطابقة — id للمتابعة؛ primaryImage و prices و alternativeNames مضمّنة",
                             "items": {
                               "type": "object",
                               "properties": {
                                 "id": { "type": "string", "format": "uuid" },
                                 "itemNumber": { "type": "string" },
                                 "name": { "type": "string" },
-                                "displayName": {
-                                  "type": "string",
-                                  "description": "مرادف لـ name"
-                                },
                                 "isAvailable": { "type": "boolean" },
-                                "attributes": { "type": "array" }
+                                "alternativeNames": {
+                                  "type": "array",
+                                  "items": { "type": "string" },
+                                  "description": "أسماء بديلة للصنف (للبحث والعرض)"
+                                },
+                                "primaryImage": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "properties": {
+                                    "url": { "type": "string" },
+                                    "alt": { "type": "string", "nullable": true }
+                                  }
+                                },
+                                "prices": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "label": { "type": "string" },
+                                      "value": { "type": "number" },
+                                      "currency": {
+                                        "type": "object",
+                                        "properties": {
+                                          "code": { "type": "string" },
+                                          "symbol": { "type": "string" },
+                                          "name": { "type": "string" }
+                                        }
+                                      },
+                                      "unit": { "type": "string", "nullable": true }
+                                    }
+                                  }
+                                },
+                                "attributes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": { "type": "string" },
+                                      "value": { "type": "string" }
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
@@ -655,15 +946,15 @@
                     },
                     "count": {
                       "type": "integer",
-                      "description": "عدد العائلات في هذه الصفحة"
+                      "description": "عدد المنتجات في هذه الصفحة"
                     },
                     "pagination": {
                       "$ref": "#/components/schemas/PaginationMeta",
-                      "description": "total تقديري على مستوى العائلات"
+                      "description": "total تقديري على مستوى المنتجات"
                     },
                     "hasMore": {
                       "type": "boolean",
-                      "description": "هل توجد عائلات إضافية بعد هذه الصفحة"
+                      "description": "هل توجد منتجات إضافية بعد هذه الصفحة"
                     },
                     "engine": {
                       "type": "string",
@@ -672,9 +963,11 @@
                         "prisma"
                       ]
                     },
-                    "skuMatch": {
-                      "type": "boolean",
-                      "description": "true عند مسار رقم الصنف السريع"
+                    "customerId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true,
+                      "description": "يُعاد عند تمرير customerId في الاستعلام — معرّف العميل المستعمل فعلياً للتسعير"
                     },
                     "parsed": {
                       "type": "object",
@@ -705,18 +998,18 @@
         }
       }
     },
-    "/api/v1/bot/products/price": {
+    "/api/v1/bot/items/price": {
       "get": {
         "tags": [
-          "Products",
+          "Items",
           "Pricing"
         ],
-        "summary": "سعر منتج",
-        "description": "تعريف المنتج بـ productId أو itemNumber. customerId اختياري لتسمية التسعير وعملات العميل. currency اختياري لفرض رمز عملة هدف.",
-        "operationId": "getProductPrice",
+        "summary": "سعر صنف",
+        "description": "تعريف الصنف بـ itemId أو itemNumber. customerId اختياري لتسمية التسعير وعملات العميل. currency اختياري لفرض رمز عملة هدف.",
+        "operationId": "getItemPrice",
         "parameters": [
           {
-            "name": "productId",
+            "name": "itemId",
             "in": "query",
             "schema": {
               "type": "string",
@@ -762,13 +1055,14 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "productId": {
-                          "type": "string"
+                        "itemId": {
+                          "type": "string",
+                          "format": "uuid"
                         },
                         "itemNumber": {
                           "type": "string"
                         },
-                        "productName": {
+                        "name": {
                           "type": "string"
                         },
                         "customerId": {
@@ -800,17 +1094,17 @@
         }
       }
     },
-    "/api/v1/bot/products/image": {
+    "/api/v1/bot/items/image": {
       "get": {
         "tags": [
-          "Products"
+          "Items"
         ],
-        "summary": "الصورة الرئيسية للمنتج",
-        "description": "تعريف المنتج بـ productId أو itemNumber. يعيد صورة واحدة (isPrimary ثم order).",
-        "operationId": "getProductPrimaryImage",
+        "summary": "الصورة الرئيسية للصنف",
+        "description": "تعريف الصنف بـ itemId أو itemNumber. يعيد صورة واحدة (isPrimary ثم order).",
+        "operationId": "getItemPrimaryImage",
         "parameters": [
           {
-            "name": "productId",
+            "name": "itemId",
             "in": "query",
             "schema": {
               "type": "string",
@@ -840,8 +1134,9 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "productId": {
-                          "type": "string"
+                        "itemId": {
+                          "type": "string",
+                          "format": "uuid"
                         },
                         "itemNumber": {
                           "type": "string"
@@ -1658,12 +1953,13 @@
       "OrderItemInput": {
         "type": "object",
         "required": [
-          "productId"
+          "itemId"
         ],
         "properties": {
-          "productId": {
+          "itemId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "معرّف الصنف القابل للبيع (SKU)"
           },
           "quantity": {
             "type": "integer",
@@ -1787,7 +2083,7 @@
         "required": [
           "type"
         ],
-        "description": "مطلوب type و q (أو searchQuery). لـ out_of_stock مطلوب productId أو itemNumber. phone/phoneNumber و customerId اختياريان.",
+        "description": "مطلوب type و q (أو searchQuery). لـ out_of_stock مطلوب itemId أو itemNumber. phone/phoneNumber و customerId اختياريان.",
         "properties": {
           "type": {
             "type": "string",
@@ -1818,9 +2114,11 @@
             "type": "string",
             "nullable": true
           },
-          "productId": {
+          "itemId": {
             "type": "string",
-            "nullable": true
+            "format": "uuid",
+            "nullable": true,
+            "description": "معرّف الصنف (SKU)"
           },
           "itemNumber": {
             "type": "string",
@@ -1902,7 +2200,7 @@
     },
     "responses": {
       "Unauthorized": {
-        "description": "مفتاح API ناقص أو خاطئ",
+        "description": "مفتاح API ناقص أو خاطئ (HTTP 401 فقط)",
         "content": {
           "application/json": {
             "schema": {
@@ -1910,14 +2208,14 @@
             },
             "example": {
               "success": false,
-              "error": "Unauthorized — invalid or missing x-api-key",
+              "error": "غير مصرح — مفتاح x-api-key ناقص أو غير صحيح",
               "code": "UNAUTHORIZED"
             }
           }
         }
       },
       "NotFound": {
-        "description": "المورد غير موجود",
+        "description": "المورد غير موجود — HTTP 200 + success=false و code=NOT_FOUND. لـ items/by-number و by-id يتضمن details.suggestSearch",
         "content": {
           "application/json": {
             "schema": {
@@ -1925,14 +2223,18 @@
             },
             "example": {
               "success": false,
-              "error": "غير موجود",
-              "code": "NOT_FOUND"
+              "error": "الصنف غير موجود",
+              "code": "NOT_FOUND",
+              "details": {
+                "suggestSearch": true,
+                "q": "035-BC-0058-00-00"
+              }
             }
           }
         }
       },
       "ValidationError": {
-        "description": "بيانات غير صالحة",
+        "description": "بيانات غير صالحة — HTTP 200 + success=false و code=VALIDATION_ERROR",
         "content": {
           "application/json": {
             "schema": {
@@ -1942,7 +2244,7 @@
         }
       },
       "InternalError": {
-        "description": "خطأ داخلي",
+        "description": "خطأ داخلي — HTTP 200 + success=false و code=INTERNAL_ERROR (ما عدا أعطال المصادقة)",
         "content": {
           "application/json": {
             "schema": {
@@ -1950,7 +2252,7 @@
             },
             "example": {
               "success": false,
-              "error": "Internal Server Error",
+              "error": "خطأ داخلي في الخادم",
               "code": "INTERNAL_ERROR"
             }
           }

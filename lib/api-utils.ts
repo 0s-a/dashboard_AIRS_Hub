@@ -17,14 +17,22 @@ export function validateApiKey(req: NextRequest): NextResponse | null {
     if (!BOT_API_KEY) {
         console.error('[API] BOT_API_KEY is not configured — blocking all requests for safety')
         return NextResponse.json(
-            { success: false, error: 'Service unavailable — API key not configured', code: 'MISCONFIGURED' },
+            {
+                success: false,
+                error: 'الخدمة غير متاحة — مفتاح API غير مضبوط',
+                code: 'MISCONFIGURED',
+            },
             { status: 503 }
         )
     }
     const apiKey = req.headers.get('x-api-key')
     if (!apiKey || apiKey !== BOT_API_KEY) {
         return NextResponse.json(
-            { success: false, error: 'Unauthorized — invalid or missing x-api-key', code: 'UNAUTHORIZED' },
+            {
+                success: false,
+                error: 'غير مصرح — مفتاح x-api-key ناقص أو غير صحيح',
+                code: 'UNAUTHORIZED',
+            },
             { status: 401 }
         )
     }
@@ -49,7 +57,7 @@ export function apiSuccess<T>(
 
 /**
  * Standard error response with optional machine-readable code.
- * All bot API routes should use this for consistency.
+ * Used by Dashboard routes and low-level helpers. Prefer `botApiError` for Bot HTTP.
  */
 export function apiError(
     message: string,
@@ -60,6 +68,19 @@ export function apiError(
     if (options?.code)    body.code    = options.code
     if (options?.details !== undefined) body.details = options.details
     return NextResponse.json(body, { status })
+}
+
+/**
+ * Bot business error — always HTTP 200 so automation (n8n tools) does not stop.
+ * Callers still pass a logical status for readability; it is not sent as HTTP status.
+ * Auth failures stay in `validateApiKey` (401 / 503). Branch on `success` + `code`.
+ */
+export function botApiError(
+    message: string,
+    _logicalStatus: number,
+    options?: { code?: string; details?: unknown }
+): NextResponse {
+    return apiError(message, 200, options)
 }
 
 // ────────────────────────────────────────────────────────

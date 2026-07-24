@@ -127,12 +127,12 @@ export async function getCustomerById(id: string) {
                                 unitPrice: true,
                                 currency: { select: { symbol: true } },
                                 priceLabel: { select: { name: true } },
-                                product: {
+                                item: {
                                     select: {
                                         id: true,
                                         name: true,
                                         itemNumber: true,
-                                        productAttributes: {
+                                        itemAttributes: {
                                             include: {
                                                 attribute: { select: { code: true, name: true } },
                                             },

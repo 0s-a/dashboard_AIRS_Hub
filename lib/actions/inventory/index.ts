@@ -1,48 +1,47 @@
-// ─────────────────────────────────────────────────────────────
-// Inventory Actions — Public API
-//
-// All imports from '@/lib/actions/inventory' continue to work
-// unchanged thanks to this barrel re-export file.
-// ─────────────────────────────────────────────────────────────
+// Thin re-export shim — prefer @/lib/actions/items
+// Maps legacy Product (SKU) action names → Item actions for gradual UI migration.
 
-// Types (re-exported so consumers can import from one place)
-export type { ProductInput, SerializedPrice, SerializedProduct, SerializedCategory, SerializedProductAttribute, ProductUnitEntry, PaginationMeta, ProductsFilters } from '@/lib/types/product'
+export type {
+    ItemInput as ProductInput,
+    SerializedPrice,
+    SerializedItem as SerializedProduct,
+    SerializedCategory,
+    SerializedItemAttribute as SerializedProductAttribute,
+    ItemUnitEntry as ProductUnitEntry,
+    PaginationMeta,
+    ItemsFilters as ProductsFilters,
+} from '@/lib/types/item'
 
-// Queries (read-only)
 export {
-    getProducts,
-    getProductsPaginated,
-    getProductFilterOptions,
-    getProductById,
-} from './product.queries'
+    getItems as getProducts,
+    getItemsPaginated as getProductsPaginated,
+    getItemFilterOptions as getProductFilterOptions,
+    getItemById as getProductById,
+} from '../items/item.queries'
 
-// Product CRUD (write)
 export {
-    createProduct,
-    updateProduct,
-    deleteProduct,
-    toggleProductAvailability,
-    toggleProductNewTag,
-} from './product.actions'
+    createItem as createProduct,
+    updateItem as updateProduct,
+    deleteItem as deleteProduct,
+    toggleItemAvailability as toggleProductAvailability,
+    toggleItemNewTag as toggleProductNewTag,
+} from '../items/item.actions'
 
-// Price management
 export {
-    addProductPrice,
-    updateProductPrice,
-    deleteProductPrice,
-    addProductPricesForAllUnits,
+    addItemPrice as addProductPrice,
+    updateItemPrice as updateProductPrice,
+    deleteItemPrice as deleteProductPrice,
+    addItemPricesForAllUnits as addProductPricesForAllUnits,
     copyPriceLabelPrices,
-} from './price.actions'
+} from '../items/price.actions'
 
-// Unit management
 export {
-    setProductUnits,
-} from './unit.actions'
+    setItemUnits as setProductUnits,
+} from '../items/unit.actions'
 
-// Metadata (tags + alternative names)
 export {
-    addAlternativeNameToProduct,
-    removeAlternativeNameFromProduct,
-    addTagToProduct,
-    removeTagFromProduct,
-} from './metadata.actions'
+    addAlternativeNameToItem as addAlternativeNameToProduct,
+    removeAlternativeNameFromItem as removeAlternativeNameFromProduct,
+    addTagToItem as addTagToProduct,
+    removeTagFromItem as removeTagFromProduct,
+} from '../items/metadata.actions'

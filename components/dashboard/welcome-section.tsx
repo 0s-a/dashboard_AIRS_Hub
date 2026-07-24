@@ -44,10 +44,10 @@ export function WelcomeSection({ userName }: { userName: string }) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
-                    <Link href="/products">
+                    <Link href="/items">
                         <Button size="sm" className="rounded-lg font-semibold gap-1.5 shadow-sm transition-all hover:-translate-y-0.5">
                             <Package className="size-4" />
-                            إضافة منتج
+                            إضافة صنف
                         </Button>
                     </Link>
                     <Link href="/customers">

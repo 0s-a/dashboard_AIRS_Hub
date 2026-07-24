@@ -4,6 +4,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { updateOrderStatus } from "@/lib/actions/orders"
 import { ORDER_STATUSES } from "./order-columns"
+import { getAllowedStatusTransitions } from "@/lib/order-constants"
 import { Loader2 } from "lucide-react"
 
 interface Props {
@@ -13,6 +14,10 @@ interface Props {
 
 export function OrderStatusUpdater({ orderId, currentStatus }: Props) {
     const [loading, setLoading] = useState<string | null>(null)
+    const allowed = getAllowedStatusTransitions(currentStatus)
+    const options = ORDER_STATUSES.filter(
+        s => s.value === currentStatus || allowed.includes(s.value)
+    )
 
     async function handleUpdate(status: string) {
         setLoading(status)
@@ -27,7 +32,7 @@ export function OrderStatusUpdater({ orderId, currentStatus }: Props) {
 
     return (
         <div className="flex flex-col gap-2">
-            {ORDER_STATUSES.map((s) => {
+            {options.map((s) => {
                 const isCurrent = s.value === currentStatus
                 const isLoading = loading === s.value
                 const Icon = s.icon
@@ -53,6 +58,9 @@ export function OrderStatusUpdater({ orderId, currentStatus }: Props) {
                     </button>
                 )
             })}
+            {allowed.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">حالة نهائية — لا انتقالات متاحة</p>
+            )}
         </div>
     )
 }

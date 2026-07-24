@@ -28,7 +28,7 @@ cancelled  → (نهائي)
 
 ```typescript
 {
-  productId, unitId?, quantity,
+  itemId, unitId?, quantity,
   unitPrice,      // snapshot — لا يتغير
   currencyId,     // snapshot
   priceLabelId,   // snapshot
@@ -38,9 +38,11 @@ cancelled  → (نهائي)
 **عرض السعر**: `resolveItemPrice()` في `lib/order-utils.ts`
 
 1. `unitPrice` snapshot — الأولوية القصوى
-2. تسعيرة العميل من ProductPrice (للطلبات القديمة)
+2. تسعيرة العميل من ItemPrice (للطلبات القديمة)
 3. التسعيرة الافتراضية (isDefault)
 4. أي سعر بالعملة الافتراضية
+
+بدون `unitId`: يُفضَّل سعر الوحدة الأساسية (`ItemUnit.isBase`).
 
 تغيير `unitId` على بند معلّق يعيد `resolveItemSnapshot`.
 
@@ -95,7 +97,7 @@ cancelled  → (نهائي)
 ```bash
 GET  /orders?pending=true&phone=0501234567
 POST /orders                              # { customerId } — سلة فارغة أو إعادة القائمة
-POST /orders/items?orderId=UUID           # { productId, quantity }
+POST /orders/items?orderId=UUID           # { itemId, quantity }
 PATCH /orders?id=UUID                     # { status: "confirmed", deliveryInfo }
 ```
 
@@ -104,12 +106,12 @@ PATCH /orders?id=UUID                     # { status: "confirmed", deliveryInfo 
 ```typescript
 await createOrder({
   customerId, notes, deliveryInfo,
-  items: [{ productId, unitId, quantity, unitPrice, currencyId, priceLabelId }]
+  items: [{ itemId, unitId, quantity, unitPrice, currencyId, priceLabelId }]
 })
 // → { order, reused }
 ```
 
-Actions تستدعي `lib/orders/service` بعد `requireAuth()`.
+Dashboard UI قد يمرّر `productId` كاسم تاريخي للصنف؛ Actions تحوّله إلى `itemId` قبل `lib/orders/service`.
 
 ## حماية
 

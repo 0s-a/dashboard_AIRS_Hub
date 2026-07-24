@@ -48,7 +48,7 @@ export async function getParseDictionary(): Promise<ParseDictionary> {
 
     const [brands, attrRows] = await Promise.all([
         prisma.brand.findMany({ select: { name: true } }),
-        prisma.productAttributeValue.findMany({
+        prisma.itemAttributeValue.findMany({
             select: { value: true },
             distinct: ['value'],
         }),

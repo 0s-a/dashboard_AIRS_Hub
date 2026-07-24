@@ -14,9 +14,9 @@ alwaysApply: false
 
 ## قيود فريدة مهمة
 
-- `ProductPrice`: unique على `(productId, priceLabelId, unitId)` — دائماً بالعملة الافتراضية؛ التحويل عبر `exchangeRate`
+- `ItemPrice`: unique على `(itemId, priceLabelId, unitId)` — دائماً بالعملة الافتراضية؛ التحويل عبر `exchangeRate`
 - `Contact.value`: فريد عالمياً عبر النظام
-- `OrderItem`: حقول snapshot (`unitPrice`, `currencyId`, `priceLabelId`) لا تُحسب ديناميكياً بعد الإنشاء
+- `OrderItem`: حقول snapshot (`unitPrice`, `currencyId`, `priceLabelId`) + `itemId` — لا تُحسب ديناميكياً بعد الإنشاء
 
 ## Migrations
 

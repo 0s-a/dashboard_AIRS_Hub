@@ -1,6 +1,6 @@
 ---
 name: nawaat-meilisearch
-description: Meilisearch في Nawaat — مزامنة منتجات، بحث، لوحة التحكم. استخدم عند العمل على meilisearch-sync، search-engine panel، أو APIs في app/api/v1/dashboard/meilisearch.
+description: Meilisearch في Nawaat — مزامنة أصناف، بحث، لوحة التحكم. استخدم عند العمل على meilisearch-sync، search-engine panel، أو APIs في app/api/v1/dashboard/meilisearch.
 ---
 
 # Nawaat Meilisearch
@@ -10,60 +10,36 @@ description: Meilisearch في Nawaat — مزامنة منتجات، بحث، ل
 | الملف | الدور |
 |-------|--------|
 | `lib/meilisearch.ts` | عميل singleton + إعدادات index |
-| `lib/utils/meilisearch-sync.ts` | مزامنة، upsert، delete، stats، `searchProductIdsInMeilisearch` |
-| `lib/bot/normalize-search-query.ts` | تطبيع عربي (همزات، تشكيل، أرقام) — يُطبَّق عند الفهرسة والبحث |
+| `lib/utils/meilisearch-sync.ts` | مزامنة، upsert، delete، stats، `searchItemIdsInMeilisearch` |
+| `lib/bot/normalize-search-query.ts` | تطبيع عربي — فهرسة + بحث البوت |
 | `app/api/v1/dashboard/meilisearch/*` | status, sync, search, indexes |
 
 ## Env
 
 - `MEILISEARCH_HOST` (default: `http://localhost:7700`)
 - `MEILISEARCH_MASTER_KEY`
-- `MEILISEARCH_INDEX` (default: `products`)
+- `MEILISEARCH_INDEX` (default: `items`)
 
 ## قواعد resilient
 
 - إذا Meili غير متاح: أرجع `{ unavailable: true }` — **لا throw**
-- بعد تعديل منتج/توفر/وحدات: `upsertProductToMeilisearch(id).catch(console.warn)`
-- بعد حذف منتج: `deleteProductFromMeilisearch(id).catch(console.warn)`
-- تعديل الأسعار لا يُحدّث Meili (لا سعر في المستند)
+- بعد تعديل صنف/توفر/وحدات: `upsertItemToMeilisearch(id).catch(console.warn)`
+- بعد حذف صنف: `removeItemFromMeilisearch(id).catch(console.warn)`
+- بعد تعديل منتج (اسم/براند/تصنيف): `syncItemsByProductId(productId)`
+- تعديل الأسعار لا يُحدّث Meili
 
 ## Document shape
 
-`MeiliProductDocument` في meilisearch-sync.ts — حقول بحث مطبّعة:
-- `id`, `itemNumber`, `name` (displayName عند الوراثة), `productName`, `familyId`
+`MeiliItemDocument` — وثيقة = **صنف** (`Item`):
+- `id`, `itemNumber`, `name` (اسم الصنف), `productName` (اسم المنتج), `productId`
+- `brand`, `category` (من المنتج)
 - `attributeText`, `attributeValues`, `tags`, `alternativeNames`, `searchText`, `isAvailable`
-- بدون سعر، وصف، تواريخ، أو brandId/categoryId
 
-`searchableAttributes` (ترتيب): `itemNumber`, `name`, `alternativeNames`, `searchText`, `brand`, `attributeText`, `category`, `tags`
-
-`filterableAttributes`: `id`, `isAvailable`, `brand`, `category`, `attributeValues`, `familyId`
-
-بعد تغيير اسم `ProductFamily`: أعد فهرسة منتجات العائلة عبر `upsertProductsToMeilisearch`.
-
-`synonyms`: بذرة صغيرة للمقاسات وقطن/cotton — قابلة للتوسيع في `MEILI_SETTINGS`
-
-## APIs (dashboard JWT)
-
-```typescript
-const authError = await requireDashboardAuth()
-if (authError) return authError
-```
-
-- `GET /status` — مقارنة documentCount مع db count
-- `POST /sync` — مزامنة كاملة (تطبّق إعدادات الفهرس + المستندات)
-- `GET /search` — بحث تجريبي
+`filterableAttributes`: `id`, `isAvailable`, `brand`, `category`, `attributeValues`, `productId`
 
 ## Bot search
 
-`GET /api/v1/bot/products/search` يستخدم Meilisearch عبر `searchProductIdsInMeilisearch`، ثم hydrate من Prisma، ثم **تجميع حسب `familyId`**.
+`GET /api/v1/bot/products/search` — Meili عبر `searchItemIdsInMeilisearch` ثم hydrate ثم تجميع حسب `productId` (SPU).
+سعر/صورة الصنف: `GET /api/v1/bot/items/price` و `/items/image` بـ `itemId` أو `itemNumber`.
 
-- الاستجابة: عائلات `{ family, category, brand, matchCount, products[] }` — المطابق فقط
-- `page`/`limit` بعدد العائلات؛ over-fetch داخلي؛ `hasMore` + `pagination.total` تقديري
-- فلتر `familyCode` → `familyId` في Meili filter
-- تطبيع عربي على `q` / `brand` / `attr` وعلى حقول الفهرس
-- حقل `searchText` يجمع الاسم/البدائل/البراند/الفئة/الصفات/الوسوم/رقم الصنف + اسم العائلة
-- تفكيك حذر لـ `q` — `parse=false` للتعطيل؛ relax عند الصفر
-- فلاتر `brand` / `attr` / `available` / `familyId`: تطابق قيمة كاملة
-- `meta.engine` · `meta.parsed` · `skuMatch` لمسار رقم الصنف
-- عند تعطّل Meili: fallback Prisma بنفس التجميع
-- بعد تغيير شكل المستند أو الإعدادات: **مزامنة كاملة مرة واحدة من لوحة search-engine**
+بعد تغيير شكل المستند: مزامنة كاملة من لوحة محرك البحث.

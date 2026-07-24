@@ -5,7 +5,8 @@ import {
     normalizePhonePatterns,
 } from '@/lib/phone-utils'
 import { BotServiceError } from './errors'
-import { resolveProductRef } from './resolve-product'
+import { resolveItemRef } from './resolve-item'
+import { optionalString } from '@/lib/zod-optional'
 
 const NotificationType = z.enum(['out_of_stock', 'not_found'])
 
@@ -14,13 +15,13 @@ const DEDUP_WINDOW_MS = 24 * 60 * 60 * 1000
 export const CreateNotificationSchema = z
     .object({
         type: NotificationType,
-        q: z.string().optional(),
-        searchQuery: z.string().optional(),
-        phone: z.string().optional().nullable(),
-        phoneNumber: z.string().optional().nullable(),
-        customerId: z.string().min(1).optional().nullable(),
-        productId: z.string().min(1).optional().nullable(),
-        itemNumber: z.string().min(1).optional().nullable(),
+        q: optionalString,
+        searchQuery: optionalString,
+        phone: optionalString,
+        phoneNumber: optionalString,
+        customerId: optionalString,
+        itemId: optionalString,
+        itemNumber: optionalString,
     })
     .transform(data => {
         const q = (data.q ?? data.searchQuery)?.trim() ?? ''
@@ -34,7 +35,7 @@ export const CreateNotificationSchema = z
             q,
             phone,
             customerId: data.customerId?.trim() || null,
-            productId: data.productId?.trim() || null,
+            itemId: data.itemId?.trim() || null,
             itemNumber: data.itemNumber?.trim() || null,
         }
     })
@@ -45,17 +46,17 @@ export const CreateNotificationSchema = z
                 q: z.string().min(1, 'q is required'),
                 phone: z.string().nullable(),
                 customerId: z.string().nullable(),
-                productId: z.string().nullable(),
+                itemId: z.string().nullable(),
                 itemNumber: z.string().nullable(),
             })
             .refine(
                 data =>
                     data.type !== 'out_of_stock' ||
-                    !!(data.productId || data.itemNumber),
+                    !!(data.itemId || data.itemNumber),
                 {
                     message:
-                        'يجب تمرير productId أو itemNumber عند type=out_of_stock',
-                    path: ['productId'],
+                        'يجب تمرير itemId أو itemNumber عند type=out_of_stock',
+                    path: ['itemId'],
                 }
             )
     )
@@ -104,7 +105,7 @@ async function resolveCustomerId(
 export async function createNotification(
     input: CreateNotificationInput
 ): Promise<CreateNotificationResult> {
-    const { type, q: searchQuery, phone, customerId, productId, itemNumber } =
+    const { type, q: searchQuery, phone, customerId, itemId, itemNumber } =
         input
 
     let phoneCanonical: string | null = null
@@ -124,15 +125,15 @@ export async function createNotification(
         phoneCanonical
     )
 
-    let resolvedProductId: string | null = null
+    let resolvedItemId: string | null = null
     let productName: string | null = null
-    if (productId || itemNumber) {
-        const product = await resolveProductRef({
-            productId: productId ?? undefined,
+    if (itemId || itemNumber) {
+        const item = await resolveItemRef({
+            itemId: itemId ?? undefined,
             itemNumber: itemNumber ?? undefined,
         })
-        resolvedProductId = product.id
-        productName = product.displayName
+        resolvedItemId = item.id
+        productName = item.name
     }
 
     const since = new Date(Date.now() - DEDUP_WINDOW_MS)
@@ -156,7 +157,7 @@ export async function createNotification(
         data: {
             type,
             searchQuery,
-            productId: resolvedProductId,
+            itemId: resolvedItemId,
             productName,
             customerId: resolvedCustomerId,
             phoneNumber: phoneCanonical,

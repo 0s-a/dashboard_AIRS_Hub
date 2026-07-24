@@ -23,5 +23,5 @@ export const createX = (data) =>
 - `requireAuth()` من `lib/auth-utils.ts` للعمليات الحساسة — **لا نظام أدوار**، كل مستخدم مسجّل = صلاحيات كاملة
 - استثناءات بدون auth: `auth.ts`، `getStoreSettings()` (صفحة login)، `getOrderById()` و `getDefaultCurrency()` (فاتورة عامة)
 - لا تُرجع أخطاء Prisma خام — استخدم `safeAction`
-- تعديلات المخزون: `upsertProductToMeilisearch(id).catch(console.warn)` بعد التغيير
+- تعديلات المخزون: `upsertItemToMeilisearch(id).catch(console.warn)` بعد التغيير
 - الملفات المساعدة الداخلية (مثل `_shared.ts`) بدون `'use server'`

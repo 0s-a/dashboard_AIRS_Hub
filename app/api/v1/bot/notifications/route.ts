@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
+import { validateApiKey, botApiError, apiSuccess } from '@/lib/api-utils'
 import {
     CreateNotificationSchema,
     createNotification,
@@ -14,14 +14,14 @@ export async function POST(req: NextRequest) {
     try {
         const rawBody = await req.json().catch(() => null)
         if (rawBody === null || typeof rawBody !== 'object') {
-            return apiError('البيانات غير صالحة', 400, {
+            return botApiError('البيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
             })
         }
 
         const parsed = CreateNotificationSchema.safeParse(rawBody)
         if (!parsed.success) {
-            return apiError('البيانات غير صالحة', 400, {
+            return botApiError('البيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: parsed.error.flatten(),
             })

@@ -40,7 +40,7 @@ export default function CategoriesPage() {
                         التصنيفات
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        إدارة التصنيفات — تُربَط بالمنتجات عبر المنتج الرئيسي
+                        إدارة التصنيفات — تُربَط بالمنتجات مباشرة
                     </p>
                 </div>
                 <Button

@@ -45,3 +45,17 @@ export const ORDER_STATUS_CONFIG: Record<OrderStatusValue, OrderStatusConfig> = 
 
 /** قائمة مرتبة للاستخدام في UI loops */
 export const ORDER_STATUS_LIST = VALID_ORDER_STATUSES.map(v => ORDER_STATUS_CONFIG[v])
+
+/** انتقالات الحالة المسموحة — مصدر موحّد للـ UI وguards */
+export const ALLOWED_STATUS_TRANSITIONS: Record<OrderStatusValue, readonly OrderStatusValue[]> = {
+    pending: ['confirmed', 'cancelled'],
+    confirmed: ['processing', 'cancelled'],
+    processing: ['shipped', 'cancelled'],
+    shipped: ['delivered', 'cancelled'],
+    delivered: [],
+    cancelled: [],
+}
+
+export function getAllowedStatusTransitions(from: string): OrderStatusValue[] {
+    return [...(ALLOWED_STATUS_TRANSITIONS[from as OrderStatusValue] ?? [])]
+}

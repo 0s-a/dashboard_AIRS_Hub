@@ -68,7 +68,12 @@ function formatCount(n: number): string {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function IndexesPanel() {
+interface IndexesPanelProps {
+    /** Increment to force a refetch from the parent (unified refresh) */
+    refreshKey?: number
+}
+
+export function IndexesPanel({ refreshKey = 0 }: IndexesPanelProps) {
     const [data, setData]           = useState<IndexesResponse | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -91,7 +96,10 @@ export function IndexesPanel() {
         }
     }
 
-    useEffect(() => { fetchIndexes() }, [])
+    useEffect(() => {
+        fetchIndexes(refreshKey > 0)
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshKey is the intentional trigger
+    }, [refreshKey])
 
     // ── Loading skeleton ───────────────────────────────────────────────────────
     if (isLoading) {

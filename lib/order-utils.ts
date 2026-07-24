@@ -2,10 +2,10 @@
 // Order Utilities — Dynamic price resolution
 // السعر يُحسب بالأولوية:
 // 1. unitPrice (snapshot) — المُثبَّت وقت إنشاء الطلب ← الأولوية
-// 2. تسعيرة العميل من ProductPrice (للطلبات القديمة بدون snapshot)
+// 2. تسعيرة العميل من ItemPrice (للطلبات القديمة بدون snapshot)
 // 3. التسعيرة الافتراضية للنظام (isDefault=true)
 // 4. أي سعر متاح
-// ملاحظة: ProductPrice يُخزَّن بالعملة الافتراضية فقط؛ التحويل عند الإنشاء عبر resolveItemSnapshot
+// ملاحظة: ItemPrice يُخزَّن بالعملة الافتراضية فقط؛ التحويل عند الإنشاء عبر resolveItemSnapshot
 // ============================================================
 
 export interface ResolvedPrice {
@@ -27,8 +27,23 @@ export function resolveItemPrice(
         unitPrice?: number | string | null       // Snapshot — الأولوية القصوى
         currency?: { symbol: string } | null     // Snapshot currency
         priceLabel?: { name: string } | null     // Snapshot label
+        item?: {
+            itemPrices?: Array<{
+                priceLabelId: string
+                value: number | string | { toString(): string }
+                priceLabel?: { id: string; name: string; isDefault: boolean } | null
+                currency?: { symbol: string } | null
+            }>
+        } | null
+        /** @deprecated use item */
         product?: {
             productPrices?: Array<{
+                priceLabelId: string
+                value: number | string | { toString(): string }
+                priceLabel?: { id: string; name: string; isDefault: boolean } | null
+                currency?: { symbol: string } | null
+            }>
+            itemPrices?: Array<{
                 priceLabelId: string
                 value: number | string | { toString(): string }
                 priceLabel?: { id: string; name: string; isDefault: boolean } | null
@@ -49,7 +64,11 @@ export function resolveItemPrice(
     }
 
     // ── Fallback الديناميكي للطلبات القديمة ──
-    const prices = item.product?.productPrices ?? []
+    const prices =
+        item.item?.itemPrices ??
+        item.product?.itemPrices ??
+        item.product?.productPrices ??
+        []
 
     if (prices.length === 0) {
         return { price: 0, symbol: '', priceLabelName: '—', isSnapshot: false }
@@ -94,11 +113,11 @@ export function resolveItemPrice(
  * يعطي أولوية لـ unitPrice snapshot إذا كان موجوداً
  */
 export function calcOrderTotal(
-    items: Array<{ quantity?: number | null; unitPrice?: number | string | null; product?: any; currency?: any; priceLabel?: any }>,
+    items: Array<{ quantity?: number | null; unitPrice?: number | string | null; item?: any; product?: any; currency?: any; priceLabel?: any }>,
     customerPriceLabelId?: string | null
 ): number {
-    return items.reduce((sum, item) => {
-        const { price } = resolveItemPrice(item, customerPriceLabelId)
-        return sum + price * (item.quantity ?? 0)
+    return items.reduce((sum, orderItem) => {
+        const { price } = resolveItemPrice(orderItem, customerPriceLabelId)
+        return sum + price * (orderItem.quantity ?? 0)
     }, 0)
 }

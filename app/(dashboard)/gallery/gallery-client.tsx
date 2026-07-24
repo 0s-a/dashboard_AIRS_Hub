@@ -32,7 +32,7 @@ interface GalleryClientProps {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function galleryItemHref(img: GalleryImage): string {
-    return `/products/${img.productId}`
+    return `/items/${img.itemId}`
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ function Lightbox({
                     className="flex items-center gap-2 bg-primary/90 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-xl hover:bg-primary transition-colors shadow-lg"
                 >
                     <Package className="h-4 w-4" />
-                    <span className="font-medium">{img.productName}</span>
+                    <span className="font-medium">{img.itemName}</span>
                     <span className="text-white/70 font-mono text-xs">#{img.itemNumber}</span>
                 </Link>
             </div>
@@ -101,7 +101,7 @@ function Lightbox({
             >
                 <Image
                     src={img.url}
-                    alt={img.alt || img.productName}
+                    alt={img.alt || img.itemName}
                     fill
                     className="object-contain"
                     priority
@@ -160,7 +160,7 @@ function ImageCard({
             >
                 <Image
                     src={image.url}
-                    alt={image.alt || image.productName}
+                    alt={image.alt || image.itemName}
                     fill
                     className="object-cover transition-all duration-500 group-hover:scale-105 group-hover:brightness-105"
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
@@ -202,7 +202,7 @@ function ImageCard({
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate text-foreground group-hover/link:text-primary transition-colors">
-                            {image.productName}
+                            {image.itemName}
                         </p>
                         <p className="text-xs font-mono text-muted-foreground mt-0.5">
                             {image.itemNumber ? `#${image.itemNumber}` : '—'}
@@ -245,10 +245,10 @@ export function GalleryClient({ initialImages, initialCursor, stats }: GalleryCl
                     <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                         <Images className="h-5 w-5 text-primary" />
                     </div>
-                    معرض صور المنتجات
+                    معرض صور الأصناف
                 </h1>
                 <p className="text-muted-foreground mt-1 text-sm">
-                    {stats.totalImages} صورة من {stats.totalProducts} منتج
+                    {stats.totalImages} صورة من {stats.totalItems} صنف
                 </p>
             </div>
 
@@ -259,14 +259,14 @@ export function GalleryClient({ initialImages, initialCursor, stats }: GalleryCl
                         <Images className="h-10 w-10 opacity-30" />
                     </div>
                     <p className="font-medium">لا توجد صور</p>
-                    <p className="text-sm opacity-70">أضف صوراً للمنتجات من صفحة المنتج</p>
+                    <p className="text-sm opacity-70">أضف صوراً للأصناف من صفحة الصنف</p>
                 </div>
             ) : (
                 <>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {images.map((img, idx) => (
                             <ImageCard
-                                key={`${img.id}-${img.productId}`}
+                                key={`${img.id}-${img.itemId}`}
                                 image={img}
                                 onLightbox={() => setLightboxIndex(idx)}
                             />

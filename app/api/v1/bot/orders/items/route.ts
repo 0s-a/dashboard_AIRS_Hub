@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { validateApiKey, apiSuccess, apiError } from '@/lib/api-utils'
+import { validateApiKey, apiSuccess, botApiError } from '@/lib/api-utils'
 import {
     AddOrderItemSchema,
     ReplaceOrderItemsSchema,
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
         const queryParsed = OrderItemQuerySchema.safeParse(Object.fromEntries(searchParams))
 
         if (!queryParsed.success) {
-            return apiError('يجب تمرير orderId في query parameters', 400, {
+            return botApiError('يجب تمرير orderId في query parameters', 400, {
                 code: 'VALIDATION_ERROR',
                 details: queryParsed.error.flatten(),
             })
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         const parsed = AddOrderItemSchema.safeParse(body)
 
         if (!parsed.success) {
-            return apiError('بيانات غير صالحة', 400, {
+            return botApiError('بيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: parsed.error.flatten(),
             })
@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest) {
         const queryParsed = OrderItemQuerySchema.safeParse(Object.fromEntries(searchParams))
 
         if (!queryParsed.success) {
-            return apiError('يجب تمرير orderId في query parameters', 400, {
+            return botApiError('يجب تمرير orderId في query parameters', 400, {
                 code: 'VALIDATION_ERROR',
                 details: queryParsed.error.flatten(),
             })
@@ -64,7 +64,7 @@ export async function PUT(req: NextRequest) {
         const parsed = ReplaceOrderItemsSchema.safeParse(body)
 
         if (!parsed.success) {
-            return apiError('بيانات غير صالحة', 400, {
+            return botApiError('بيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: parsed.error.flatten(),
             })
@@ -86,7 +86,7 @@ export async function PATCH(req: NextRequest) {
         const queryParsed = OrderItemIdQuerySchema.safeParse(Object.fromEntries(searchParams))
 
         if (!queryParsed.success) {
-            return apiError('يجب تمرير orderId و itemId في query parameters', 400, {
+            return botApiError('يجب تمرير orderId و itemId في query parameters', 400, {
                 code: 'VALIDATION_ERROR',
                 details: queryParsed.error.flatten(),
             })
@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest) {
         const parsed = UpdateOrderItemSchema.safeParse(body)
 
         if (!parsed.success) {
-            return apiError('بيانات غير صالحة', 400, {
+            return botApiError('بيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: parsed.error.flatten(),
             })
@@ -122,7 +122,7 @@ export async function DELETE(req: NextRequest) {
         const queryParsed = OrderItemIdQuerySchema.safeParse(Object.fromEntries(searchParams))
 
         if (!queryParsed.success) {
-            return apiError('يجب تمرير orderId و itemId في query parameters', 400, {
+            return botApiError('يجب تمرير orderId و itemId في query parameters', 400, {
                 code: 'VALIDATION_ERROR',
                 details: queryParsed.error.flatten(),
             })

@@ -79,7 +79,7 @@
 | `app/api/v1/bot/orders/` | Orders Bot API (`x-api-key`) — مصدر HTTP واحد |
 | `lib/orders/` | منطق Bot Orders API (service, snapshot, schemas) |
 | `lib/customers/` | منطق Bot Customers API |
-| `lib/bot/` | product-search، product-price، product-image، notifications |
+| `lib/bot/` | product-search، item-price، item-image، item-by-number، notifications |
 | `public/openapi.json` | عقد Bot API المنشور |
 | `lib/actions/` | منطق الأعمال (Server Actions) |
 | `lib/api-utils.ts` | validateApiKey, apiSuccess, apiError |
@@ -88,25 +88,27 @@
 | `lib/meilisearch.ts` | عميل Meilisearch |
 | `lib/prisma-includes.ts` | Prisma include/select constants |
 | `prisma/schema.prisma` | مصدر الحقيقة للبيانات |
-| `app/(dashboard)/product-attributes/` | كتالوج صفات المنتج (`ProductAttribute`) |
-| `app/(dashboard)/product-families/` | المنتجات الرئيسية (`ProductFamily`) — تجميع فقط |
-| `lib/actions/product-attributes.ts` | CRUD صفات المنتج |
-| `lib/actions/product-families.ts` | CRUD المنتجات الرئيسية |
+| `app/(dashboard)/products/` | المنتجات (`Product` / SPU) |
+| `app/(dashboard)/items/` | الأصناف (`Item` / SKU) |
+| `app/(dashboard)/product-attributes/` | كتالوج صفات الأصناف (`ItemAttribute`) |
+| `lib/actions/products.ts` | CRUD المنتجات |
+| `lib/actions/items/` | CRUD الأصناف + تسعير/وحدات |
+| `lib/actions/item-attributes.ts` | CRUD صفات الأصناف |
 
 ## قواعد التسعير
 
 - التسعير عبر **PriceLabel** وليس tiers ثابتة (RETAIL/WHOLESALE/VIP في README قديم — تجاهله)
-- `ProductPrice` = مفتاح فريد: `productId + priceLabelId + unitId` (بالعملة الافتراضية دائماً)
+- `ItemPrice` = مفتاح فريد: `itemId + priceLabelId + unitId` (بالعملة الافتراضية دائماً)
 - التحويل لعملات أخرى عبر `exchangeRate` في `lib/currency-utils.ts` (`convertFromDefault`)
 - كل عميل له `priceLabelId` اختياري + عملات عبر `CustomerCurrency` (تفضيل عرض)
 - عند إنشاء طلب: **snapshot إلزامي** في `OrderItem`:
- - `unitPrice`, `currencyId`, `priceLabelId` (بعد التحويل إن لزم)
+ - `unitPrice`, `currencyId`, `priceLabelId` (بعد التحويل إن لزم)؛ الربط عبر `itemId`
 - عرض السعر: `resolveItemPrice()` في `lib/order-utils.ts`
  1. snapshot (unitPrice) — الأولوية
- 2. تسعيرة العميل من ProductPrice
+ 2. تسعيرة العميل من ItemPrice
  3. التسعيرة الافتراضية (isDefault)
  4. أي سعر
-- Bot product price: يفلتر بـ `customer.priceLabelId` ويحوّل لعملة مطلوبة أو عملات العميل (`GET /api/v1/bot/products/price`)
+- Bot item price: يفلتر بـ `customer.priceLabelId` ويحوّل لعملة مطلوبة أو عملات العميل (`GET /api/v1/bot/items/price`)
 
 ## قواعد الطلبات
 
@@ -130,22 +132,23 @@ export const createX = (data) =>
 - `'use server'` في أعلى كل ملف action
 - `requireAuth()` للعمليات الحساسة — لا أدوار
 - استثناءات: `auth.ts`, `getStoreSettings()`, `getOrderById()`, `getDefaultCurrency()`
-- تعديلات المخزون: `upsertProductToMeilisearch(id).catch(console.warn)`
+- تعديلات المخزون: `upsertItemToMeilisearch(id).catch(console.warn)`
 
 ### Bot API
 
 ```typescript
 const authError = validateApiKey(req)
 if (authError) return authError
-return apiSuccess(data) // أو apiError(message, status, { code })
+return apiSuccess(data) // أو botApiError(message, logicalStatus, { code })
 ```
 
+أخطاء الأعمال → HTTP 200 + `success: false` (لا توقف n8n). المصادقة → 401/503.
 ## Bot API Contract
 
 - **Bot = HTTP** تحت `app/api/v1/bot/**` (`x-api-key`)؛ **Dashboard CRUD = Server Actions**؛ Dashboard HTTP = Meilisearch ops؛ بحث منتجات البوت = Meili + Prisma fallback
 - مصدر الحقيقة للمسارات: الكود — و`public/openapi.json` مرآة يدوية (لا `/persons`)
 - Route رفيع؛ المنطق في `lib/orders/`, `lib/customers/`, `lib/bot/`
-- Envelope: `apiSuccess` / `apiError` مع `code` إنجليزي ورسالة عربية
+- Envelope: `apiSuccess` / `botApiError` مع `code` إنجليزي ورسالة عربية؛ أخطاء الأعمال HTTP 200 (ما عدا 401/503 للمفتاح)
 - الهاتف: `normalizePhonePatterns` / `validatePhoneInput`؛ الصفحات: `parsePagination`
 - قواعد مفصّلة: `.cursor/rules/bot-api.mdc` · Skill: `nawaat-bot-api`
 

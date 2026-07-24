@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
+import { validateApiKey, botApiError, apiSuccess } from '@/lib/api-utils'
 import { searchCustomerByPhone, handleCustomerServiceError } from '@/lib/customers'
 
 // GET /api/v1/bot/customers/search?phone=xxx
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
             searchParams.get('value')
 
         if (!raw || !raw.trim()) {
-            return apiError('يجب تمرير رقم الهاتف عبر المعامل phone', 400, {
+            return botApiError('يجب تمرير رقم الهاتف عبر المعامل phone', 400, {
                 code: 'MISSING_PHONE',
             })
         }

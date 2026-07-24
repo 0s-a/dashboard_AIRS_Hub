@@ -21,6 +21,7 @@ import type {
     UpdateOrderInput,
 } from './types'
 import type { Prisma } from '@prisma/client'
+import { notifyOrderStatusWebhook } from '@/lib/bot/order-webhook'
 
 const PENDING_ORDER_INCLUDE = {
     customer: {
@@ -62,16 +63,16 @@ async function resolveCustomerId(input: {
     return undefined
 }
 
-async function assertProductsExist(items: OrderItemInput[]) {
+async function assertItemsExist(items: OrderItemInput[]) {
     if (items.length === 0) return
 
-    const productIds = [...new Set(items.map(item => item.productId))]
-    const products = await prisma.product.findMany({
-        where: { id: { in: productIds } },
+    const itemIds = [...new Set(items.map(item => item.itemId))]
+    const found = await prisma.item.findMany({
+        where: { id: { in: itemIds } },
         select: { id: true },
     })
-    if (products.length !== productIds.length) {
-        throw new OrderServiceError('المنتج غير موجود', 404, 'NOT_FOUND')
+    if (found.length !== itemIds.length) {
+        throw new OrderServiceError('الصنف غير موجود', 404, 'NOT_FOUND')
     }
 }
 
@@ -83,7 +84,7 @@ async function buildItemCreateData(
         items.map(async item => {
             const snapshot = await resolveItemSnapshot({
                 customerId,
-                productId: item.productId,
+                itemId: item.itemId,
                 unitId: item.unitId,
                 unitPrice: item.unitPrice,
                 currencyId: item.currencyId,
@@ -91,7 +92,7 @@ async function buildItemCreateData(
             })
 
             return {
-                productId: item.productId,
+                itemId: item.itemId,
                 unitId: item.unitId ?? null,
                 quantity: item.quantity ?? 1,
                 notes: item.notes ?? null,
@@ -128,7 +129,7 @@ export async function createOrder(input: CreateOrderInput) {
         }
     }
 
-    await assertProductsExist(items)
+    await assertItemsExist(items)
 
     const order = await prisma.$transaction(async tx => {
         const orderNumber = await generateItemNumber('order')
@@ -225,7 +226,12 @@ export async function getOrderById(id: string) {
 export async function updateOrder(id: string, input: UpdateOrderInput) {
     const existing = await prisma.order.findUnique({
         where: { id },
-        select: { id: true, status: true, customerId: true },
+        select: {
+            id: true,
+            status: true,
+            customerId: true,
+            orderNumber: true,
+        },
     })
     if (!existing) {
         throw new OrderServiceError('الطلب غير موجود', 404, 'NOT_FOUND')
@@ -255,12 +261,12 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
     if (hasItemsUpdate) {
         if (!input.items || input.items.length === 0) {
             throw new OrderServiceError(
-                'لا يمكن حفظ طلب بدون منتجات — أضف منتجاً واحداً على الأقل',
+                'لا يمكن حفظ طلب بدون أصناف — أضف صنفاً واحداً على الأقل',
                 400,
                 'VALIDATION_ERROR'
             )
         }
-        await assertProductsExist(input.items)
+        await assertItemsExist(input.items)
     }
 
     const snapshotCustomerId =
@@ -270,7 +276,10 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
         ? await buildItemCreateData(input.items!, snapshotCustomerId)
         : null
 
-    return prisma.$transaction(async tx => {
+    const statusChanged =
+        input.status !== undefined && nextStatus !== existing.status
+
+    const updated = await prisma.$transaction(async tx => {
         if (itemData) {
             await tx.orderItem.deleteMany({ where: { orderId: id } })
             await tx.orderItem.createMany({
@@ -289,6 +298,20 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
             include: ORDER_INCLUDE,
         })
     })
+
+    if (statusChanged) {
+        notifyOrderStatusWebhook({
+            event: 'order.status_changed',
+            orderId: updated.id,
+            orderNumber: updated.orderNumber,
+            previousStatus: existing.status,
+            status: updated.status,
+            customerId: updated.customerId,
+            at: new Date().toISOString(),
+        })
+    }
+
+    return updated
 }
 
 export async function deleteOrder(id: string) {
@@ -309,7 +332,14 @@ export async function deleteOrder(id: string) {
 export async function replaceOrderItems(orderId: string, items: OrderItemInput[]) {
     const order = await getOrderOrThrow(orderId)
     assertOrderMutable(order.status)
-    await assertProductsExist(items)
+    if (!items.length) {
+        throw new OrderServiceError(
+            'لا يمكن حفظ طلب بدون أصناف — أضف صنفاً واحداً على الأقل',
+            400,
+            'VALIDATION_ERROR'
+        )
+    }
+    await assertItemsExist(items)
 
     const itemData = await buildItemCreateData(items, order.customerId)
 
@@ -334,12 +364,12 @@ export async function addOrderItem(orderId: string, input: OrderItemInput) {
         throw new OrderServiceError('الطلب غير موجود', 404, 'NOT_FOUND')
     }
     assertOrderMutable(order.status)
-    await assertProductsExist([input])
+    await assertItemsExist([input])
 
     const existingItem = await prisma.orderItem.findFirst({
         where: {
             orderId,
-            productId: input.productId,
+            itemId: input.itemId,
             unitId: input.unitId ?? null,
         },
     })
@@ -355,7 +385,7 @@ export async function addOrderItem(orderId: string, input: OrderItemInput) {
 
     const snapshot = await resolveItemSnapshot({
         customerId: order.customerId,
-        productId: input.productId,
+        itemId: input.itemId,
         unitId: input.unitId,
         unitPrice: input.unitPrice,
         currencyId: input.currencyId,
@@ -365,7 +395,7 @@ export async function addOrderItem(orderId: string, input: OrderItemInput) {
     const item = await prisma.orderItem.create({
         data: {
             orderId,
-            productId: input.productId,
+            itemId: input.itemId,
             unitId: input.unitId ?? null,
             quantity: input.quantity ?? 1,
             notes: input.notes ?? null,
@@ -414,7 +444,7 @@ export async function updateOrderItem(
     if (unitIdChanging) {
         snapshotUpdate = await resolveItemSnapshot({
             customerId: order.customerId,
-            productId: existingItem.productId,
+            itemId: existingItem.itemId,
             unitId: input.unitId,
             priceLabelId: existingItem.priceLabelId,
         })
@@ -449,6 +479,15 @@ export async function deleteOrderItem(orderId: string, itemId: string) {
     const existingItem = await prisma.orderItem.findUnique({ where: { id: itemId } })
     if (!existingItem || existingItem.orderId !== orderId) {
         throw new OrderServiceError('البند غير موجود في هذا الطلب', 404, 'NOT_FOUND')
+    }
+
+    const remaining = await prisma.orderItem.count({ where: { orderId } })
+    if (remaining <= 1) {
+        throw new OrderServiceError(
+            'لا يمكن حذف آخر صنف في الطلب — احذف الطلب بالكامل أو أضف صنفاً آخر أولاً',
+            400,
+            'VALIDATION_ERROR'
+        )
     }
 
     await prisma.orderItem.delete({ where: { id: itemId } })

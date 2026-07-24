@@ -1,6 +1,6 @@
 ---
 name: nawaat-bot-api
-description: Bot API في Nawaat — عقد HTTP للبوتات (customers، orders، brands، products search/price/image، notifications). استخدم عند العمل على app/api/v1/bot أو public/openapi.json.
+description: Bot API في Nawaat — عقد HTTP للبوتات (customers، orders، brands، products search، items by-number/price/image، notifications). استخدم عند العمل على app/api/v1/bot أو public/openapi.json.
 ---
 
 # Nawaat Bot API
@@ -15,7 +15,16 @@ description: Bot API في Nawaat — عقد HTTP للبوتات (customers، ord
 
 إذا لم يُضبط `BOT_API_KEY` → كل طلبات البوت **503** `MISCONFIGURED`.
 
+**أخطاء الأعمال (Bot):** HTTP **200** + `{ success: false, error, code }` حتى لا تتوقف أدوات الأتمتة (n8n). استثناء: `UNAUTHORIZED` (401) و`MISCONFIGURED` (503).
+
+الحقول الاختيارية تقبل `null` / `""` / `"null"` وتُعامل كـ غير مُمرَّرة (`lib/zod-optional.ts`).
+
 عقد منشور يدوي: `public/openapi.json` (يجب أن يطابق الكود؛ لا `/persons`).
+
+**نموذج المخزون:** `Product` = منتج (SPU)، `Item` = صنف (SKU).
+- بحث مجمّع: `GET /products/search` → منتجات + أصناف مطابقة
+- عمليات صنف: `GET /items/*` بـ `itemId` أو `itemNumber`
+- بنود الطلبات والإشعارات: `itemId` (وليس `productId` للصنف)
 
 ## Envelope
 
@@ -23,8 +32,9 @@ description: Bot API في Nawaat — عقد HTTP للبوتات (customers، ord
 apiSuccess(data, status?, meta?)
 // { success: true, data, ...meta }
 
-apiError(message, status, { code?, details? })
-// { success: false, error, code?, details? }
+botApiError(message, logicalStatus, { code?, details? })
+// HTTP 200 دائماً — { success: false, error, code?, details? }
+// فرّع على success/code. المصادقة تبقى 401/503 عبر validateApiKey.
 ```
 
 - رسالة `error` عربية · `code` إنجليزي للبوت
@@ -51,22 +61,28 @@ apiError(message, status, { code?, details? })
 | GET/POST/PATCH/DELETE | `/api/v1/bot/orders` (`?id=` / `?pending=true`) |
 | POST/PUT/PATCH/DELETE | `/api/v1/bot/orders/items` (`?orderId=` / `?itemId=`) |
 
-### Products & pricing — `lib/bot/`
+بنود الطلب: `{ itemId, quantity, ... }` — معرّف الصنف القابل للبيع.
+
+### Products & Items — `lib/bot/`
 
 | Method | Path | ملاحظات |
 |--------|------|---------|
 | GET | `/api/v1/bot/brands` | قائمة البراندات — `{ name, code }` فقط، مرتبة أبجدياً |
-| GET | `/api/v1/bot/products/search` | `q` مطلوب · نتائج **عائلات** (`family` + `products[]` مطابق فقط) · `page`/`limit` بعدد العائلات · `familyCode` · `hasMore`/`skuMatch` · تفكيك `parse` · فلاتر `brand`/`attr`/`available` · `meta.engine` + `meta.parsed` |
-| GET | `/api/v1/bot/products/price` | `productId` أو `itemNumber` · `customerId`/`currency` اختياريان |
-| GET | `/api/v1/bot/products/image` | `productId` أو `itemNumber` · الصورة الرئيسية فقط |
+| GET | `/api/v1/bot/products/search` | `q` مطلوب · نتائج: `product{code,name}` + أسماء `category`/`brand` + `items[]` (`id`, `alternativeNames`, `primaryImage`, `prices`, صفات) · `customerId`/`currency` اختياريان · عند تمرير `customerId` يُعاد في meta · **ليس** لبطاقة كاملة برقم/UUID |
+| GET | `/api/v1/bot/items/by-number` | `itemNumber` مطلوب · بطاقة صنف (عرض موحّد مع البحث + وحدات/أسعار/صور) · عند NOT_FOUND: `details.suggestSearch` · `customerId`/`currency` اختياريان |
+| GET | `/api/v1/bot/items/by-id` | `itemId` مطلوب · نفس بطاقة by-number |
+| GET | `/api/v1/bot/items/price` | `itemId` أو `itemNumber` · `customerId`/`currency` اختياريان |
+| GET | `/api/v1/bot/items/image` | `itemId` أو `itemNumber` · الصورة الرئيسية فقط |
 
-لا يوجد `GET /api/v1/bot/products` (قائمة عامة) ولا `POST /check-price`.
+لا يوجد `GET /api/v1/bot/products` (قائمة عامة) ولا `POST /check-price`. رقم الصنف الدقيق → `/items/by-number`؛ معرّف UUID → `/items/by-id`.
+
+**Webhook (اختياري):** عند تغيّر حالة طلب يُرسل `POST` إلى `BOT_ORDER_WEBHOOK_URL` بالجسم `{ event: "order.status_changed", orderId, orderNumber, previousStatus, status, customerId, at }` — لا يوقف تحديث الطلب عند الفشل.
 
 ### Notifications — `lib/bot/notifications.ts`
 
 | Method | Path | ملاحظات |
 |--------|------|---------|
-| POST | `/api/v1/bot/notifications` | عقد خفيف: `type` + `q` (+ `phone`/`customerId`؛ و`productId`/`itemNumber` لـ `out_of_stock`) · dedup 24 ساعة · استجابة `{ id, type, created }` |
+| POST | `/api/v1/bot/notifications` | عقد خفيف: `type` + `q` (+ `phone`/`customerId`؛ و`itemId`/`itemNumber` لـ `out_of_stock`) · dedup 24 ساعة · استجابة `{ id, type, created }` |
 
 لا يوجد `GET` — القراءة عبر Dashboard Server Actions.
 
@@ -75,16 +91,18 @@ apiError(message, status, { code?, details? })
 | المسار | الدور |
 |--------|-------|
 | `app/api/v1/bot/**/route.ts` | رفيع: auth + Zod + استدعاء service |
-| `lib/api-utils.ts` | validateApiKey، envelope، هاتف، pagination |
+| `lib/api-utils.ts` | validateApiKey، envelope، `botApiError`، هاتف، pagination |
 | `lib/orders/` | طلبات البوت (service + snapshot + schemas) |
 | `lib/customers/` | عملاء البوت (upsert، search، status، pricing) |
 | `lib/bot/brands.ts` | قائمة البراندات (name + code) |
-| `lib/bot/resolve-product.ts` | حل المنتج بـ productId أو itemNumber |
-| `lib/bot/product-search.ts` | بحث منتجات (Meili + تطبيع + تفكيك + Prisma hydrate / fallback) |
+| `lib/bot/resolve-item.ts` | حل الصنف بـ `itemId` أو `itemNumber` |
+| `lib/bot/resolve-item-number.ts` | حل معرّف الصنف برقم الصنف (تطبيع + regexp) |
+| `lib/bot/item-by-number.ts` | بطاقة صنف كاملة برقم الصنف |
+| `lib/bot/product-search/` | بحث منتجات مجمّع (Meili + تطبيع + تفكيك + Prisma hydrate / fallback) |
 | `lib/bot/parse-product-query.ts` | قاموس Brand/attrs + تفكيك حذر لـ `q` |
 | `lib/bot/normalize-search-query.ts` | تطبيع عربي/SKU لاستعلام البحث والفهرسة |
-| `lib/bot/product-price.ts` | سعر المنتج |
-| `lib/bot/product-image.ts` | الصورة الرئيسية |
+| `lib/bot/item-price.ts` | سعر الصنف |
+| `lib/bot/item-image.ts` | الصورة الرئيسية |
 | `lib/bot/notifications.ts` | إشعارات البحث |
 
 ## SOP — endpoint جديد

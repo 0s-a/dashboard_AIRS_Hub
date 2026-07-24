@@ -118,22 +118,22 @@ export async function deleteUnit(id: string) {
     return safeActionWithRevalidation(
         async () => {
             await requireAuth()
-            // Check both ProductPrice AND ProductUnit references
+            // Check both ItemPrice AND ItemUnit references
             const rows = await prisma.$queryRawUnsafe<any[]>(
                 `SELECT
-                    (SELECT count(*)::int FROM "ProductPrice" WHERE "unitId" = $1) AS price_count,
-                    (SELECT count(*)::int FROM "ProductUnit"  WHERE "unitId" = $1) AS unit_count`,
+                    (SELECT count(*)::int FROM "ItemPrice" WHERE "unitId" = $1) AS price_count,
+                    (SELECT count(*)::int FROM "ItemUnit"  WHERE "unitId" = $1) AS unit_count`,
                 id
             )
             if (rows[0]?.price_count > 0) {
                 throw Object.assign(
-                    new Error('لا يمكن حذف الوحدة لأنها مستخدمة في أسعار المنتجات'),
+                    new Error('لا يمكن حذف الوحدة لأنها مستخدمة في أسعار الأصناف'),
                     { code: 'P2003' }
                 )
             }
             if (rows[0]?.unit_count > 0) {
                 throw Object.assign(
-                    new Error('لا يمكن حذف الوحدة لأنها مرتبطة بمنتجات'),
+                    new Error('لا يمكن حذف الوحدة لأنها مرتبطة بأصناف'),
                     { code: 'P2003' }
                 )
             }

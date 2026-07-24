@@ -173,12 +173,12 @@ async function main() {
         logItem(pl.name)
     }
 
-    // ── 5b. Product Attributes ─────────────────────────────────
+    // ── 5b. Item Attributes ────────────────────────────────────
 
-    log('🏷️', 'Seeding Product Attributes...')
+    log('🏷️', 'Seeding Item Attributes...')
     const seededAttributes: Record<string, string> = {}
     for (const attr of PRODUCT_ATTRIBUTES) {
-        const row = await prisma.productAttribute.upsert({
+        const row = await prisma.itemAttribute.upsert({
             where: { code: attr.code },
             update: {
                 name: attr.name,
@@ -194,7 +194,7 @@ async function main() {
         logItem(`${attr.name} (${attr.code})`)
     }
 
-    // ── 6. Sample Brand + Category + Product ───────────────────
+    // ── 6. Sample Brand + Category + Product + Item ────────────
 
     log('🏷️', 'Seeding Sample Brand & Category...')
     const sampleBrand = await prisma.brand.upsert({
@@ -219,100 +219,98 @@ async function main() {
     })
     logItem(`${sampleCategory.name} (${sampleCategory.code})`)
 
-    const sampleFamily = await prisma.productFamily.upsert({
+    log('📦', 'Seeding Sample Product...')
+    const sampleProduct = await prisma.product.upsert({
         where: { code: 'SAMPLE' },
         update: {
             categoryId: sampleCategory.id,
+            brandId: sampleBrand.id,
         },
         create: {
             code: 'SAMPLE',
-            name: 'عائلة اختبار',
-            description: 'منتج رئيسي تجريبي',
+            name: 'منتج اختبار',
+            description: 'منتج تجريبي',
             categoryId: sampleCategory.id,
+            brandId: sampleBrand.id,
         },
     })
-    logItem(`${sampleFamily.name} (${sampleFamily.code})`)
+    logItem(`${sampleProduct.name} (${sampleProduct.code})`)
 
-    log('📦', 'Seeding Sample Product...')
+    log('📦', 'Seeding Sample Item...')
 
-    // جلب الوحدة والعملة وتسمية السعر المطلوبة عبر itemNumber (أكثر أماناً من البحث بالاسم)
-    const defaultCurrency   = await prisma.currency.findUnique({ where: { itemNumber: 'CUR-001' } })
     const defaultUnit       = await prisma.unit.findUnique({     where: { itemNumber: 'UNIT-001' } })
     const defaultPriceLabel = await prisma.priceLabel.findUnique({ where: { itemNumber: 'PL-003' } })
 
-    if (!defaultCurrency || !defaultUnit || !defaultPriceLabel) {
-        throw new Error('❌ Missing required seed records (currency / unit / price label). Run seed again.')
+    if (!defaultUnit || !defaultPriceLabel) {
+        throw new Error('❌ Missing required seed records (unit / price label). Run seed again.')
     }
 
-    const sampleProduct = await prisma.product.upsert({
+    const sampleItem = await prisma.item.upsert({
         where: { itemNumber: 'TEST-001' },
         update: {
-            brandId: sampleBrand.id,
-            familyId: sampleFamily.id,
+            productId: sampleProduct.id,
         },
         create: {
             itemNumber: 'TEST-001',
-            slug: 'test-product-st',
-            name: 'منتج اختبار',
-            description: 'منتج تجريبي — يمكن حذفه بعد التشغيل الأول',
-            brandId: sampleBrand.id,
-            familyId: sampleFamily.id,
+            slug: 'test-item-st',
+            name: 'صنف اختبار',
+            description: 'صنف تجريبي — يمكن حذفه بعد التشغيل الأول',
+            productId: sampleProduct.id,
             isAvailable: true,
         },
     })
 
     if (seededAttributes.color) {
-        await prisma.productAttributeValue.upsert({
+        await prisma.itemAttributeValue.upsert({
             where: {
-                productId_attributeId: {
-                    productId: sampleProduct.id,
+                itemId_attributeId: {
+                    itemId: sampleItem.id,
                     attributeId: seededAttributes.color,
                 },
             },
             update: { value: 'قياسي' },
             create: {
-                productId: sampleProduct.id,
+                itemId: sampleItem.id,
                 attributeId: seededAttributes.color,
                 value: 'قياسي',
             },
         })
     }
 
-    await prisma.productUnit.upsert({
+    await prisma.itemUnit.upsert({
         where: {
-            productId_unitId: {
-                productId: sampleProduct.id,
+            itemId_unitId: {
+                itemId: sampleItem.id,
                 unitId: defaultUnit.id,
             },
         },
         update: {},
         create: {
-            productId: sampleProduct.id,
+            itemId: sampleItem.id,
             unitId: defaultUnit.id,
             isBase: true,
             conversionFactor: 1,
         },
     })
 
-    await prisma.productPrice.upsert({
+    await prisma.itemPrice.upsert({
         where: {
-            productId_priceLabelId_unitId: {
-                productId: sampleProduct.id,
+            itemId_priceLabelId_unitId: {
+                itemId: sampleItem.id,
                 priceLabelId: defaultPriceLabel.id,
                 unitId: defaultUnit.id,
             },
         },
         update: {},
         create: {
-            productId: sampleProduct.id,
+            itemId: sampleItem.id,
             priceLabelId: defaultPriceLabel.id,
             unitId: defaultUnit.id,
             value: 100.00,
         },
     })
 
-    logItem(`${sampleProduct.name} (${sampleProduct.itemNumber})`)
-
+    logItem(`${sampleItem.name} (${sampleItem.itemNumber})`)
     // ── 7. Sample Customer (Test Only) ────────────────────────
 
     log('👥', 'Seeding Sample Customer...')

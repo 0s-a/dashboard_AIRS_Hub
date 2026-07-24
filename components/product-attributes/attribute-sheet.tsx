@@ -8,12 +8,12 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet"
 import { ProductAttributeForm } from "./attribute-form"
-import type { SerializedProductAttributeCatalog } from "@/lib/types/product-attribute"
+import type { SerializedItemAttributeCatalog } from "@/lib/types/item-attribute"
 
 interface AttributeSheetProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    attribute?: SerializedProductAttributeCatalog
+    attribute?: SerializedItemAttributeCatalog
 }
 
 export function AttributeSheet({ open, onOpenChange, attribute }: AttributeSheetProps) {
@@ -23,7 +23,7 @@ export function AttributeSheet({ open, onOpenChange, attribute }: AttributeSheet
                 <SheetHeader>
                     <SheetTitle>{attribute ? "تعديل الصفة" : "إضافة صفة جديدة"}</SheetTitle>
                     <SheetDescription>
-                        {attribute ? "قم بتحديث بيانات الصفة" : "أضف صفة جديدة لكتالوج المنتجات"}
+                        {attribute ? "قم بتحديث بيانات الصفة" : "أضف صفة جديدة لكتالوج الأصناف"}
                     </SheetDescription>
                 </SheetHeader>
                 <div className="mt-6">

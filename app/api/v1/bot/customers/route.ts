@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
+import { validateApiKey, botApiError, apiSuccess } from '@/lib/api-utils'
 import {
     createCustomerSchema,
     upsertCustomer,
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
         const rawBody = await req.json()
         const validationResult = createCustomerSchema.safeParse(rawBody)
         if (!validationResult.success) {
-            return apiError('البيانات غير صالحة', 400, {
+            return botApiError('البيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: validationResult.error.format(),
             })

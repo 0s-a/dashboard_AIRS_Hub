@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import type { PaginationMeta } from "@/lib/actions/inventory"
+import type { PaginationMeta } from "@/lib/types/item"
 
 interface ServerPaginationProps {
     pagination: PaginationMeta

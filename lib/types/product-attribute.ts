@@ -1,15 +1,5 @@
-export interface ProductAttributeFormData {
-    code: string
-    name: string
-    examples?: string[] | null
-}
-
-export type SerializedProductAttributeCatalog = {
-    id: string
-    code: string
-    name: string
-    examples: string[]
-    createdAt: string
-    updatedAt: string
-    valuesCount?: number
-}
+// Thin re-export shim — prefer @/lib/types/item-attribute
+export type {
+    ItemAttributeFormData as ProductAttributeFormData,
+    SerializedItemAttributeCatalog as SerializedProductAttributeCatalog,
+} from './item-attribute'

@@ -15,7 +15,7 @@ import { toast } from "sonner"
 import { OrderSheet } from "./order-sheet"
 import Link from "next/link"
 import { calcOrderTotal } from "@/lib/order-utils"
-import { ORDER_STATUS_CONFIG, ORDER_STATUS_LIST, type OrderStatusValue } from "@/lib/order-constants"
+import { ORDER_STATUS_CONFIG, ORDER_STATUS_LIST, getAllowedStatusTransitions, type OrderStatusValue } from "@/lib/order-constants"
 
 // ─── Status Config ────────────────────────────────────────────────────────────
 // استخدام ORDER_STATUS_LIST من constants — مصدر موحّد
@@ -99,7 +99,9 @@ function ActionsCell({ row, customers, products }: { row: any, customers: any[],
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    {ORDER_STATUSES.filter(s => s.value !== order.status).map(s => (
+                    {ORDER_STATUSES
+                        .filter(s => getAllowedStatusTransitions(order.status).includes(s.value))
+                        .map(s => (
                         <DropdownMenuItem key={s.value} onClick={() => handleStatus(s.value)}>
                             <s.icon className="size-4 ml-2" />
                             {s.label}
@@ -160,7 +162,7 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
         },
         {
             accessorKey: "items",
-            header: "المنتجات",
+            header: "الأصناف",
             size: 260,
             minSize: 200,
             maxSize: 340,
@@ -174,14 +176,16 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
                 return (
                     <div className="flex flex-col gap-0.5 py-0.5 min-w-0">
                         {visibleItems.map((item: any, i: number) => {
-                            const attrText = (item.product?.productAttributes ?? [])
+                            const line = item.item ?? item.product
+                            const attrs = line?.itemAttributes ?? line?.productAttributes ?? []
+                            const attrText = attrs
                                 .map((a: { value?: string }) => a.value)
                                 .filter(Boolean)
                                 .join(' / ')
                             return (
                             <div key={i} className="flex items-center gap-1.5 text-xs min-w-0">
                                 <span className="text-foreground/80 truncate min-w-0">
-                                    {item.product?.name ?? '—'}
+                                    {line?.name ?? '—'}
                                     {attrText && (
                                         <span className="text-muted-foreground/60">
                                             {' '}({attrText})
@@ -200,7 +204,7 @@ export function getOrderColumns(customers: any[], products: any[], defaultSymbol
                             )
                         })}
                         {extraCount > 0 && (
-                            <span className="text-primary font-semibold text-[10px]">+{extraCount} منتجات أخرى</span>
+                            <span className="text-primary font-semibold text-[10px]">+{extraCount} أصناف أخرى</span>
                         )}
                     </div>
                 )

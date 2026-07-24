@@ -5,7 +5,7 @@ import { GalleryClient } from "./gallery-client"
 
 export const metadata = {
     title: "معرض الصور | نواة",
-    description: "عرض صور جميع المنتجات في معرض مرئي احترافي",
+    description: "عرض صور جميع الأصناف في معرض مرئي احترافي",
 }
 
 export default async function GalleryPage() {
@@ -18,7 +18,7 @@ export default async function GalleryPage() {
         <GalleryClient
             initialImages={galleryRes.data ?? []}
             initialCursor={galleryRes.nextCursor ?? null}
-            stats={statsRes.data ?? { totalImages: 0, totalProducts: 0 }}
+            stats={statsRes.data ?? { totalImages: 0, totalItems: 0, totalProducts: 0 }}
         />
     )
 }

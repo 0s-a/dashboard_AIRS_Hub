@@ -21,15 +21,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { deleteProductAttribute } from "@/lib/actions/product-attributes"
-import type { SerializedProductAttributeCatalog } from "@/lib/types/product-attribute"
+import { deleteItemAttribute } from "@/lib/actions/item-attributes"
+import type { SerializedItemAttributeCatalog } from "@/lib/types/item-attribute"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 export function createColumns(opts: {
-    onEdit: (attr: SerializedProductAttributeCatalog) => void
-}): ColumnDef<SerializedProductAttributeCatalog>[] {
+    onEdit: (attr: SerializedItemAttributeCatalog) => void
+}): ColumnDef<SerializedItemAttributeCatalog>[] {
     return [
         {
             accessorKey: "code",
@@ -105,7 +105,7 @@ export function createColumns(opts: {
                 const attribute = row.original
 
                 const handleDelete = async () => {
-                    const res = await deleteProductAttribute(attribute.id)
+                    const res = await deleteItemAttribute(attribute.id)
                     if (res.success) {
                         toast.success("تم حذف الصفة")
                         router.refresh()
@@ -146,7 +146,7 @@ export function createColumns(opts: {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        سيتم حذف الصفة &quot;{attribute.name}&quot; — لا يمكن حذف صفات مرتبطة بمنتجات.
+                                        سيتم حذف الصفة &quot;{attribute.name}&quot; — لا يمكن حذف صفات مرتبطة بأصناف.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

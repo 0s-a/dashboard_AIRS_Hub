@@ -6,17 +6,18 @@ alwaysApply: false
 
 # Meilisearch
 
-- العميل: `lib/meilisearch.ts` — `getMeilisearchClient()`, `MEILI_INDEX`
-- المزامنة: `lib/utils/meilisearch-sync.ts` — يتضمن `searchProductIdsInMeilisearch`
+- العميل: `lib/meilisearch.ts` — `getMeilisearchClient()`, `MEILI_INDEX` (افتراضي `items`)
+- المزامنة: `lib/utils/meilisearch-sync.ts` — `searchItemIdsInMeilisearch`, `upsertItemToMeilisearch`, `syncItemsByProductId`
 - تطبيع عربي: `lib/bot/normalize-search-query.ts` (فهرسة + بحث البوت)
 - APIs: `app/api/v1/dashboard/meilisearch/*` — `requireDashboardAuth()`
 
 ## قواعد
 
 - resilient: `.catch(console.warn)` / `{ unavailable: true }` — لا تعطّل التطبيق عند تعطّل Meili
-- بعد تعديل منتج/توفر/وحدات: `upsertProductToMeilisearch(id).catch(console.warn)`
+- بعد تعديل صنف/توفر/وحدات: `upsertItemToMeilisearch(id).catch(console.warn)`
+- بعد تعديل منتج: `syncItemsByProductId(productId)`
 - تعديل الأسعار لا يُحدّث Meili
-- بحث البوت: Meili-first ثم hydrate ثم تجميع حسب `familyId`؛ fallback بنفس التجميع
-- فلتر `familyId` مدعوم في `searchProductIdsInMeilisearch`
-- بعد تغيير `MEILI_SETTINGS` أو شكل المستند (`searchText`/`familyId`): مزامنة كاملة مرة واحدة من لوحة search-engine
+- بحث البوت: Meili-first ثم hydrate ثم تجميع حسب `productId` (SPU)
+- فلتر `productId` مدعوم في `searchItemIdsInMeilisearch`
+- بعد تغيير `MEILI_SETTINGS` أو شكل المستند: مزامنة كاملة مرة واحدة من لوحة search-engine
 - `MEILISEARCH_HOST`, `MEILISEARCH_MASTER_KEY` من env

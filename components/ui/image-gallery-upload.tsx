@@ -15,12 +15,12 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import {
-    addProductImage,
-    removeProductImage,
-    setPrimaryProductImage,
-    reorderProductImages,
-} from "@/lib/actions/product-images"
-import type { ProductImageRecord } from "@/lib/actions/product-images"
+    addItemImage,
+    removeItemImage,
+    setPrimaryItemImage,
+    reorderItemImages,
+} from "@/lib/actions/item-images"
+import type { ItemImageRecord } from "@/lib/actions/item-images"
 import { IMAGE_STORAGE_CONFIG } from "@/lib/config/image-storage.config"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -34,9 +34,15 @@ interface UploadingImage {
 }
 
 interface ImageGalleryUploadProps {
-    images: ProductImageRecord[]
-    productId: string
-    productItemNumber: string
+    images: ItemImageRecord[]
+    /** Preferred — SKU id */
+    itemId?: string
+    /** Preferred — SKU item number (folder key) */
+    itemNumber?: string
+    /** @deprecated Use itemId */
+    productId?: string
+    /** @deprecated Use itemNumber */
+    productItemNumber?: string
     maxImages?: number
     disabled?: boolean
     className?: string
@@ -47,6 +53,8 @@ interface ImageGalleryUploadProps {
 
 export function ImageGalleryUpload({
     images,
+    itemId,
+    itemNumber: _itemNumber,
     productId,
     productItemNumber: _productItemNumber,
     maxImages = IMAGE_STORAGE_CONFIG.upload.maxImagesPerProduct,
@@ -54,6 +62,10 @@ export function ImageGalleryUpload({
     className,
     onImagesChange,
 }: ImageGalleryUploadProps) {
+    const resolvedItemId = itemId ?? productId
+    if (!resolvedItemId) {
+        throw new Error("ImageGalleryUpload requires itemId (or legacy productId)")
+    }
     const [uploading, setUploading] = useState<UploadingImage[]>([])
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
     const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
@@ -95,7 +107,7 @@ export function ImageGalleryUpload({
                     prev.map((u) => (u.id === item.id ? { ...u, progress: 30 } : u))
                 )
 
-                const result = await addProductImage(productId, item.file)
+                const result = await addItemImage(resolvedItemId, item.file)
 
                 setUploading((prev) =>
                     prev.map((u) =>
@@ -127,7 +139,7 @@ export function ImageGalleryUpload({
                 prev.filter((u) => !newUploading.find((n) => n.id === u.id))
             )
         },
-        [images, uploading, productId, maxImages, onImagesChange]
+        [images, uploading, resolvedItemId, maxImages, onImagesChange]
     )
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -153,7 +165,7 @@ export function ImageGalleryUpload({
 
     const handleSetPrimary = async (imageId: string) => {
         setSettingPrimary(imageId)
-        const result = await setPrimaryProductImage(imageId)
+        const result = await setPrimaryItemImage(imageId)
         setSettingPrimary(null)
         if (result.success) {
             onImagesChange?.()
@@ -164,7 +176,7 @@ export function ImageGalleryUpload({
 
     const handleRemoveImage = async (imageId: string) => {
         setRemovingId(imageId)
-        const result = await removeProductImage(imageId)
+        const result = await removeItemImage(imageId)
         setRemovingId(null)
         if (result.success) {
             toast.success('تم حذف الصورة')
@@ -202,7 +214,7 @@ export function ImageGalleryUpload({
             reordered.splice(to, 0, moved)
 
             // Send new order to server
-            await reorderProductImages(reordered.map(img => img.id))
+            await reorderItemImages(reordered.map(img => img.id))
             onImagesChange?.()
         }
 
@@ -220,7 +232,7 @@ export function ImageGalleryUpload({
                 <div className="flex items-center gap-2">
                     <ImageIcon className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">
-                        صور المنتج
+                        صور الصنف
                     </span>
                     <span className="text-xs text-muted-foreground">
                         ({images.length}/{maxImages})

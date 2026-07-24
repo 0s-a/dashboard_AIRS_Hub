@@ -13,12 +13,12 @@ export default async function OrdersPage() {
         getOrders({ page: 1, limit: 100 }),
         getOrderStats(),
         getCustomers(),
-        prisma.product.findMany({
+        prisma.item.findMany({
             select: {
                 id: true,
                 name: true,
                 itemNumber: true,
-                productUnits: {
+                itemUnits: {
                     include: { unit: { select: { id: true, name: true, pluralName: true } } },
                     orderBy: { order: 'asc' },
                 },

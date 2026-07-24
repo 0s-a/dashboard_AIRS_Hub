@@ -1,14 +1,8 @@
-import type { OrderStatusValue } from '@/lib/order-constants'
+import {
+    ALLOWED_STATUS_TRANSITIONS,
+    type OrderStatusValue,
+} from '@/lib/order-constants'
 import { OrderServiceError } from './errors'
-
-const ALLOWED_TRANSITIONS: Record<OrderStatusValue, readonly OrderStatusValue[]> = {
-    pending: ['confirmed', 'cancelled'],
-    confirmed: ['processing', 'cancelled'],
-    processing: ['shipped', 'cancelled'],
-    shipped: ['delivered', 'cancelled'],
-    delivered: [],
-    cancelled: [],
-}
 
 export function assertOrderMutable(status: OrderStatusValue | string): void {
     if (status !== 'pending') {
@@ -26,7 +20,7 @@ export function assertValidStatusTransition(
 ): void {
     if (from === to) return
 
-    const allowed = ALLOWED_TRANSITIONS[from as OrderStatusValue]
+    const allowed = ALLOWED_STATUS_TRANSITIONS[from as OrderStatusValue]
     if (!allowed || !allowed.includes(to as OrderStatusValue)) {
         throw new OrderServiceError(
             `لا يمكن الانتقال من "${from}" إلى "${to}"`,

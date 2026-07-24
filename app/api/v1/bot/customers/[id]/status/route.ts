@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { validateApiKey, apiError, apiSuccess } from '@/lib/api-utils'
+import { validateApiKey, botApiError, apiSuccess } from '@/lib/api-utils'
 import {
     CustomerStatusSchema,
     setCustomerStatus,
@@ -19,7 +19,7 @@ export async function PATCH(
         const body = await req.json()
         const parsed = CustomerStatusSchema.safeParse(body)
         if (!parsed.success) {
-            return apiError(
+            return botApiError(
                 'البيانات غير صالحة - يجب تمرير isActive كقيمة منطقية',
                 400,
                 { code: 'VALIDATION_ERROR' }

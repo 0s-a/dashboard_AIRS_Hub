@@ -12,12 +12,12 @@ export async function GET(req: NextRequest) {
     try {
         const [stats, dbCount] = await Promise.all([
             getMeilisearchStats(),
-            prisma.product.count(),
+            prisma.item.count(),
         ])
 
         return apiSuccess({
             ...stats,
-            dbProductCount: dbCount,
+            dbItemCount: dbCount,
             inSync: stats.connected && stats.documentCount === dbCount,
         }, 200)
     } catch (error) {

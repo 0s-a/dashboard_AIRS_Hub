@@ -21,12 +21,15 @@ export interface CustomerSummary {
     name: string | null
 }
 
-export interface ProductSummary {
+export interface ItemSummary {
     id: string
     itemNumber: string
     name: string
     brand: string | null
 }
+
+/** @deprecated use ItemSummary */
+export type ProductSummary = ItemSummary
 
 export interface CategorySummary {
     id: string
@@ -92,7 +95,7 @@ export interface VariantFull {
     isDefault: boolean
 }
 
-export interface ProductPriceFull {
+export interface ItemPriceFull {
     id: string
     priceLabelId: string
     priceLabelName: string
@@ -103,21 +106,24 @@ export interface ProductPriceFull {
     isAutoCalculated: boolean
 }
 
+/** @deprecated use ItemPriceFull */
+export type ProductPriceFull = ItemPriceFull
+
 // ─── Order Types ────────────────────────────────────────────
 
 export interface OrderItemFull {
     id: string
-    productId: string
-    product: {
+    itemId: string
+    item: {
         id: string
         name: string
         itemNumber: string | null
-        productAttributes?: Array<{
+        itemAttributes?: Array<{
             id: string
             value: string
             attribute?: { id: string; code: string; name: string } | null
         }>
-        productPrices?: Array<{
+        itemPrices?: Array<{
             priceLabelId: string
             value: number
             priceLabel?: { id: string; name: string; isDefault: boolean } | null

@@ -1,7 +1,8 @@
 import type { OrderStatusValue } from '@/lib/order-constants'
 
 export interface OrderItemInput {
-    productId: string
+    /** Sellable Item (SKU) id */
+    itemId: string
     quantity?: number
     unitId?: string | null
     notes?: string | null

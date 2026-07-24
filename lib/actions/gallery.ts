@@ -12,14 +12,20 @@ export type GalleryImage = {
     width: number | null
     height: number | null
     isPrimary: boolean
-    productId: string
-    productName: string
+    itemId: string
+    itemName: string
     itemNumber: string | null
     categoryName: string | null
+    /** @deprecated use itemId */
+    productId: string
+    /** @deprecated use itemName */
+    productName: string
 }
 
 export type GalleryStats = {
     totalImages: number
+    totalItems: number
+    /** @deprecated use totalItems */
     totalProducts: number
 }
 
@@ -33,7 +39,7 @@ export async function getGalleryImages(cursor?: string): Promise<{
 }> {
     try {
         await requireAuth()
-        const productImages = await prisma.productImage.findMany({
+        const itemImages = await prisma.itemImage.findMany({
             take: PAGE_SIZE + 1,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
             orderBy: [{ createdAt: 'desc' }],
@@ -45,13 +51,13 @@ export async function getGalleryImages(cursor?: string): Promise<{
                 width: true,
                 height: true,
                 isPrimary: true,
-                productId: true,
-                product: {
+                itemId: true,
+                item: {
                     select: {
                         id: true,
                         name: true,
                         itemNumber: true,
-                        family: {
+                        product: {
                             select: {
                                 category: { select: { name: true } },
                             },
@@ -61,21 +67,23 @@ export async function getGalleryImages(cursor?: string): Promise<{
             },
         })
 
-        const hasMore = productImages.length > PAGE_SIZE
-        const items = hasMore ? productImages.slice(0, PAGE_SIZE) : productImages
+        const hasMore = itemImages.length > PAGE_SIZE
+        const items = hasMore ? itemImages.slice(0, PAGE_SIZE) : itemImages
 
-        const data: GalleryImage[] = items.map((pi) => ({
-            id: pi.id,
-            url: toDisplayUrl(pi.url),
-            filename: pi.filename,
-            alt: pi.alt,
-            width: pi.width,
-            height: pi.height,
-            isPrimary: pi.isPrimary,
-            productId: pi.product.id,
-            productName: pi.product.name,
-            itemNumber: pi.product.itemNumber,
-            categoryName: pi.product.family?.category?.name ?? null,
+        const data: GalleryImage[] = items.map((img) => ({
+            id: img.id,
+            url: toDisplayUrl(img.url),
+            filename: img.filename,
+            alt: img.alt,
+            width: img.width,
+            height: img.height,
+            isPrimary: img.isPrimary,
+            itemId: img.item.id,
+            itemName: img.item.name,
+            itemNumber: img.item.itemNumber,
+            categoryName: img.item.product?.category?.name ?? null,
+            productId: img.item.id,
+            productName: img.item.name,
         }))
 
         return {
@@ -95,10 +103,10 @@ export async function getGalleryStats(): Promise<{
 }> {
     try {
         await requireAuth()
-        const [totalImages, productsWithImages] = await Promise.all([
-            prisma.productImage.count(),
-            prisma.product.count({
-                where: { productImages: { some: {} } },
+        const [totalImages, itemsWithImages] = await Promise.all([
+            prisma.itemImage.count(),
+            prisma.item.count({
+                where: { itemImages: { some: {} } },
             }),
         ])
 
@@ -106,14 +114,15 @@ export async function getGalleryStats(): Promise<{
             success: true,
             data: {
                 totalImages,
-                totalProducts: productsWithImages,
+                totalItems: itemsWithImages,
+                totalProducts: itemsWithImages,
             },
         }
     } catch (error) {
         console.error('Failed to fetch gallery stats:', error)
         return {
             success: true,
-            data: { totalImages: 0, totalProducts: 0 },
+            data: { totalImages: 0, totalItems: 0, totalProducts: 0 },
         }
     }
 }

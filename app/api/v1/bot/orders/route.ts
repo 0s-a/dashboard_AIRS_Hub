@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { validateApiKey, apiSuccess, apiError } from '@/lib/api-utils'
+import { validateApiKey, apiSuccess, botApiError } from '@/lib/api-utils'
 import {
     CreateOrderSchema,
     GetOrdersDispatchSchema,
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         const parsed = GetOrdersDispatchSchema.safeParse(Object.fromEntries(searchParams))
 
         if (!parsed.success) {
-            return apiError('بيانات غير صالحة', 400, {
+            return botApiError('بيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: parsed.error.flatten(),
             })
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         const parsed = CreateOrderSchema.safeParse(body)
 
         if (!parsed.success) {
-            return apiError('بيانات غير صالحة', 400, {
+            return botApiError('بيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: parsed.error.flatten(),
             })
@@ -91,7 +91,7 @@ export async function PATCH(req: NextRequest) {
         const idParsed = OrderIdQuerySchema.safeParse(Object.fromEntries(searchParams))
 
         if (!idParsed.success) {
-            return apiError('يجب تمرير id في query parameters', 400, {
+            return botApiError('يجب تمرير id في query parameters', 400, {
                 code: 'VALIDATION_ERROR',
                 details: idParsed.error.flatten(),
             })
@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest) {
         const parsed = UpdateOrderSchema.safeParse(body)
 
         if (!parsed.success) {
-            return apiError('بيانات غير صالحة', 400, {
+            return botApiError('بيانات غير صالحة', 400, {
                 code: 'VALIDATION_ERROR',
                 details: parsed.error.flatten(),
             })
@@ -123,7 +123,7 @@ export async function DELETE(req: NextRequest) {
         const idParsed = OrderIdQuerySchema.safeParse(Object.fromEntries(searchParams))
 
         if (!idParsed.success) {
-            return apiError('يجب تمرير id في query parameters', 400, {
+            return botApiError('يجب تمرير id في query parameters', 400, {
                 code: 'VALIDATION_ERROR',
                 details: idParsed.error.flatten(),
             })

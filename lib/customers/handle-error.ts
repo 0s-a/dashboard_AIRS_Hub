@@ -1,16 +1,16 @@
-import { apiError } from '@/lib/api-utils'
+import { botApiError } from '@/lib/api-utils'
 import { CustomerServiceError } from './errors'
 
 export function handleCustomerServiceError(error: unknown) {
     if (error instanceof CustomerServiceError) {
-        return apiError(error.message, error.status, {
+        return botApiError(error.message, error.status, {
             code: error.code,
             ...(error.details !== undefined && { details: error.details }),
         })
     }
 
     if (error instanceof SyntaxError && error.message.includes('JSON')) {
-        return apiError('تنسيق بيانات JSON غير صالح', 400, {
+        return botApiError('تنسيق بيانات JSON غير صالح', 400, {
             code: 'INVALID_JSON',
             details: error.message,
         })
@@ -20,17 +20,17 @@ export function handleCustomerServiceError(error: unknown) {
     const target = (error as { meta?: { target?: string[] } })?.meta?.target
     if (prismaCode === 'P2002') {
         if (target?.includes('value')) {
-            return apiError('رقم الهاتف أو البريد مسجل بالفعل لشخص آخر في النظام', 409, {
+            return botApiError('رقم الهاتف أو البريد مسجل بالفعل لشخص آخر في النظام', 409, {
                 code: 'DUPLICATE_CONTACT',
                 details: `Duplicate contact: ${target}`,
             })
         }
-        return apiError('بيانات مكررة', 409, {
+        return botApiError('بيانات مكررة', 409, {
             code: 'DUPLICATE_FIELD',
             details: `Duplicate field: ${target}`,
         })
     }
 
     console.error('[Bot Customers]', error)
-    return apiError('خطأ داخلي في الخادم', 500, { code: 'INTERNAL_ERROR' })
+    return botApiError('خطأ داخلي في الخادم', 500, { code: 'INTERNAL_ERROR' })
 }

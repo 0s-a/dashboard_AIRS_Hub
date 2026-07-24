@@ -1,94 +1,94 @@
 ---
 name: nawaat-inventory
-description: مخزون Nawaat — منتجات مسطّحة، صفات منتج، استيراد CSV. استخدم عند العمل على inventory actions، products، أو import.
+description: مخزون Nawaat — منتج (SPU) وصنف (SKU)، صفات أصناف. استخدم عند العمل على products، items، أو item-attributes.
 ---
 
 # Nawaat Inventory
 
-## نموذج المنتج (مسطّح)
+## النموذج
 
-كل صف في `Product` = منتج قابل للبيع واحد:
+| عربي | إنجليزي | الدور |
+|------|---------|--------|
+| **منتج** | `Product` | SPU — تعريف تجاري؛ `code`, `name`, `categoryId`, `brandId` |
+| **صنف** | `Item` | SKU — وحدة قابلة للبيع؛ أسعار، وحدات، صور، صفات، طلبات |
+
+```
+Product (منتج)
+  ├── brandId, categoryId
+  └── items[] → Item (صنف)
+        ├── itemNumber, name, slug, isAvailable
+        ├── itemAttributes[], itemUnits[], itemPrices[], itemImages[]
+        └── orderItems[]
+```
+
+## منتج (`Product`)
 
 | الحقل | الوصف |
 |-------|--------|
-| `itemNumber` | رقم الصنف — يدخله المستخدم (فريد) |
-| `name` | اسم المنتج (دائماً مستقل) |
-| `familyId` | **إلزامي** — ربط بمنتج رئيسي (`ProductFamily`) |
-| `brandId` | البراند (يبقى على المنتج) |
+| `code` | كود فريد |
+| `name` | اسم المنتج |
+| `description` | وصف اختياري |
+| `categoryId` | تصنيف إلزامي |
+| `brandId` | براند إلزامي |
+
+- لا أسعار / وحدات / صور / طلبات على المنتج
+- حذف المنتج يُرفض إن وُجدت أصناف مرتبطة (`onDelete: Restrict`)
+- UI: `app/(dashboard)/products/` · Actions: `lib/actions/products.ts`
+- عند تعديل الاسم/البراند/التصنيف: `syncItemsByProductId(id)` لـ Meilisearch
+
+## صنف (`Item`)
+
+| الحقل | الوصف |
+|-------|--------|
+| `itemNumber` | رقم الصنف — فريد إلزامي |
+| `name` | اسم الصنف (منفصل عن اسم المنتج دائماً) |
+| `productId` | ربط بالمنتج — إلزامي |
+| `description` | وصف اختياري |
+| `alternativeNames` / `tags` | بحث ووسوم — على الصنف فقط |
 | `isAvailable` | التوفر |
 
-**التصنيف** ليس على `Product` — يُؤخذ من `ProductFamily.categoryId` ويُسرَّل كـ `product.category` للعرض.
+**البراند والتصنيف** من `item.product` (للعرض).
 
-**الأسماء:** لا وراثة. `Product.name` و `family.name` منفصلان دائماً. `displayName` في التسلسل/Bot = مرادف لـ `name` فقط (توافق API).
+- UI: `app/(dashboard)/items/` (+ `/items/[id]`) · Actions: `lib/actions/items/`
+- بعد أي تعديل: `upsertItemToMeilisearch(id).catch(console.warn)`
 
-## المنتجات الرئيسية (تجميع + تصنيف)
-
-| الجدول | الدور |
-|--------|--------|
-| `ProductFamily` | تجميع + `categoryId` إلزامي — **لا** أسعار/صور/طلبات |
-| `Product.familyId` | إلزامي؛ `onDelete: Restrict` |
-
-- البيع يبقى على `Product`
-- UI: `app/(dashboard)/product-families/` · Actions: `lib/actions/product-families.ts`
-- حذف العائلة يُرفض إن وُجدت منتجات مرتبطة
-- تغيير تصنيف العائلة يظهر على كل أصنافها
-
-**لا يوجد:** Color، SKC، SKU، `sizeLabel`، `specKind`، `productNumber`، `inheritsFamilyName`، `Product.categoryId`
-
-## صفات المنتج
+## صفات الأصناف
 
 | الجدول | الدور |
 |--------|--------|
-| `ProductAttribute` | كتالوج: `code`, `name`, `examples` (JSON string[]) |
-| `ProductAttributeValue` | وسيط: `productId` + `attributeId` + `value`، `@@unique([productId, attributeId])` |
+| `ItemAttribute` | كتالوج: `code`, `name`, `examples` |
+| `ItemAttributeValue` | وسيط: `itemId` + `attributeId` + `value`، `@@unique([itemId, attributeId])` |
 
-- المنتج قد يكون بلا صفات أو بعدة صفات
-- كل صفة مرة واحدة فقط لكل منتج
-- بذرة أساسية: `color`, `size`, `capacity`, `volume`, `weight`
-- UI كتالوج: `app/(dashboard)/product-attributes/`
-- Actions: `lib/actions/product-attributes.ts`
+- UI: `app/(dashboard)/product-attributes/` (تسمية عربية: صفات الأصناف)
+- Actions: `lib/actions/item-attributes.ts`
+- بذرة: `color`, `size`, `capacity`, `volume`, `weight`
 
 ## هيكل الملفات
 
 ```
-lib/actions/inventory/
-├── product.actions.ts    # CRUD منتجات + استبدال صفات الوسيط
-├── product.queries.ts    # قراءة وبحث
-├── price.actions.ts      # تسعير (productId)
-├── unit.actions.ts       # وحدات المنتج
-├── metadata.actions.ts   # tags, availability
-├── new-tags.queries.ts   # منتجات جديدة
-└── _shared.ts            # helpers + serialize
-lib/actions/product-attributes.ts  # كتالوج الصفات
-lib/actions/product-families.ts    # المنتجات الرئيسية (تجميع)
-lib/actions/product-images.ts
-lib/actions/import.ts
-lib/utils/product-attributes.ts    # formatProductAttributes
+lib/actions/products.ts       # CRUD منتجات (SPU)
+lib/actions/items/
+├── item.actions.ts           # CRUD أصناف + صفات الوسيط
+├── item.queries.ts
+├── price.actions.ts          # ItemPrice
+├── unit.actions.ts           # ItemUnit
+├── metadata.actions.ts       # tags, availability
+├── new-tags.queries.ts
+└── _shared.ts
+lib/actions/item-attributes.ts
+lib/actions/item-images.ts
 ```
 
 ## التسعير والوحدات
 
-- `ProductPrice`: `(productId, priceLabelId, unitId)` → `value` (بالعملة الافتراضية؛ التحويل عبر exchangeRate)
-- `ProductUnit`: وحدات البيع لكل منتج
-- بعد أي تعديل: `upsertProductToMeilisearch(id).catch(console.warn)`
+- `ItemPrice`: `(itemId, priceLabelId, unitId)` → `value` (عملة افتراضية)
+- `ItemUnit`: وحدات البيع لكل صنف (+ باركود)
 
 ## Constraints
 
-- `itemNumber` unique (إلزامي)
-- `familyId` إلزامي؛ `ProductFamily.categoryId` إلزامي
-- `ProductAttribute.code` و `name` فريدان
-- `ProductAttributeValue`: unique `(productId, attributeId)`
-
-## Import CSV
-
-أعمدة إلزامية: `name`, `itemNumber`, `familyCode`, `brandCode`  
-التصنيف من العائلة (لا `categoryCode` على صف المنتج)  
-أعمدة صفات اختيارية: `color`, `size`, `capacity`, `volume`, `weight`
-
-## Gallery & images
-
-- `ProductImage.productId` — معرض لكل منتج
-- مجلد التخزين: `itemNumber` أو `product.id`
+- `Product.code` unique؛ `Item.itemNumber` و `slug` unique
+- `productId` إلزامي على الصنف
+- لا استيراد CSV — أُزيل من النظام
 
 ## Auth
 

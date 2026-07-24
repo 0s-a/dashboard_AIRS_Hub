@@ -87,12 +87,12 @@ export async function deletePriceLabel(id: string) {
             await requireAuth()
             const label = await prisma.priceLabel.findUnique({
                 where: { id },
-                include: { _count: { select: { productPrices: true } } },
+                include: { _count: { select: { itemPrices: true } } },
             })
             if (!label) throw Object.assign(new Error('التسعيرة غير موجودة'), { code: 'P2025' })
 
             await prisma.priceLabel.delete({ where: { id } })
-            return { deletedPriceCount: (label as any)._count?.productPrices || 0 }
+            return { deletedPriceCount: (label as any)._count?.itemPrices || 0 }
         },
         PATHS,
         'تعذّر حذف مسمى التسعيرة'

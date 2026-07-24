@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Meilisearch Sync Utilities
+// Meilisearch Sync Utilities — Item (SKU) documents
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { prisma } from '@/lib/prisma'
@@ -11,14 +11,14 @@ import {
 
 const BATCH_SIZE = 500
 
-export interface MeiliProductDocument {
+export interface MeiliItemDocument {
     id:               string
     itemNumber:       string | null
-    /** Indexed name (= Product.name; displayName synonym) */
+    /** Indexed name (= Item.name; displayName synonym) */
     name:             string
-    /** Same as name — kept for document shape / searchText compat */
+    /** Parent Product (SPU) name */
     productName:      string
-    familyId:         string | null
+    productId:        string | null
     brand:            string | null
     category:         string | null
     attributeText:    string[]
@@ -31,24 +31,35 @@ export interface MeiliProductDocument {
     isAvailable:      boolean
 }
 
-export interface MeiliProductIdsResult {
+/** @deprecated use MeiliItemDocument */
+export type MeiliProductDocument = MeiliItemDocument
+
+export interface MeiliItemIdsResult {
     ids: string[]
     estimatedTotal: number
     processingTimeMs: number
     unavailable?: boolean
 }
 
-export interface SearchProductIdsOptions {
+/** @deprecated use MeiliItemIdsResult */
+export type MeiliProductIdsResult = MeiliItemIdsResult
+
+export interface SearchItemIdsOptions {
     limit: number
     offset: number
     brand?: string
     attributeValues?: string[]
     isAvailable?: boolean
-    /** Restrict to a ProductFamily id */
+    /** Restrict to a Product (SPU) id */
+    productId?: string
+    /** @deprecated use productId */
     familyId?: string
     /** Exclude a document id (e.g. exact SKU already pinned on page 1) */
     excludeId?: string
 }
+
+/** @deprecated use SearchItemIdsOptions */
+export type SearchProductIdsOptions = SearchItemIdsOptions
 
 export interface SyncResult {
     synced:    number
@@ -67,24 +78,55 @@ export interface MeiliStats {
     host:           string
 }
 
+/** Highlight markers from Meilisearch (`⟦…⟧`) — rendered in the playground UI */
+export interface MeiliSearchHitHighlights {
+    name?:             string
+    productName?:      string
+    itemNumber?:       string | null
+    alternativeNames?: string[]
+    attributeText?:    string[]
+}
+
+export interface MeiliSearchHit extends MeiliItemDocument {
+    highlights?: MeiliSearchHitHighlights
+}
+
+export interface PrismaCompareHit {
+    id:          string
+    name:        string
+    itemNumber:  string | null
+    productName: string | null
+    isAvailable: boolean
+}
+
+export interface PrismaCompareResult {
+    hits:             PrismaCompareHit[]
+    estimatedTotal:   number
+    processingTimeMs: number
+    onlyInMeili:      string[]
+    onlyInPrisma:     string[]
+    inBoth:           string[]
+}
+
 export interface MeiliSearchResult {
-    hits:             MeiliProductDocument[]
+    hits:             MeiliSearchHit[]
     estimatedTotal:   number
     processingTimeMs: number
     query:            string
     unavailable?:     boolean
+    prismaCompare?:   PrismaCompareResult
 }
 
-const MEILI_PRODUCT_INCLUDE = {
-    brandRef: { select: { name: true } },
-    family: {
+const MEILI_ITEM_INCLUDE = {
+    product: {
         select: {
             id: true,
             name: true,
+            brand: { select: { name: true } },
             category: { select: { name: true } },
         },
     },
-    productAttributes: {
+    itemAttributes: {
         include: { attribute: { select: { name: true, code: true } } },
     },
 } as const
@@ -97,8 +139,8 @@ function normalizeTextList(values: unknown): string[] {
         .filter(Boolean)
 }
 
-function toMeiliDocument(product: any): MeiliProductDocument {
-    const rows = product.productAttributes || []
+function toMeiliDocument(item: any): MeiliItemDocument {
+    const rows = item.itemAttributes || []
     const attributeText = rows
         .map((row: any) => {
             const name = row.attribute?.name ?? row.attribute?.code ?? ''
@@ -115,28 +157,25 @@ function toMeiliDocument(product: any): MeiliProductDocument {
         .filter(Boolean)
 
     const itemNumber =
-        product.itemNumber != null
-            ? normalizeItemNumberForSearch(String(product.itemNumber))
+        item.itemNumber != null
+            ? normalizeItemNumberForSearch(String(item.itemNumber))
             : null
 
-    const productNameRaw = product.name ?? ''
-    const name = normalizeSearchQuery(productNameRaw)
-    const productName = name
-    const familyName = product.family?.name
-        ? normalizeSearchQuery(product.family.name)
+    const name = normalizeSearchQuery(item.name ?? '')
+    const productNameRaw = item.product?.name ?? ''
+    const productName = productNameRaw ? normalizeSearchQuery(productNameRaw) : ''
+    const brand = item.product?.brand?.name
+        ? normalizeSearchQuery(item.product.brand.name)
         : null
-    const brand = product.brandRef?.name
-        ? normalizeSearchQuery(product.brandRef.name)
+    const category = item.product?.category?.name
+        ? normalizeSearchQuery(item.product.category.name)
         : null
-    const category = product.family?.category?.name
-        ? normalizeSearchQuery(product.family.category.name)
-        : null
-    const tags = normalizeTextList(product.tags)
-    const alternativeNames = normalizeTextList(product.alternativeNames)
+    const tags = normalizeTextList(item.tags)
+    const alternativeNames = normalizeTextList(item.alternativeNames)
 
     const searchText = [
         name,
-        familyName && familyName !== name ? familyName : null,
+        productName && productName !== name ? productName : null,
         ...alternativeNames,
         brand,
         category,
@@ -149,11 +188,11 @@ function toMeiliDocument(product: any): MeiliProductDocument {
         .join(' ')
 
     return {
-        id: product.id,
+        id: item.id,
         itemNumber: itemNumber || null,
         name,
         productName,
-        familyId: product.familyId ?? null,
+        productId: item.productId ?? item.product?.id ?? null,
         brand,
         category,
         attributeText,
@@ -161,7 +200,7 @@ function toMeiliDocument(product: any): MeiliProductDocument {
         tags,
         alternativeNames,
         searchText,
-        isAvailable: product.isAvailable ?? true,
+        isAvailable: item.isAvailable ?? true,
     }
 }
 
@@ -170,7 +209,7 @@ function escapeMeiliFilterValue(value: string): string {
     return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-function buildProductSearchFilter(options: SearchProductIdsOptions): string | undefined {
+function buildItemSearchFilter(options: SearchItemIdsOptions): string | undefined {
     const parts: string[] = []
     if (options.brand) {
         parts.push(`brand = "${escapeMeiliFilterValue(options.brand)}"`)
@@ -181,8 +220,9 @@ function buildProductSearchFilter(options: SearchProductIdsOptions): string | un
     if (options.isAvailable !== undefined) {
         parts.push(`isAvailable = ${options.isAvailable}`)
     }
-    if (options.familyId) {
-        parts.push(`familyId = "${escapeMeiliFilterValue(options.familyId)}"`)
+    const productId = options.productId ?? options.familyId
+    if (productId) {
+        parts.push(`productId = "${escapeMeiliFilterValue(productId)}"`)
     }
     if (options.excludeId) {
         parts.push(`id != "${escapeMeiliFilterValue(options.excludeId)}"`)
@@ -191,17 +231,17 @@ function buildProductSearchFilter(options: SearchProductIdsOptions): string | un
 }
 
 /**
- * Fuzzy / full-text product id search for Bot API.
+ * Fuzzy / full-text item id search for Bot API.
  * Resilient: returns `{ unavailable: true }` when Meilisearch is down.
  */
-export async function searchProductIdsInMeilisearch(
+export async function searchItemIdsInMeilisearch(
     query: string,
-    options: SearchProductIdsOptions
-): Promise<MeiliProductIdsResult> {
+    options: SearchItemIdsOptions
+): Promise<MeiliItemIdsResult> {
     try {
         const client = getMeilisearchClient()
         const index = client.index(MEILI_INDEX)
-        const filter = buildProductSearchFilter(options)
+        const filter = buildItemSearchFilter(options)
         const result = await index.search(query, {
             limit: options.limit,
             offset: options.offset,
@@ -217,12 +257,15 @@ export async function searchProductIdsInMeilisearch(
             processingTimeMs: result.processingTimeMs,
         }
     } catch (err) {
-        console.warn('[Meilisearch] searchProductIds failed:', err)
+        console.warn('[Meilisearch] searchItemIds failed:', err)
         return { ids: [], estimatedTotal: 0, processingTimeMs: 0, unavailable: true }
     }
 }
 
-export async function syncAllProductsToMeilisearch(): Promise<SyncResult> {
+/** @deprecated use searchItemIdsInMeilisearch */
+export const searchProductIdsInMeilisearch = searchItemIdsInMeilisearch
+
+export async function syncAllItemsToMeilisearch(): Promise<SyncResult> {
     const startTime = Date.now()
     try {
         await ensureIndexConfigured()
@@ -233,15 +276,15 @@ export async function syncAllProductsToMeilisearch(): Promise<SyncResult> {
 
     const client = getMeilisearchClient()
     const index = client.index(MEILI_INDEX)
-    const totalCount = await prisma.product.count()
+    const totalCount = await prisma.item.count()
 
     let offset = 0, synced = 0, errors = 0
 
     while (offset < totalCount) {
-        const batch = await prisma.product.findMany({
+        const batch = await prisma.item.findMany({
             skip: offset,
             take: BATCH_SIZE,
-            include: MEILI_PRODUCT_INCLUDE,
+            include: MEILI_ITEM_INCLUDE,
             orderBy: { createdAt: 'asc' },
         })
         if (batch.length === 0) break
@@ -258,6 +301,9 @@ export async function syncAllProductsToMeilisearch(): Promise<SyncResult> {
     return { synced, errors, duration: Date.now() - startTime, indexedAt: new Date().toISOString() }
 }
 
+/** @deprecated use syncAllItemsToMeilisearch */
+export const syncAllProductsToMeilisearch = syncAllItemsToMeilisearch
+
 export async function getMeilisearchStats(): Promise<MeiliStats> {
     const host = process.env.MEILISEARCH_HOST || 'http://localhost:7700'
     try {
@@ -270,59 +316,197 @@ export async function getMeilisearchStats(): Promise<MeiliStats> {
     }
 }
 
-export async function upsertProductToMeilisearch(productId: string): Promise<void> {
+export async function upsertItemToMeilisearch(itemId: string): Promise<void> {
     try {
         const client = getMeilisearchClient()
         const index = client.index(MEILI_INDEX)
-        const product = await prisma.product.findUnique({
-            where: { id: productId },
-            include: MEILI_PRODUCT_INCLUDE,
+        const item = await prisma.item.findUnique({
+            where: { id: itemId },
+            include: MEILI_ITEM_INCLUDE,
         })
-        if (!product) return
-        await index.addDocuments([toMeiliDocument(product)], { primaryKey: 'id' })
+        if (!item) return
+        await index.addDocuments([toMeiliDocument(item)], { primaryKey: 'id' })
     } catch (err) {
-        console.warn('[Meilisearch] upsertProduct failed (non-fatal):', err)
+        console.warn('[Meilisearch] upsertItem failed (non-fatal):', err)
     }
 }
 
-/** Re-index many products (e.g. after family name change). Non-fatal per id. */
-export async function upsertProductsToMeilisearch(productIds: string[]): Promise<void> {
-    const unique = [...new Set(productIds.filter(Boolean))]
+/** Re-index many items (e.g. after product name/brand/category change). Non-fatal per id. */
+export async function upsertItemsToMeilisearch(itemIds: string[]): Promise<void> {
+    const unique = [...new Set(itemIds.filter(Boolean))]
     for (const id of unique) {
-        await upsertProductToMeilisearch(id)
+        await upsertItemToMeilisearch(id)
     }
 }
 
-export async function deleteProductFromMeilisearch(productId: string): Promise<void> {
+/** Re-index all items belonging to a Product (SPU). */
+export async function syncItemsByProductId(productId: string): Promise<void> {
+    const items = await prisma.item.findMany({
+        where: { productId },
+        select: { id: true },
+    })
+    if (items.length === 0) return
+    await upsertItemsToMeilisearch(items.map(i => i.id))
+}
+
+export async function removeItemFromMeilisearch(itemId: string): Promise<void> {
     try {
         const client = getMeilisearchClient()
-        await client.index(MEILI_INDEX).deleteDocument(productId)
+        await client.index(MEILI_INDEX).deleteDocument(itemId)
     } catch (err) {
-        console.warn('[Meilisearch] deleteProduct failed (non-fatal):', err)
+        console.warn('[Meilisearch] removeItem failed (non-fatal):', err)
+    }
+}
+
+/** @deprecated use upsertItemToMeilisearch */
+export const upsertProductToMeilisearch = upsertItemToMeilisearch
+/** @deprecated use upsertItemsToMeilisearch */
+export const upsertProductsToMeilisearch = upsertItemsToMeilisearch
+/** @deprecated use removeItemFromMeilisearch */
+export const deleteProductFromMeilisearch = removeItemFromMeilisearch
+
+const HIGHLIGHT_PRE = '⟦'
+const HIGHLIGHT_POST = '⟧'
+
+type MeiliFormattedHit = MeiliItemDocument & {
+    _formatted?: Partial<MeiliItemDocument>
+}
+
+function mapSearchHit(hit: MeiliFormattedHit): MeiliSearchHit {
+    const { _formatted, ...doc } = hit
+    if (!_formatted) return doc as MeiliSearchHit
+
+    return {
+        ...(doc as MeiliItemDocument),
+        highlights: {
+            name: _formatted.name,
+            productName: _formatted.productName,
+            itemNumber: _formatted.itemNumber,
+            alternativeNames: Array.isArray(_formatted.alternativeNames)
+                ? _formatted.alternativeNames
+                : undefined,
+            attributeText: Array.isArray(_formatted.attributeText)
+                ? _formatted.attributeText
+                : undefined,
+        },
+    }
+}
+
+/** Lightweight Prisma ILIKE sample — for dashboard search playground diagnostics only */
+export async function samplePrismaItemSearch(
+    query: string,
+    options: { limit?: number; isAvailable?: boolean } = {}
+): Promise<Omit<PrismaCompareResult, 'onlyInMeili' | 'onlyInPrisma' | 'inBoth'>> {
+    const start = Date.now()
+    const limit = options.limit ?? 10
+    const trimmed = query.trim()
+    const variants = [...new Set([trimmed, normalizeSearchQuery(trimmed)].filter(Boolean))]
+
+    const textOr = variants.flatMap((v) => [
+        { name: { contains: v, mode: 'insensitive' as const } },
+        { itemNumber: { contains: v, mode: 'insensitive' as const } },
+        { product: { name: { contains: v, mode: 'insensitive' as const } } },
+        { product: { brand: { name: { contains: v, mode: 'insensitive' as const } } } },
+    ])
+
+    const where = {
+        AND: [
+            ...(options.isAvailable !== undefined ? [{ isAvailable: options.isAvailable }] : []),
+            { OR: textOr },
+        ],
+    }
+
+    const [rows, total] = await Promise.all([
+        prisma.item.findMany({
+            where,
+            take: limit,
+            orderBy: { name: 'asc' },
+            select: {
+                id: true,
+                name: true,
+                itemNumber: true,
+                isAvailable: true,
+                product: { select: { name: true } },
+            },
+        }),
+        prisma.item.count({ where }),
+    ])
+
+    return {
+        hits: rows.map((r) => ({
+            id: r.id,
+            name: r.name,
+            itemNumber: r.itemNumber,
+            productName: r.product?.name ?? null,
+            isAvailable: r.isAvailable,
+        })),
+        estimatedTotal: total,
+        processingTimeMs: Date.now() - start,
+    }
+}
+
+function buildPrismaCompare(
+    meiliHits: MeiliSearchHit[],
+    prismaSample: Omit<PrismaCompareResult, 'onlyInMeili' | 'onlyInPrisma' | 'inBoth'>
+): PrismaCompareResult {
+    const meiliIds = new Set(meiliHits.map((h) => h.id))
+    const prismaIds = new Set(prismaSample.hits.map((h) => h.id))
+    const onlyInMeili = [...meiliIds].filter((id) => !prismaIds.has(id))
+    const onlyInPrisma = [...prismaIds].filter((id) => !meiliIds.has(id))
+    const inBoth = [...meiliIds].filter((id) => prismaIds.has(id))
+
+    return {
+        ...prismaSample,
+        onlyInMeili,
+        onlyInPrisma,
+        inBoth,
     }
 }
 
 export async function testMeilisearchSearch(
     query: string,
-    options: { limit?: number; isAvailable?: boolean } = {}
+    options: { limit?: number; isAvailable?: boolean; compare?: boolean } = {}
 ): Promise<MeiliSearchResult> {
+    const searchQ = normalizeSearchQuery(query.trim()) || query.trim()
     try {
         const client = getMeilisearchClient()
         const index = client.index(MEILI_INDEX)
         const filter: string[] = []
         if (options.isAvailable !== undefined) filter.push(`isAvailable = ${options.isAvailable}`)
-        const result = await index.search(query, {
+        const result = await index.search(searchQ, {
             limit: options.limit ?? 10,
             filter: filter.length > 0 ? filter : undefined,
+            attributesToHighlight: [
+                'name',
+                'productName',
+                'itemNumber',
+                'alternativeNames',
+                'attributeText',
+            ],
+            highlightPreTag: HIGHLIGHT_PRE,
+            highlightPostTag: HIGHLIGHT_POST,
         })
-        return {
-            hits: result.hits as MeiliProductDocument[],
-            estimatedTotal: result.estimatedTotalHits ?? result.hits.length,
+
+        const hits = (result.hits as MeiliFormattedHit[]).map(mapSearchHit)
+        const base: MeiliSearchResult = {
+            hits,
+            estimatedTotal: result.estimatedTotalHits ?? hits.length,
             processingTimeMs: result.processingTimeMs,
             query: result.query,
         }
+
+        if (!options.compare) return base
+
+        const prismaSample = await samplePrismaItemSearch(query, {
+            limit: options.limit,
+            isAvailable: options.isAvailable,
+        })
+        return {
+            ...base,
+            prismaCompare: buildPrismaCompare(hits, prismaSample),
+        }
     } catch (err) {
         console.warn('[Meilisearch] Search failed:', err)
-        return { hits: [], estimatedTotal: 0, processingTimeMs: 0, query, unavailable: true }
+        return { hits: [], estimatedTotal: 0, processingTimeMs: 0, query: searchQ, unavailable: true }
     }
 }

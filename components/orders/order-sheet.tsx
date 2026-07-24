@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { createOrder, updateOrder, getProductPriceLabels } from "@/lib/actions/orders"
 import { ORDER_STATUSES } from "./order-columns"
+import { getAllowedStatusTransitions } from "@/lib/order-constants"
 
 // ──────────────────────────────────────────────────────────
 // Types
@@ -89,7 +90,7 @@ interface UnitOption {
 
 function buildEditItem(it: any): OrderItemRow {
     return {
-        productId: it.productId ?? "",
+        productId: it.itemId ?? it.productId ?? "",
         productPriceId: "",
         unitId: it.unitId ?? "",
         quantity: it.quantity ?? 1,
@@ -247,6 +248,7 @@ function ProductCombobox({ products, value, onChange, disabled }: {
 
 export function OrderSheet({ mode = "create", order, customers, products, defaultSymbol = "", trigger }: Props) {
     const isEdit = mode === "edit"
+    const isMutable = !isEdit || (order?.status ?? "pending") === "pending"
     const [open, setOpen] = useState(false)
     const [isPending, startTransition] = useTransition()
 
@@ -320,7 +322,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         setItems(prev => [...prev, emptyItem()])
         // Small delay to allow render then focus might be needed, 
         // but since it's a new item at the end, we'll let the user click search.
-        toast.info("تم إضافة بند جديد (يمكنك الضغط على 'اختر المنتج')")
+        toast.info("تم إضافة بند جديد (يمكنك الضغط على 'اختر الصنف')")
     }
 
     function removeItem(idx: number) {
@@ -334,7 +336,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
     // When product changes → load prices and units
     const onProductChange = useCallback(async (idx: number, productId: string) => {
         const exists = items.find((it, i) => i !== idx && it.productId === productId)
-        if (exists) toast.info("هذا المنتج موجود بالفعل في الطلب")
+        if (exists) toast.info("هذا الصنف موجود بالفعل في الطلب")
 
         updateItem(idx, {
             productId,
@@ -353,8 +355,9 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         const auto = pickAutoPrice(labels, customerId, customers)
 
         const selectedProduct = products.find((p: any) => p.id === productId)
-        const units: UnitOption[] = selectedProduct?.productUnits
-            ? selectedProduct.productUnits.map((pu: any) => ({
+        const unitsSrc = selectedProduct?.itemUnits ?? selectedProduct?.productUnits
+        const units: UnitOption[] = unitsSrc
+            ? unitsSrc.map((pu: any) => ({
                 id: pu.unit?.id ?? pu.unitId,
                 name: pu.unit?.name ?? "",
                 pluralName: pu.unit?.pluralName ?? null,
@@ -390,8 +393,9 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         const auto = pickAutoPrice(labels, customerId, customers)
 
         const selectedProduct = products.find((p: any) => p.id === item.productId)
-        const units: UnitOption[] = selectedProduct?.productUnits
-            ? selectedProduct.productUnits.map((pu: any) => ({
+        const unitsSrc = selectedProduct?.itemUnits ?? selectedProduct?.productUnits
+        const units: UnitOption[] = unitsSrc
+            ? unitsSrc.map((pu: any) => ({
                 id: pu.unit?.id ?? pu.unitId,
                 name: pu.unit?.name ?? "",
                 pluralName: pu.unit?.pluralName ?? null,
@@ -428,34 +432,45 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
         return sum
     }, 0)
 
-    // ── Submit ── يُرسل productId + quantity + notes
+    // ── Submit ── يُرسل productId + quantity + notes (أو الحالة فقط إن كان غير معلّق)
     async function handleSubmit(keepOpen = false) {
-        const validItems = items.filter(it => it.productId && it.quantity > 0)
-        if (validItems.length === 0) {
-            toast.error("أضف منتجاً واحداً على الأقل")
-            return
-        }
-
-        const payload = {
-            customerId: customerId && customerId !== "none" ? customerId : null,
-            notes: notes || null,
-            deliveryInfo: deliveryInfo || null,
-            items: validItems.map(it => {
-                const selectedLabel = it.availablePriceLabels.find(l => l.productPriceId === it.productPriceId)
-                return {
-                    productId: it.productId,
-                    unitId: it.unitId || null,
-                    quantity: it.quantity,
-                    notes: it.notes || null,
-                    // دع الخادم يثبّت السعر ويحوّل للعملة المناسبة
-                    unitPrice: null,
-                    currencyId: null,
-                    priceLabelId: selectedLabel?.priceLabelId ?? null,
-                }
-            }),
-        }
-
         startTransition(async () => {
+            if (isEdit && !isMutable) {
+                const res = await updateOrder(order.id, { status })
+                if (res.success) {
+                    toast.success("تم تحديث الحالة بنجاح")
+                    setOpen(false)
+                } else {
+                    toast.error(res.error ?? "حدث خطأ غير متوقع")
+                }
+                return
+            }
+
+            const validItems = items.filter(it => it.productId && it.quantity > 0)
+            if (validItems.length === 0) {
+                toast.error("أضف صنفاً واحداً على الأقل")
+                return
+            }
+
+            const payload = {
+                customerId: customerId && customerId !== "none" ? customerId : null,
+                notes: notes || null,
+                deliveryInfo: deliveryInfo || null,
+                items: validItems.map(it => {
+                    const selectedLabel = it.availablePriceLabels.find(l => l.productPriceId === it.productPriceId)
+                    return {
+                        productId: it.productId,
+                        unitId: it.unitId || null,
+                        quantity: it.quantity,
+                        notes: it.notes || null,
+                        // دع الخادم يثبّت السعر ويحوّل للعملة المناسبة
+                        unitPrice: null,
+                        currencyId: null,
+                        priceLabelId: selectedLabel?.priceLabelId ?? null,
+                    }
+                }),
+            }
+
             if (isEdit) {
                 const res = await updateOrder(order.id, { ...payload, status })
                 if (res.success) {
@@ -554,7 +569,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                 {/* Customer */}
                                 <div className="space-y-1.5">
                                     <Label className="text-xs font-semibold">العميل <span className="text-muted-foreground font-normal">(اختياري)</span></Label>
-                                    <Select value={customerId} onValueChange={setCustomerId}>
+                                    <Select value={customerId} onValueChange={setCustomerId} disabled={!isMutable}>
                                         <SelectTrigger className="rounded-xl h-10" id="order-customer-select">
                                             <SelectValue placeholder="اختر عميلاً..." />
                                         </SelectTrigger>
@@ -576,7 +591,12 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {ORDER_STATUSES.map(s => {
+                                                {ORDER_STATUSES
+                                                    .filter(s =>
+                                                        s.value === (order?.status ?? status) ||
+                                                        getAllowedStatusTransitions(order?.status ?? "pending").includes(s.value)
+                                                    )
+                                                    .map(s => {
                                                     const Icon = s.icon
                                                     return (
                                                         <SelectItem key={s.value} value={s.value}>
@@ -593,6 +613,12 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                 )}
                             </div>
 
+                            {!isMutable && (
+                                <p className="text-xs text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                                    الطلب غير معلّق — يمكن تغيير الحالة فقط. تعديل البنود والعميل متاح للطلبات المعلّقة.
+                                </p>
+                            )}
+
                             {/* Notes */}
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold flex items-center gap-1.5">
@@ -606,6 +632,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                     placeholder="ملاحظات إضافية على الطلب..."
                                     className="rounded-xl resize-none text-sm"
                                     rows={2}
+                                    disabled={!isMutable}
                                 />
                             </div>
 
@@ -623,6 +650,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                     placeholder="العنوان، الكوريير، رقم التتبع، ملاحظات التوصيل..."
                                     className="rounded-xl resize-none text-sm"
                                     rows={2}
+                                    disabled={!isMutable}
                                 />
                             </div>
                         </div>
@@ -650,6 +678,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                     className="rounded-xl gap-1.5 border-dashed border-primary/30 text-primary hover:bg-primary/5 text-xs h-8 px-3"
                                     onClick={addItem}
                                     id="add-order-item-btn"
+                                    disabled={!isMutable}
                                 >
                                     <Plus className="size-3.5" />
                                     إضافة (Alt+N)
@@ -662,13 +691,13 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                     <div className="size-14 mx-auto mb-3 rounded-2xl bg-muted flex items-center justify-center">
                                         <ShoppingCart className="size-7 opacity-40" />
                                     </div>
-                                    <p className="text-sm font-medium">لا توجد منتجات بعد</p>
-                                    <p className="text-xs mt-1 text-muted-foreground/70">اضغط &quot;إضافة منتج&quot; للبدء</p>
+                                    <p className="text-sm font-medium">لا توجد أصناف بعد</p>
+                                    <p className="text-xs mt-1 text-muted-foreground/70">اضغط &quot;إضافة&quot; للبدء</p>
                                 </div>
                             )}
 
                             {/* Items List */}
-                            <div className="space-y-3">
+                            <div className={cn("space-y-3", !isMutable && "pointer-events-none opacity-60")}>
                                 {items.map((item, idx) => (
                                     <div
                                         key={idx}
@@ -682,7 +711,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                                     {idx + 1}
                                                 </span>
                                                 <span className="text-xs font-semibold text-muted-foreground">
-                                                    {item.productId ? getProductName(item.productId) : "منتج جديد"}
+                                                    {item.productId ? getProductName(item.productId) : "صنف جديد"}
                                                 </span>
                                             </div>
                                             <Button
@@ -700,7 +729,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                             {/* Product + Price Label Row */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div className="space-y-1">
-                                                    <Label className="text-[10px] font-bold text-muted-foreground/70">المنتج</Label>
+                                                    <Label className="text-[10px] font-bold text-muted-foreground/70">الصنف</Label>
                                                     <ProductCombobox
                                                         products={products}
                                                         value={item.productId}
@@ -829,7 +858,7 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                                     <div className="flex flex-col gap-0.5">
                                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">الإجمالي الكلي</span>
                                         <span className="text-[10px] text-muted-foreground/60">
-                                            {items.filter(it => it.productId).length} منتج
+                                            {items.filter(it => it.productId).length} صنف
                                         </span>
                                     </div>
                                     <div className="text-left">
@@ -854,12 +883,12 @@ export function OrderSheet({ mode = "create", order, customers, products, defaul
                         <Button
                             className="flex-1 rounded-xl gap-2 font-semibold shadow-lg shadow-primary/20 h-11"
                             onClick={() => handleSubmit(false)}
-                            disabled={isPending || items.length === 0}
+                            disabled={isPending || (isMutable && items.length === 0)}
                             id="order-submit-btn"
                         >
                             {isPending
                                 ? <><Loader2 className="size-4 animate-spin" />جاري الحفظ...</>
-                                : <><ShoppingCart className="size-4" />{isEdit ? "حفظ التعديلات" : "إنشاء (Ctrl+Enter)"}</>
+                                : <><ShoppingCart className="size-4" />{isEdit ? (isMutable ? "حفظ التعديلات" : "تحديث الحالة") : "إنشاء (Ctrl+Enter)"}</>
                             }
                         </Button>
                         {!isEdit && (
